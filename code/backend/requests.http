@@ -1,0 +1,35 @@
+### 0. LOGIN (Obtener Token)
+# Usuario creado por defecto: admin@sgp.com / admin123
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@sgp.com",
+  "password": "admin123"
+}
+
+> {%
+    client.global.set("auth_token", response.body.token);
+%}
+
+### 1. Guardar Configuración (Requiere Token)
+POST http://localhost:8080/api/config
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
+
+{
+  "spreadsheetId": "1wbFbc2CAX4w_NcXpWRYFJ8HGNJ0IxImRwyovwz35dq4",
+  "sheetName": "Hoja 1",
+  "syncFrequencyMinutes": 60
+}
+
+### 2. Listar Configuraciones Existentes (Requiere Token)
+GET http://localhost:8080/api/config
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
+
+### 3. Ejecutar Sincronización Manual (Requiere Token)
+POST http://localhost:8080/api/sync/1
+Content-Type: application/json
+Authorization: Bearer {{auth_token}}
+

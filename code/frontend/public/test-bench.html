@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SGP - Test Bench</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; background: #f4f4f4; }
+        .card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 1.5rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
+        input { width: 100%; padding: 0.5rem; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;}
+        button { background: #007bff; color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+        button:hover { background: #0056b3; }
+        pre { background: #2d2d2d; color: #ccc; padding: 1rem; border-radius: 4px; overflow-x: auto; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>🛠️ SGP - Banco de Pruebas</h1>
+    
+    <div class="card">
+        <h2>1. Configuración</h2>
+        <label>Spreadsheet ID:</label>
+        <input type="text" id="spreadsheetId" placeholder="Ej: 1wbFbc..." value="">
+        <label>Nombre de la Hoja (Tab Name):</label>
+        <input type="text" id="sheetName" placeholder="Ej: Hoja 1" value="Hoja 1">
+        <button onclick="saveConfig()">Guardar Configuración</button>
+        <p id="configResult"></p>
+    </div>
+
+    <div class="card">
+        <h2>2. Sincronización</h2>
+        <label>ID de Configuración (Backend ID):</label>
+        <input type="number" id="configId" placeholder="Ej: 1">
+        <button onclick="triggerSync()">Simular Sync</button>
+        <pre id="syncResult">Los resultados aparecerán aquí...</pre>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:8080/api";
+
+        async function saveConfig() {
+            const id = document.getElementById('spreadsheetId').value;
+            const name = document.getElementById('sheetName').value;
+            const resultEl = document.getElementById('configResult');
+            
+            if(!id) return alert("Falta el ID del Sheet");
+
+            try {
+                const res = await fetch(`${API_URL}/config`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ spreadsheetId: id, sheetName: name })
+                });
+                const data = await res.json();
+                
+                resultEl.innerHTML = `<span class="success">✅ Configuración Guardada! ID: <b>${data.id}</b></span>`;
+                document.getElementById('configId').value = data.id; // Auto-fill next step
+            } catch (err) {
+                resultEl.innerHTML = `<span class="error">❌ Error: ${err.message}</span>`;
+            }
+        }
+
+        async function triggerSync() {
+            const id = document.getElementById('configId').value;
+            const resultEl = document.getElementById('syncResult');
+
+            if(!id) return alert("Falta el ID de Configuración");
+
+            resultEl.innerText = "⏳ Sincronizando... por favor espera...";
+
+            try {
+                const res = await fetch(`${API_URL}/sync/${id}`, { method: 'POST' });
+                const data = await res.json();
+                
+                if(res.ok) {
+                    resultEl.innerText = JSON.stringify(data, null, 2);
+                } else {
+                    resultEl.innerHTML = `⚠️ Error del Backend:\n${data}`;
+                }
+            } catch (err) {
+                resultEl.innerText = `❌ Error de Conexión: ${err.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

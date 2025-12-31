@@ -1,0 +1,28 @@
+# Helper scripts
+start-*.bat
+start-*.ps1
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+
+# Build artifacts
+target/
+build/
+node_modules/
+dist/
+*.log
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Secrets (Double check)
+credentials.json
+**/*.class
+**/generated-sources/
+
+# Specifics
+code/backend/help.md
+code/backend/jconsole.exe

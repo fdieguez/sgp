@@ -1,0 +1,27 @@
+1wbFbc2CAX4w_NcXpWRYFJ8HGNJ0IxImRwyovwz35dq4
+
+http://localhost:8080/api/sheets/test?id=1wbFbc2CAX4w_NcXpWRYFJ8HGNJ0IxImRwyovwz35dq4
+
+
+
+http://localhost:8080/api/sheets/test?id=1wbFbc2CAX4w_NcXpWRYFJ8HGNJ0IxImRwyovwz35dq4&range=hoja1
+
+----------------------------------
+
+http://localhost:8080/api/sheets/test?id=1wbFbc2CAX4w_NcXpWRYFJ8HGNJ0IxImRwyovwz35dq4&range=hoja1
+
+
+1wbFbc2CAX4w_NcXpWRYFJ8HGNJ0IxImRwyovwz35dq4
+
+&
+
+range=hoja1
+
+'{"spreadsheetId":"TU_ID_DE_SHEET", "sheetName":"Hoja 1"}' 
+
+
+
+curl -X POST -H "Content-Type: application/json" -d '{"spreadsheetId":"1wbFbc2CAX4w_NcXpWRYFJ8HGNJ0IxImRwyovwz35dq4", "sheetName":"hoja1"}' http://localhost:8080/api/config
+
+
+

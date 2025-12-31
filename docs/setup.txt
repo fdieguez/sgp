@@ -1,0 +1,32 @@
+GUÍA DE INSTALACIÓN Y CONFIGURACIÓN (PRODUCCIÓN) - SGP
+===========================================================
+
+1. INTEGRACIÓN CON GOOGLE SHEETS
+-----------------------------------------------------------
+Para que el sistema backend pueda leer las planillas de Google en un entorno de servidor (sin intervención humana), se utiliza una "Service Account".
+
+A. Configuración en Google Cloud Console:
+   1. Crear un proyecto en https://console.cloud.google.com/
+   2. Ir a "APIs & Services" > "Library".
+   3. Habilitar "Google Sheets API". (CRÍTICO: Si no se habilita, dará error 403).
+   4. Ir a "IAM & Admin" > "Service Accounts".
+   5. Crear una nueva Service Account (ej: sgp-production-bot).
+   6. Ir a la pestaña "Keys" de esa cuenta y crear una nueva key JSON.
+   7. Descargar el archivo.
+
+B. Despliegue de Credenciales:
+   1. Renombrar el archivo JSON descargado a `credentials.json`.
+   2. Colocarlo en la ruta del classpath de la aplicación:
+      - En código fuente: `/src/main/resources/credentials.json`
+      - En Docker/Prod: Se puede montar como volumen o configurar la ruta vía variable de entorno (pendiente de implementación futura).
+
+C. Permisos en las Planillas (Google Sheets):
+   1. Abrir la planilla que se desea sincronizar.
+   2. Botón "Compartir" (Share).
+   3. Pegar el email de la Service Account (ej: sgp-bot@....iam.gserviceaccount.com).
+   4. Asignar rol de "Lector" (Viewer).
+
+-----------------------------------------------------------
+2. VARIABLES DE ENTORNO (Próximamente)
+-----------------------------------------------------------
+Se detallarán aquí las variables para DB, Puertos, etc.

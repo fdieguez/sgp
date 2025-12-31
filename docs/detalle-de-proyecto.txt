@@ -1,0 +1,39 @@
+*Objetivo general*
+
+Desarrollar un sistema a medida que sincronice múltiples planillas de Google Sheets, consolide datos en una base unificada, gestione usuarios con roles, y ofrezca dashboards y reportes accesibles desde un sistema web.
+
+
+*Alcance del trabajo**1. Integración Google Sheets*
+
+   - Configuración de Google Cloud, credenciales y APIs
+   - Implementación de autenticación (OAuth o Service Account)
+   - Lectura de una o múltiples planillas
+   - Normalización y validación de datos
+   - Manejo de permisos y accesos
+
+*2. Backend del sistema*
+
+   - Diseño y creación de la base de datos (PostgreSQL o SQL Server)
+   - API REST con endpoints para proyectos, usuarios y dashboards
+   - Lógica de negocio (roles, permisos, filtros por usuario)
+   - Servicio de sincronización automática (cron o scheduler)
+   - Manejo de errores, logs y control de cambios
+
+*3. Frontend / Interfaz web*
+
+   - Login y autenticación
+   - Pantallas de administración de planillas
+   - Listado dinámico de proyectos
+   - Dashboards con gráficos y KPIs
+   - Filtros, tablas y visualización por rol
+
+*4. Infraestructura y despliegue*
+
+   - Configuración de servidor en la nube (VPS o PaaS)
+   - Contenedores Docker (opcional)
+   - Instalación y configuración de la base de datos
+   - Certificado SSL, dominio y acceso público
+   - Backup, seguridad y ajustes de producción
+
+
+
