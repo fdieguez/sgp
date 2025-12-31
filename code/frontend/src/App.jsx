@@ -1,28 +1,41 @@
-import { useState, useEffect } from 'react'
-import './App.css'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
+import ProjectDetailsPage from './pages/ProjectDetailsPage';
+
+const ProtectedRoute = ({ children }) => {
+  const { token } = useAuth();
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+};
 
 function App() {
-  const [message, setMessage] = useState("Cargando...")
-
-  useEffect(() => {
-    fetch('/api/welcome')
-      .then(response => {
-        if (response.ok) return response.text();
-        throw new Error("Network response was not ok.");
-      })
-      .then(data => setMessage(data))
-      .catch(error => setMessage("Error conectando al Backend: " + error.message));
-  }, [])
-
   return (
-    <>
-      <div className="card">
-        <h1>Sistema de Gestión de Proyectos (SGP)</h1>
-        <p>Estado del Backend:</p>
-        <h2 style={{ color: '#646cff' }}>{message}</h2>
-      </div>
-    </>
-  )
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/projects/config/:configId" element={
+            <ProtectedRoute>
+              <ProjectDetailsPage />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
