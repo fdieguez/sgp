@@ -87,11 +87,3 @@ Estructura de carpetas propuesta para `/code`:
 - React app (Vite), componentes de UI.
 #### [NEW] /code/docker-compose.yml
 - Orquestación de servicios locales.
-
-## Verification Plan
-### Automated Tests
-- **Backend**: **JUnit 5** y **Mockito** para pruebas unitarias y de integración. **Spring Boot Test** para validación de contextos de aplicación y endpoints.
-- **Sync**: Mock de Google API Client para probar la resiliencia del sincronizador de Spring.
-### Manual Verification
-- Cargar una Google Sheet de prueba y verificar que los datos aparecen en la base de datos PostgreSQL.
-- Loguearse con distintos usuarios y verificar que ven la data correspondiente a su rol.

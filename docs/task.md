@@ -1,0 +1,53 @@
+- [x] Parse .eml file and save as .txt <!-- id: 0 -->
+- [x] Analyze project details from `detalle-de-proyecto.txt` <!-- id: 1 -->
+- [x] Update implementation plan for Java/Spring Boot backend <!-- id: 2 -->
+- [/] Initialize project structure <!-- id: 3 -->
+    - [x] Install Chocolatey (Skipped, using winget) <!-- id: 7 -->
+    - [x] Install Java, Docker, Node via winget <!-- id: 8 -->
+    - [x] Install Maven manually <!-- id: 9 -->
+    - [x] Create directory structure <!-- id: 4 -->
+    - [x] Initialize Spring Boot application <!-- id: 5 -->
+    - [x] Initialize React application <!-- id: 6 -->
+    - [x] Version Control Setup <!-- id: 36 -->
+        - [x] Initialize Git Repo <!-- id: 37 -->
+        - [x] Configure .gitignore (Secrets) <!-- id: 38 -->
+        - [x] Push to GitHub <!-- id: 39 -->
+
+- [/] Hello World Verification (Local & Docker) <!-- id: 16 -->
+    - [x] Create Welcome Controller (Backend) <!-- id: 17 -->
+    - [x] Create Welcome Page (Frontend) <!-- id: 18 -->
+    - [x] Create Dockerfiles <!-- id: 19 -->
+    - [x] Verify Local Run <!-- id: 20 -->
+    - [x] Verify Docker Run (Ready for Prod, skipped local) <!-- id: 21 -->
+- [/] Backend Core & Google Sync <!-- id: 10 -->
+    - [x] Create User Entity & Repository <!-- id: 11 -->
+    - [x] Create SheetsConfig Entity & Repository <!-- id: 12 -->
+    - [x] Create Project Entity <!-- id: 13 -->
+    - [x] Configure PostgreSQL Connection <!-- id: 14 -->
+    - [x] Implement Google Sheets Service <!-- id: 15 -->
+        - [x] Service Account Setup <!-- id: 22 -->
+        - [x] Create Service Class (Java) <!-- id: 23 -->
+        - [x] Test Read Operation <!-- id: 24 -->
+    - [x] Implement Data Synchronization <!-- id: 25 -->
+        - [x] Create SyncService Logic (ETL) <!-- id: 26 -->
+        - [x] Implement Project Repository Save/Update <!-- id: 27 -->
+        - [x] Create Sync Controller Endpoint <!-- id: 28 -->
+    - [/] Implement Security Layer <!-- id: 30 -->
+        - [x] Add Spring Security Dependencies <!-- id: 31 -->
+        - [x] Create JWT Utility Class <!-- id: 32 -->
+        - [x] Implement Auth Filter & Security Config <!-- id: 33 -->
+        - [x] Create Login Endpoint <!-- id: 34 -->
+        - [x] Secure Sync Endpoints (Admin Only) <!-- id: 35 -->
+    - [x] Backend Data Access <!-- id: 40 -->
+        - [x] Create ProjectController (Get Data without Sync) <!-- id: 41 -->
+    - [x] Frontend Implementation <!-- id: 42 -->
+        - [x] Verify Tailwind & dependencies <!-- id: 43 -->
+        - [x] Implement Auth Context & Login Page <!-- id: 44 -->
+        - [x] Implement Dashboard (List Sheets) <!-- id: 45 -->
+        - [x] Implement Project Detail View <!-- id: 46 -->
+        - [x] Refine Detail View (Search & Pagination) <!-- id: 47 -->
+
+    - [x] Feature: Add New Sheet (Create Config) <!-- id: 48 -->
+        - [x] Verify Backend Create Endpoint <!-- id: 49 -->
+        - [x] Implement CreateConfigModal (Frontend) <!-- id: 50 -->
+        - [x] Connect "Nueva Planilla" Button <!-- id: 51 -->

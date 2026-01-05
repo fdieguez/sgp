@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
+import CreateConfigModal from '../components/CreateConfigModal';
 import {
     LayoutDashboard,
     FileSpreadsheet,
@@ -16,6 +17,7 @@ import {
 export default function DashboardPage() {
     const [configs, setConfigs] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const { logout } = useAuth();
     const navigate = useNavigate();
 
@@ -73,7 +75,10 @@ export default function DashboardPage() {
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="flex justify-between items-center mb-8">
                     <h1 className="text-2xl font-bold">Mis Planillas</h1>
-                    <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg font-medium transition-colors">
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg font-medium transition-colors"
+                    >
                         <Plus className="h-5 w-5" />
                         Nueva Planilla
                     </button>
@@ -88,6 +93,12 @@ export default function DashboardPage() {
                         <FileSpreadsheet className="h-16 w-16 mx-auto text-gray-600 mb-4" />
                         <h3 className="text-xl font-medium text-gray-300">No hay planillas configuradas</h3>
                         <p className="text-gray-500 mt-2">Agrega tu primera conexión a Google Sheets para comenzar.</p>
+                        <button
+                            onClick={() => setIsModalOpen(true)}
+                            className="mt-6 border border-indigo-500 text-indigo-400 hover:bg-indigo-900/30 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                        >
+                            Crear Configuración
+                        </button>
                     </div>
                 ) : (
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -141,6 +152,12 @@ export default function DashboardPage() {
                         ))}
                     </div>
                 )}
+
+                <CreateConfigModal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    onSuccess={fetchConfigs}
+                />
             </main>
         </div>
     );

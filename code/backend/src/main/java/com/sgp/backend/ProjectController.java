@@ -32,10 +32,8 @@ public class ProjectController {
 
     @GetMapping("/by-config/{configId}")
     public ResponseEntity<Project> getByConfigId(@PathVariable Long configId) {
-        SheetsConfig config = sheetsConfigRepository.findById(configId)
-                .orElseThrow(() -> new RuntimeException("Config not found"));
-
-        return projectRepository.findBySheetsConfig(config)
+        return sheetsConfigRepository.findById(configId)
+                .flatMap(projectRepository::findBySheetsConfig)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
