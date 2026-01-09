@@ -20,9 +20,18 @@ Desktop.ini
 
 # Secrets (Double check)
 credentials.json
+**.env
+.env
+.env.local
+.env.production
+
 **/*.class
 **/generated-sources/
 
 # Specifics
 code/backend/help.md
 code/backend/jconsole.exe
+
+# Docker
+code/backend/data/
+postgres_data/

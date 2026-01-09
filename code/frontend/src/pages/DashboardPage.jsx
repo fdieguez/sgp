@@ -11,12 +11,14 @@ import {
     LogOut,
     ChevronRight,
     CheckCircle2,
-    AlertCircle
+    AlertCircle,
+    Users
 } from 'lucide-react';
 
 export default function DashboardPage() {
     const [configs, setConfigs] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [syncingId, setSyncingId] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const { logout } = useAuth();
     const navigate = useNavigate();
@@ -37,12 +39,15 @@ export default function DashboardPage() {
     };
 
     const handleSync = async (id) => {
+        setSyncingId(id);
         try {
             await axios.post(`http://localhost:8080/api/sync/${id}`);
             fetchConfigs(); // Refresh status
         } catch (error) {
             console.error("Sync failed", error);
             alert("Error al sincronizar");
+        } finally {
+            setSyncingId(null);
         }
     };
 
@@ -61,13 +66,22 @@ export default function DashboardPage() {
                             <LayoutDashboard className="h-8 w-8 text-indigo-500" />
                             <span className="ml-2 text-xl font-bold tracking-tight">SGP Dashboard</span>
                         </div>
-                        <button
-                            onClick={handleLogout}
-                            className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
-                        >
-                            <LogOut className="h-5 w-5" />
-                            <span>Salir</span>
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => navigate('/users')}
+                                className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
+                            >
+                                <Users className="h-5 w-5" />
+                                <span>Usuarios</span>
+                            </button>
+                            <button
+                                onClick={handleLogout}
+                                className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
+                            >
+                                <LogOut className="h-5 w-5" />
+                                <span>Salir</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </nav>
@@ -110,10 +124,10 @@ export default function DashboardPage() {
                                             <FileSpreadsheet className="h-6 w-6 text-green-400" />
                                         </div>
                                         <span className={`px-3 py-1 rounded-full text-xs font-medium border ${config.status === 'SUCCESS'
-                                                ? 'bg-green-900/30 text-green-400 border-green-800'
-                                                : config.status === 'ERROR'
-                                                    ? 'bg-red-900/30 text-red-400 border-red-800'
-                                                    : 'bg-gray-700 text-gray-300 border-gray-600'
+                                            ? 'bg-green-900/30 text-green-400 border-green-800'
+                                            : config.status === 'ERROR'
+                                                ? 'bg-red-900/30 text-red-400 border-red-800'
+                                                : 'bg-gray-700 text-gray-300 border-gray-600'
                                             }`}>
                                             {config.status || 'PENDING'}
                                         </span>
@@ -133,10 +147,11 @@ export default function DashboardPage() {
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => handleSync(config.id)}
-                                                className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                                                disabled={syncingId === config.id}
+                                                className={`p-2 rounded-lg transition-colors ${syncingId === config.id ? 'cursor-wait text-indigo-400 bg-indigo-900/20' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}
                                                 title="Sincronizar ahora"
                                             >
-                                                <RefreshCw className="h-4 w-4" />
+                                                <RefreshCw className={`h-4 w-4 ${syncingId === config.id ? 'animate-spin' : ''}`} />
                                             </button>
                                             <Link
                                                 to={`/projects/config/${config.id}`}

@@ -41,6 +41,62 @@ public class SyncService {
             String range = "'" + config.getSheetName() + "'!A:Z"; // Quoted for safety with spaces
             List<List<Object>> rawData = googleSheetsService.readSheet(config.getSpreadsheetId(), range);
 
+            // AUTO-DETECT HEADERS (ROBUST HEADER HUNTING):
+            // Scan the first few rows (e.g., top 10) to find the row with the MOST data
+            // columns.
+            // This handles cases with:
+            // 1. Empty rows at the top.
+            // 2. "Super headers" (merged cells with only 1 value).
+            // 3. Title rows.
+            // The row with the most distinct populated cells is most likely the actual
+            // Header Row.
+            if (rawData != null && !rawData.isEmpty()) {
+                int headerRowIndex = 0;
+                int maxNonEmptyCount = -1;
+                int scanLimit = Math.min(rawData.size(), 10); // Scan top 10 rows
+
+                for (int i = 0; i < scanLimit; i++) {
+                    List<Object> row = rawData.get(i);
+                    int count = 0;
+                    if (row != null) {
+                        for (Object cell : row) {
+                            if (cell != null && !cell.toString().trim().isEmpty()) {
+                                count++;
+                            }
+                        }
+                    }
+                    System.out.println("Row " + i + " count: " + count); // DEBUG LOG
+
+                    // Strict greater than (>): keeps the FIRST row if multiple have lines same max
+                    // count.
+                    // This is crucial to prefer the "Header" over data rows if they have same
+                    // column count.
+                    if (count > maxNonEmptyCount) {
+                        maxNonEmptyCount = count;
+                        headerRowIndex = i;
+                    }
+                }
+
+                System.out.println("Selected Header Row Index: " + headerRowIndex); // DEBUG LOG
+
+                // If we found a better start row, slice the list
+                if (headerRowIndex > 0) {
+                    // Create a new list to ensure mutability and safety
+                    rawData = new java.util.ArrayList<>(rawData.subList(headerRowIndex, rawData.size()));
+                }
+
+                // SANITIZE HEADERS: Ensure no empty headers exist
+                if (!rawData.isEmpty()) {
+                    List<Object> headers = rawData.get(0);
+                    for (int i = 0; i < headers.size(); i++) {
+                        Object cell = headers.get(i);
+                        if (cell == null || cell.toString().trim().isEmpty()) {
+                            headers.set(i, "Campo " + (i + 1));
+                        }
+                    }
+                }
+            }
+
             // 3. Convert to JSON
             String jsonContent = objectMapper.writeValueAsString(rawData);
 
@@ -57,7 +113,7 @@ public class SyncService {
                 project.setUpdatedAt(LocalDateTime.now());
             } else {
                 project = new Project();
-                project.setName("Project from " + config.getSheetName()); // Default name
+                project.setName("Proyectos de " + config.getSheetName()); // Default name
                 project.setSheetsConfig(config);
                 project.setDataJson(jsonContent);
                 project.setCreatedAt(LocalDateTime.now());

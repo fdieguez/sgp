@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ProjectDetailsPage from './pages/ProjectDetailsPage';
+import UsersPage from './pages/UsersPage';
 
 const ProtectedRoute = ({ children }) => {
   const { token } = useAuth();
@@ -28,6 +29,12 @@ function App() {
           <Route path="/projects/config/:configId" element={
             <ProtectedRoute>
               <ProjectDetailsPage />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/users" element={
+            <ProtectedRoute>
+              <UsersPage />
             </ProtectedRoute>
           } />
 
