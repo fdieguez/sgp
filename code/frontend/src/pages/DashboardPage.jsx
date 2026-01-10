@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../config/axios';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import CreateConfigModal from '../components/CreateConfigModal';
@@ -29,7 +29,7 @@ export default function DashboardPage() {
 
     const fetchConfigs = async () => {
         try {
-            const response = await axios.get('http://localhost:8080/api/config');
+            const response = await api.get('/api/config');
             setConfigs(response.data);
         } catch (error) {
             console.error("Error fetching configs", error);
@@ -41,7 +41,7 @@ export default function DashboardPage() {
     const handleSync = async (id) => {
         setSyncingId(id);
         try {
-            await axios.post(`http://localhost:8080/api/sync/${id}`);
+            await api.post(`/api/sync/${id}`);
             fetchConfigs(); // Refresh status
         } catch (error) {
             console.error("Sync failed", error);

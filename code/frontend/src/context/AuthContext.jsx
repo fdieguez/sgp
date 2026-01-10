@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../config/axios';
 
 const AuthContext = createContext();
 
@@ -12,18 +12,16 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         if (token) {
             localStorage.setItem('token', token);
-            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-            // In a real app we might validate the token or decode it here
+            // Interceptor handles the header
         } else {
             localStorage.removeItem('token');
-            delete axios.defaults.headers.common['Authorization'];
         }
     }, [token]);
 
     const login = async (email, password) => {
         try {
-            // Point to Backend API
-            const response = await axios.post('http://localhost:8080/api/auth/login', {
+            // Point to Backend API using configured instance
+            const response = await api.post('/api/auth/login', {
                 email,
                 password,
             });

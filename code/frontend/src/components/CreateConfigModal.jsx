@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import api from '../config/axios';
 import { X, Loader2, FileSpreadsheet } from 'lucide-react';
 
 export default function CreateConfigModal({ isOpen, onClose, onSuccess }) {
@@ -16,7 +16,7 @@ export default function CreateConfigModal({ isOpen, onClose, onSuccess }) {
         setLoading(true);
 
         try {
-            await axios.post('http://localhost:8080/api/config', {
+            await api.post('/api/config', {
                 spreadsheetId,
                 sheetName
             });

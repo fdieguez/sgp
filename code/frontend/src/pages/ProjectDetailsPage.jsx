@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import axios from 'axios';
+import api from '../config/axios';
 import { useParams, Link } from 'react-router-dom';
 import {
     ArrowLeft,
@@ -127,7 +127,7 @@ export default function ProjectDetailsPage() {
     useEffect(() => {
         const fetchProject = async () => {
             try {
-                const response = await axios.get(`http://localhost:8080/api/projects/by-config/${configId}`);
+                const response = await api.get(`/api/projects/by-config/${configId}`);
                 setProject(response.data);
             } catch (err) {
                 console.error(err);

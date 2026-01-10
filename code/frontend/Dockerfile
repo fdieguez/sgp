@@ -27,6 +27,12 @@ COPY --from=build /app/dist .
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+# Copy env.sh script and make it executable
+COPY env.sh /docker-entrypoint.d/env.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.d/env.sh
+RUN chmod +x /docker-entrypoint.d/env.sh
+
 EXPOSE 80
 
+# The default nginx entrypoint executes scripts in /docker-entrypoint.d/
 CMD ["nginx", "-g", "daemon off;"]

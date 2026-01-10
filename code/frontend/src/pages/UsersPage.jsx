@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../config/axios';
 import { Link } from 'react-router-dom';
 import {
     ArrowLeft,
@@ -25,10 +25,7 @@ export default function UsersPage() {
 
     const fetchUsers = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const response = await axios.get('http://localhost:8080/api/users', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const response = await api.get('/api/users');
             setUsers(response.data);
         } catch (err) {
             console.error(err);
@@ -40,19 +37,14 @@ export default function UsersPage() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const token = localStorage.getItem('token');
 
         try {
             if (editingUser) {
                 // Update
-                await axios.put(`http://localhost:8080/api/users/${editingUser.id}`, formData, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                await api.put(`/api/users/${editingUser.id}`, formData);
             } else {
                 // Create
-                await axios.post('http://localhost:8080/api/users', formData, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                await api.post('/api/users', formData);
             }
             setShowModal(false);
             setFormData({ email: '', password: '', role: 'USER' });
@@ -66,11 +58,8 @@ export default function UsersPage() {
     const handleDelete = async (id) => {
         if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
 
-        const token = localStorage.getItem('token');
         try {
-            await axios.delete(`http://localhost:8080/api/users/${id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.delete(`/api/users/${id}`);
             fetchUsers();
         } catch (err) {
             alert('Error al eliminar usuario');
