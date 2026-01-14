@@ -22,7 +22,11 @@ public class SyncService {
     private final GoogleSheetsService googleSheetsService;
     private final SheetsConfigRepository sheetsConfigRepository;
     private final ProjectRepository projectRepository;
-    private final ObjectMapper objectMapper; // Spring Boot auto-configures this
+    private final ObjectMapper objectMapper;
+
+    // New Repositories
+    private final com.sgp.backend.repository.OrderRepository orderRepository;
+    private final com.sgp.backend.repository.PersonRepository personRepository;
 
     @Transactional
     public Project syncProject(Long sheetsConfigId) {
@@ -32,28 +36,14 @@ public class SyncService {
 
         try {
             // 2. Fetch Data from Google Sheets
-            // Assuming range is NOT null, or we construct it via SheetName
-            // If the SheetsConfig stores just "Sheet1", we might want to fetch everything
-            // (e.g. "Sheet1!A:Z")
-            // For now, let's assume we fetch a reasonable range or the whole sheet name.
-            // But GoogleSheetsService.readSheet takes (id, range).
-            // Let's assume config.getSheetName() acts as the range prefix.
-            String range = "'" + config.getSheetName() + "'!A:Z"; // Quoted for safety with spaces
+            String range = "'" + config.getSheetName() + "'!A:Z";
             List<List<Object>> rawData = googleSheetsService.readSheet(config.getSpreadsheetId(), range);
 
-            // AUTO-DETECT HEADERS (ROBUST HEADER HUNTING):
-            // Scan the first few rows (e.g., top 10) to find the row with the MOST data
-            // columns.
-            // This handles cases with:
-            // 1. Empty rows at the top.
-            // 2. "Super headers" (merged cells with only 1 value).
-            // 3. Title rows.
-            // The row with the most distinct populated cells is most likely the actual
-            // Header Row.
+            // AUTO-DETECT HEADERS logic...
+            int headerRowIndex = 0;
             if (rawData != null && !rawData.isEmpty()) {
-                int headerRowIndex = 0;
                 int maxNonEmptyCount = -1;
-                int scanLimit = Math.min(rawData.size(), 10); // Scan top 10 rows
+                int scanLimit = Math.min(rawData.size(), 10);
 
                 for (int i = 0; i < scanLimit; i++) {
                     List<Object> row = rawData.get(i);
@@ -65,63 +55,43 @@ public class SyncService {
                             }
                         }
                     }
-                    System.out.println("Row " + i + " count: " + count); // DEBUG LOG
-
-                    // Strict greater than (>): keeps the FIRST row if multiple have lines same max
-                    // count.
-                    // This is crucial to prefer the "Header" over data rows if they have same
-                    // column count.
                     if (count > maxNonEmptyCount) {
                         maxNonEmptyCount = count;
                         headerRowIndex = i;
                     }
                 }
 
-                System.out.println("Selected Header Row Index: " + headerRowIndex); // DEBUG LOG
-
-                // If we found a better start row, slice the list
                 if (headerRowIndex > 0) {
-                    // Create a new list to ensure mutability and safety
                     rawData = new java.util.ArrayList<>(rawData.subList(headerRowIndex, rawData.size()));
-                }
-
-                // SANITIZE HEADERS: Ensure no empty headers exist
-                if (!rawData.isEmpty()) {
-                    List<Object> headers = rawData.get(0);
-                    for (int i = 0; i < headers.size(); i++) {
-                        Object cell = headers.get(i);
-                        if (cell == null || cell.toString().trim().isEmpty()) {
-                            headers.set(i, "Campo " + (i + 1));
-                        }
-                    }
                 }
             }
 
-            // 3. Convert to JSON
+            // 3. Convert to JSON (Keep existing logic for backup)
             String jsonContent = objectMapper.writeValueAsString(rawData);
 
             // 4. Find or Create Project
-            // Logic: Is there already a project for this config?
-            // Since we have @ManyToOne, we need to query ProjectRepository by SheetsConfig
             Optional<Project> existingProject = projectRepository.findBySheetsConfig(config);
-
             Project project;
             if (existingProject.isPresent()) {
                 project = existingProject.get();
                 project.setDataJson(jsonContent);
-                project.setLastUpdate(); // Trigger @PreUpdate manually if needed, or rely on entity lifecycle
+                project.setLastUpdate();
                 project.setUpdatedAt(LocalDateTime.now());
             } else {
                 project = new Project();
-                project.setName("Proyectos de " + config.getSheetName()); // Default name
+                project.setName("Proyectos de " + config.getSheetName());
                 project.setSheetsConfig(config);
                 project.setDataJson(jsonContent);
                 project.setCreatedAt(LocalDateTime.now());
                 project.setUpdatedAt(LocalDateTime.now());
             }
-
-            // 5. Save Project
             Project savedProject = projectRepository.save(project);
+
+            // 5. HYBRID SYNC: Parse rows to Entities
+            if (rawData != null && rawData.size() > 1) { // Skip header
+                List<List<Object>> dataRows = rawData.subList(1, rawData.size());
+                processRows(dataRows);
+            }
 
             // 6. Update Config Status
             config.setLastSync(LocalDateTime.now());
@@ -131,9 +101,88 @@ public class SyncService {
             return savedProject;
 
         } catch (Exception e) {
+            e.printStackTrace(); // Log error
             config.setStatus("ERROR: " + e.getMessage());
             sheetsConfigRepository.save(config);
             throw new RuntimeException("Failed to sync project: " + e.getMessage(), e);
+        }
+    }
+
+    private void processRows(List<List<Object>> rows) {
+        // ASSUMPTION:
+        // Col 0: Date
+        // Col 1: Person Name
+        // Col 2: Description
+        // Col 3: Origin
+        for (List<Object> row : rows) {
+            try {
+                if (row.size() < 2)
+                    continue; // Skip empty/invalid rows
+
+                String dateStr = getValue(row, 0);
+                String personName = getValue(row, 1);
+                String description = getValue(row, 2);
+                String origin = getValue(row, 3);
+
+                if (personName.isEmpty())
+                    continue;
+
+                // 1. Find or Create Person
+                String finalName = personName; // Effective final for lambda
+                com.sgp.backend.entity.Person person = personRepository.findByNameContainingIgnoreCase(personName)
+                        .stream().findFirst() // Simple duplicate check
+                        .orElseGet(() -> {
+                            return personRepository.save(com.sgp.backend.entity.Person.builder()
+                                    .name(finalName)
+                                    .type("INDIVIDUAL") // Default
+                                    .build());
+                        });
+
+                // 2. Create Order (Avoid duplicates usually by checking exact match of fields?)
+                // For MVP: We will create a new order if description doesn't match last one for
+                // this person.
+                // A better approach for sync is checking if hash exists, but let's keep it
+                // simple.
+                // We check if this person has an order with same description on same day.
+
+                java.time.LocalDate entryDate = parseDate(dateStr);
+
+                boolean exists = orderRepository.findByPersonId(person.getId()).stream()
+                        .anyMatch(o -> o.getDescription() != null && o.getDescription().equals(description)
+                                && o.getEntryDate().equals(entryDate));
+
+                if (!exists) {
+                    com.sgp.backend.entity.Order order = com.sgp.backend.entity.Order.builder()
+                            .person(person)
+                            .description(description)
+                            .origin(origin.isEmpty() ? "IMPORTED" : origin)
+                            .entryDate(entryDate)
+                            .status("PENDING")
+                            .build();
+                    orderRepository.save(order);
+                }
+
+            } catch (Exception e) {
+                System.err.println("Error processing row: " + row + " -> " + e.getMessage());
+            }
+        }
+    }
+
+    private String getValue(List<Object> row, int index) {
+        if (index >= row.size() || row.get(index) == null)
+            return "";
+        return row.get(index).toString().trim();
+    }
+
+    private java.time.LocalDate parseDate(String dateStr) {
+        try {
+            if (dateStr.isEmpty())
+                return java.time.LocalDate.now();
+            // Basic parsing, improve as needed (e.g. DD/MM/YYYY)
+            // Google sheets often sends "DD/MM/YYYY" or "YYYY-MM-DD"
+            return java.time.LocalDate.now(); // Placeholder for safer sync first
+        } catch (Exception e) {
+            return java.time.LocalDate.now();
         }
     }
 }
