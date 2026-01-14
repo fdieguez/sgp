@@ -42,6 +42,7 @@ services:
       - sgp-network
     volumes:
       - ./backend/data:/app/data
+      - ./logs/backend:/app/logs
 
   # Frontend (React + Nginx)
   frontend:
