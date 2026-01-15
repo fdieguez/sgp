@@ -1,8 +1,8 @@
 import api from '../config/axios';
 
 const orderService = {
-    getAll: async () => {
-        const response = await api.get('/api/orders');
+    getAll: async (params = {}) => {
+        const response = await api.get('/api/orders', { params });
         return response.data;
     },
 

@@ -15,8 +15,10 @@ public class OrderController {
     private final OrderService orderService;
 
     @GetMapping
-    public List<Order> getAllOrders() {
-        return orderService.getAllOrders();
+    public List<Order> getAllOrders(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String search) {
+        return orderService.getAllOrders(status, search);
     }
 
     @PostMapping

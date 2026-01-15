@@ -10,4 +10,7 @@ public interface SubsidyRepository extends JpaRepository<Subsidy, Long> {
     List<Subsidy> findByStatus(String status);
 
     List<Subsidy> findByOrderId(Long orderId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT SUM(s.amount) FROM Subsidy s WHERE s.status = :status")
+    java.math.BigDecimal sumAmountByStatus(@org.springframework.data.repository.query.Param("status") String status);
 }
