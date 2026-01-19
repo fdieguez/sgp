@@ -8,6 +8,20 @@
 
 ## 📅 Enero 2026
 
+### 19/01/2026
+- **✅ Commit y Preparación para Deployment**:
+    - Subido código con todos los fixes de mapeo y validaciones al repositorio GitHub.
+    - Commit: `2008440` - "fix: correct Google Sheets column mapping and increase Person.name limit to 1000 chars"
+    - **Cambios incluidos**: 16 archivos modificados, 539 inserciones, 62 eliminaciones.
+    - **Estado actual**: Código listo para deployment en producción.
+- **🌐 Configuración DNS Completada**:
+    - **Dominio elegido**: `solicitudes.ultrasoft.website`
+    - Configurado registro DNS tipo A: `solicitudes` → `149.50.128.168`
+    - DNS propagado exitosamente (verificado con nslookup)
+    - Actualizado `.env.example` con la nueva URL: `http://solicitudes.ultrasoft.website/api`
+    - Creada guía completa de deployment: `docs/DEPLOYMENT_GUIDE.md`
+    - **Próxima fase**: Deployment en servidor VPS de DonWeb.
+
 ### 17/01/2026
 - **🔥 FIX: DataIntegrityViolationException por valores largos**:
     - Identificado error: Campo `name` en `Person` limitado a 255 chars, pero algunos nombres de instituciones tienen 298+ chars.
@@ -154,4 +168,4 @@
 
 ---
 
-**Última actualización**: 08/01/2026 18:03
+**Última actualización**: 19/01/2026 07:42
