@@ -10,8 +10,6 @@ import {
     Plus,
     LogOut,
     ChevronRight,
-    CheckCircle2,
-    AlertCircle,
     Users
 } from 'lucide-react';
 
@@ -24,6 +22,7 @@ export default function DashboardPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const { logout } = useAuth();
     const navigate = useNavigate();
+    const [statsKey, setStatsKey] = useState(0);
 
     useEffect(() => {
         fetchConfigs();
@@ -45,6 +44,7 @@ export default function DashboardPage() {
         try {
             await api.post(`/api/sync/${id}`);
             fetchConfigs(); // Refresh status
+            setStatsKey(prev => prev + 1); // Trigger stats refresh
         } catch (error) {
             console.error("Sync failed", error);
             alert("Error al sincronizar");
@@ -89,7 +89,7 @@ export default function DashboardPage() {
             </nav>
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <DashboardStats />
+                <DashboardStats key={statsKey} />
 
                 <div className="flex justify-between items-center mb-8">
                     <h1 className="text-2xl font-bold">Mis Planillas</h1>

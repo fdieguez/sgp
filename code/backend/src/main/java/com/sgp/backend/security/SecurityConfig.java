@@ -30,12 +30,26 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
+                .headers(headers -> headers.frameOptions(
+                        org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig::disable))
                 .authorizeHttpRequests(auth -> auth
                         // Public Endpoints
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/welcome").permitAll()
+                        .requestMatchers(
+                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/api/auth/**"))
+                        .permitAll()
+                        .requestMatchers(
+                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/api/welcome"))
+                        .permitAll()
+                        .requestMatchers(new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
+                                "/h2-console/**"))
+                        .permitAll()
                         // Admin Only Endpoints
-                        .requestMatchers("/api/sync/**", "/api/config/**").hasRole("ADMIN")
+                        .requestMatchers(
+                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/api/sync/**"))
+                        .hasRole("ADMIN")
+                        .requestMatchers(new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
+                                "/api/config/**"))
+                        .hasRole("ADMIN")
                         // Secured Endpoints (everything else)
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session

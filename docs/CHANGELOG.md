@@ -8,6 +8,56 @@
 
 ## 📅 Enero 2026
 
+### 17/01/2026
+- **🔥 FIX: DataIntegrityViolationException por valores largos**:
+    - Identificado error: Campo `name` en `Person` limitado a 255 chars, pero algunos nombres de instituciones tienen 298+ chars.
+    - **Solución**:
+        - Aumentado límite de `Person.name` de 255 a **1000 caracteres** para soportar descripciones largas de instituciones.
+        - Agregado método `truncateString()` en `SyncService` para truncar defensivamente valores que excedan límites de BD.
+        - Truncado automático: name (1000), phone (50), address (500).
+    - Mejorado logging en `SyncService`:
+        - `log.error()` ahora muestra **stack trace completo** en lugar de solo `getMessage()`.
+        - Agregado `EntityManager.clear()` después de cada error para limpiar sesión de Hibernate y prevenir errores en cascada.
+        - Logs detallados en todos los métodos helper (findOrCreateCity, findOrCreatePerson, etc.) para debugging.
+
+### 16/01/2026
+- **🔥 FIX CRÍTICO: Mapeo de Columnas en Sincronización**:
+    - Identificado y corregido error grave en `SyncService.java`: el mapeo hardcodeado asumía estructura incorrecta de columnas.
+    - **Problema**: Columna 0 se asumía como "Date" y columna 1 como "Person Name", pero en realidad:
+        - Col 0: N° Orden
+        - Col 1: Fecha de Ingreso
+        - Col 4: Nombre / Institución
+    - **Resultado**: Los datos se guardaban incorrectamente (fechas en el campo `name` de Person).
+    - **Solución**: Reescrito método `processRows()` para mapear correctamente las 18+ columnas del sheet "SEGUIMIENTO":
+        - Person: name (Col E), phone (Col H), address/barrio (Col G)
+        - Location: localidad (Col F), barrio (Col G) - con jerarquía CITY → NEIGHBORHOOD
+        - Order: entryDate (Col B), origin (Col D), description/solicitud (Col I), status/resolución (Col O)
+    - Mejorado `parseDate()` con soporte real para formatos DD/MM/YYYY e ISO.
+    - Agregado `LocationRepository` como dependencia en `SyncService`.
+    - Los datos ahora se crean correctamente con todas las relaciones (Person → Location, Order → Person, Order → Location).
+
+### 15/01/2026
+- **Backend Logging & Debugging**:
+    - Agregado logging detallado (SLF4J) en `SyncService.java` para trazar el proceso de sincronización.
+- **Frontend Routing Fix**:
+    - Corregida ruta `/projects/config/:configId` en `App.jsx` para coincidir con la navegación del Dashboard, solucionando la pantalla en blanco al ver detalles.
+- **Persistencia de Sesión y Roles**:
+    - Actualizado `AuthController` y `AuthResponse` para devolver el rol del usuario.
+    - Actualizado `AuthContext` para persistir el usuario y rol en `localStorage`, resolviendo el error de "Acceso Denegado" al refrescar.
+- **Acceso H2 & Documentación**:
+    - Configurado `SecurityConfig` para permitir acceso público a `/h2-console` y deshabilitar frame options.
+    - Actualizado `walkthrough.md` con guías paso a paso para conectar DB Local (H2 Web Console) y Remota (HeidiSQL + SSH Tunnel).
+
+### 09/01/2026 (En Progreso)
+- **Deployment en DonWeb VPS**: 
+  - Backend/DB funcionando OK.
+  - Frontend despliega pero falla al conectar con API (sigue apuntando a localhost).
+  - **Problema Detectado**: `VITE_API_URL` no se inyecta correctamente en el build de Docker.
+  - **Fixes Intentados**: 
+    - Agregar `ARG VITE_API_URL` al Dockerfile (commit `1671c46`).
+    - Configurar `args` en `docker-compose.yml`.
+  - **Próximo Paso**: Verificar si hardcodear la URL en `docker-compose.yml` (`args`) o usar `environment` (aunque Vite requiere build-time env vars) soluciona el problema de reconstrucción.
+
 ### 08/01/2026
 - **Configuración de Deployment Productivo** 🚀:
   - Creados `Dockerfile` para backend y frontend (multi-stage builds).

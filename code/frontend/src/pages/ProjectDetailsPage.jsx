@@ -151,7 +151,7 @@ export default function ProjectDetailsPage() {
 
         try {
             const rawData = JSON.parse(project.dataJson);
-            if (rawData.length === 0) return { headers: [], filteredRows: [], chartData: [], categoricalColumns: [], filterOptions: {} };
+            if (!rawData || !Array.isArray(rawData) || rawData.length === 0) return { headers: [], filteredRows: [], chartData: [], categoricalColumns: [], filterOptions: {} };
 
             // Sanitize headers: prevent empty strings
             const headers = rawData[0].map((h, i) => (h && String(h).trim() !== '') ? h : `Campo ${i + 1}`);

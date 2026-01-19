@@ -27,4 +27,9 @@ range=hoja1
 curl -X POST -H "Content-Type: application/json" -d '{"spreadsheetId":"1wbFbc2CAX4w_NcXpWRYFJ8HGNJ0IxImRwyovwz35dq4", "sheetName":"hoja1"}' http://localhost:8080/api/config
 
 
+crear usuario base de datos
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@sgp.com", "password":"10203040.Fnd.2026", "role":"ADMIN"}'
 
+10203040.Fnd.2026

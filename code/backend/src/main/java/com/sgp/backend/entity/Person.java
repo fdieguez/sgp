@@ -18,8 +18,8 @@ public class Person {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private String name; // Name or Institution Name
+    @Column(nullable = false, length = 1000)
+    private String name; // Name or Institution Name (up to 1000 chars for long institution descriptions)
 
     // "INDIVIDUAL", "INSTITUTION", "GOVERNMENT"
     @Column(nullable = false)

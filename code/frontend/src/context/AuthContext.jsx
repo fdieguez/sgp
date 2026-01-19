@@ -7,7 +7,10 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
     const [token, setToken] = useState(localStorage.getItem('token'));
-    const [user, setUser] = useState(null);
+    const [user, setUser] = useState(() => {
+        const savedUser = localStorage.getItem('user');
+        return savedUser ? JSON.parse(savedUser) : null;
+    });
 
     useEffect(() => {
         if (token) {
@@ -18,6 +21,14 @@ export const AuthProvider = ({ children }) => {
         }
     }, [token]);
 
+    useEffect(() => {
+        if (user) {
+            localStorage.setItem('user', JSON.stringify(user));
+        } else {
+            localStorage.removeItem('user');
+        }
+    }, [user]);
+
     const login = async (email, password) => {
         try {
             // Point to Backend API using configured instance
@@ -26,6 +37,10 @@ export const AuthProvider = ({ children }) => {
                 password,
             });
             setToken(response.data.token);
+            setUser({
+                email: response.data.email,
+                role: response.data.role
+            });
             return true;
         } catch (error) {
             console.error("Login failed", error);
@@ -36,10 +51,14 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         setToken(null);
         setUser(null);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
     };
 
+    const [loading, setLoading] = useState(false); // Can be improved with actual token validation
+
     return (
-        <AuthContext.Provider value={{ token, login, logout }}>
+        <AuthContext.Provider value={{ token, isAuthenticated: !!token, login, logout, user, loading }}>
             {children}
         </AuthContext.Provider>
     );

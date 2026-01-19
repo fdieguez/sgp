@@ -31,13 +31,14 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
-        // If no exception is thrown, auth is successful
-        // We can fetch the user details to put role in token if needed, or just
-        // generate with email
-        // Let's fetch the user to get the role if we want, or just rely on basics.
-        // For simplicity now:
+
+        // Fetch user to get role
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
         final String token = jwtUtils.generateToken(request.getEmail());
-        return ResponseEntity.ok(new AuthResponse(token));
+
+        return ResponseEntity.ok(new AuthResponse(token, user.getEmail(), user.getRole()));
     }
 
     @PostMapping("/register")

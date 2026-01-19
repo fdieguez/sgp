@@ -1,22 +1,23 @@
 package com.sgp.backend.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sgp.backend.entity.Project;
 import com.sgp.backend.entity.SheetsConfig;
 import com.sgp.backend.repository.ProjectRepository;
 import com.sgp.backend.repository.SheetsConfigRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SyncService {
 
     private final GoogleSheetsService googleSheetsService;
@@ -27,17 +28,28 @@ public class SyncService {
     // New Repositories
     private final com.sgp.backend.repository.OrderRepository orderRepository;
     private final com.sgp.backend.repository.PersonRepository personRepository;
+    private final com.sgp.backend.repository.LocationRepository locationRepository;
+
+    // EntityManager for session management
+    private final jakarta.persistence.EntityManager entityManager;
 
     @Transactional
     public Project syncProject(Long sheetsConfigId) {
+        log.info("Starting sync for SheetsConfig ID: {}", sheetsConfigId);
+
         // 1. Fetch Config
         SheetsConfig config = sheetsConfigRepository.findById(sheetsConfigId)
                 .orElseThrow(() -> new RuntimeException("SheetsConfig not found with id: " + sheetsConfigId));
 
+        log.info("Found Config: {} (SpreadsheetID: {})", config.getSheetName(), config.getSpreadsheetId());
+
         try {
             // 2. Fetch Data from Google Sheets
             String range = "'" + config.getSheetName() + "'!A:Z";
+            log.info("Fetching data from Google Sheets with range: {}", range);
+
             List<List<Object>> rawData = googleSheetsService.readSheet(config.getSpreadsheetId(), range);
+            log.info("Fetched {} rows from Google Sheets", rawData != null ? rawData.size() : 0);
 
             // AUTO-DETECT HEADERS logic...
             int headerRowIndex = 0;
@@ -62,6 +74,7 @@ public class SyncService {
                 }
 
                 if (headerRowIndex > 0) {
+                    log.info("Detected header at row index: {}", headerRowIndex);
                     rawData = new java.util.ArrayList<>(rawData.subList(headerRowIndex, rawData.size()));
                 }
             }
@@ -74,11 +87,13 @@ public class SyncService {
             Project project;
             if (existingProject.isPresent()) {
                 project = existingProject.get();
+                log.info("Updating existing Project ID: {}", project.getId());
                 project.setDataJson(jsonContent);
                 project.setLastUpdate();
                 project.setUpdatedAt(LocalDateTime.now());
             } else {
                 project = new Project();
+                log.info("Creating new Project for Sheet: {}", config.getSheetName());
                 project.setName("Proyectos de " + config.getSheetName());
                 project.setSheetsConfig(config);
                 project.setDataJson(jsonContent);
@@ -86,22 +101,28 @@ public class SyncService {
                 project.setUpdatedAt(LocalDateTime.now());
             }
             Project savedProject = projectRepository.save(project);
+            log.info("Project saved successfully. ID: {}", savedProject.getId());
 
             // 5. HYBRID SYNC: Parse rows to Entities
             if (rawData != null && rawData.size() > 1) { // Skip header
+                log.info("Starting Hybrid Sync processing for {} rows...", rawData.size() - 1);
                 List<List<Object>> dataRows = rawData.subList(1, rawData.size());
                 processRows(dataRows);
+            } else {
+                log.warn("Not enough data rows to process hybrid sync (Size: {})",
+                        rawData != null ? rawData.size() : "null");
             }
 
             // 6. Update Config Status
             config.setLastSync(LocalDateTime.now());
             config.setStatus("SUCCESS");
             sheetsConfigRepository.save(config);
+            log.info("Sync completed successfully for Config ID: {}", config.getId());
 
             return savedProject;
 
         } catch (Exception e) {
-            e.printStackTrace(); // Log error
+            log.error("Sync FAILED for Config ID: {}", config.getId(), e);
             config.setStatus("ERROR: " + e.getMessage());
             sheetsConfigRepository.save(config);
             throw new RuntimeException("Failed to sync project: " + e.getMessage(), e);
@@ -109,63 +130,126 @@ public class SyncService {
     }
 
     private void processRows(List<List<Object>> rows) {
-        // ASSUMPTION:
-        // Col 0: Date
-        // Col 1: Person Name
-        // Col 2: Description
-        // Col 3: Origin
+        log.info("Processing {} rows into Order entities...", rows.size());
+        int createdCount = 0;
+        int errorCount = 0;
+
+        // MAPEO REAL DE COLUMNAS DEL SHEET "SEGUIMIENTO":
+        // Col A (0): N° Orden
+        // Col B (1): Fecha de Ingreso
+        // Col C (2): Mes
+        // Col D (3): Origen
+        // Col E (4): Nombre / Institución
+        // Col F (5): Localidad
+        // Col G (6): Barrio
+        // Col H (7): Teléfono
+        // Col I (8): Solicitud
+        // Col J (9): ZONA / EJE
+        // Col K (10): (vacío)
+        // Col L (11): RESPONSABLE
+        // Col M (12): Fecha de Contacto
+        // Col N (13): Fecha de Resolución
+        // Col O (14): Resolución
+        // Col P (15): Detalle
+        // Col Q (16): Observación
+        // Col R (17): Monto
+        // Col S (18): CONTROL 1er contacto
+
         for (List<Object> row : rows) {
             try {
-                if (row.size() < 2)
+                if (row.size() < 5)
                     continue; // Skip empty/invalid rows
 
-                String dateStr = getValue(row, 0);
-                String personName = getValue(row, 1);
-                String description = getValue(row, 2);
+                // Extract columns
+                String orderNumber = getValue(row, 0);
+                String entryDateStr = getValue(row, 1);
+                String month = getValue(row, 2);
                 String origin = getValue(row, 3);
+                String personName = getValue(row, 4);
+                String localidad = getValue(row, 5);
+                String barrio = getValue(row, 6);
+                String phone = getValue(row, 7);
+                String solicitud = getValue(row, 8);
+                String zona = getValue(row, 9);
+                String responsable = getValue(row, 11);
+                String contactDateStr = getValue(row, 12);
+                String resolutionDateStr = getValue(row, 13);
+                String resolucion = getValue(row, 14);
+                String detalle = getValue(row, 15);
+                String observacion = getValue(row, 16);
+                String monto = getValue(row, 17);
+                String control = getValue(row, 18);
 
+                // Skip if no person name
                 if (personName.isEmpty())
                     continue;
 
-                // 1. Find or Create Person
-                String finalName = personName; // Effective final for lambda
-                com.sgp.backend.entity.Person person = personRepository.findByNameContainingIgnoreCase(personName)
-                        .stream().findFirst() // Simple duplicate check
-                        .orElseGet(() -> {
-                            return personRepository.save(com.sgp.backend.entity.Person.builder()
-                                    .name(finalName)
-                                    .type("INDIVIDUAL") // Default
-                                    .build());
-                        });
+                // 1. Find or Create Location (CITY)
+                com.sgp.backend.entity.Location cityLocation = null;
+                if (!localidad.isEmpty()) {
+                    cityLocation = findOrCreateCity(localidad);
 
-                // 2. Create Order (Avoid duplicates usually by checking exact match of fields?)
-                // For MVP: We will create a new order if description doesn't match last one for
-                // this person.
-                // A better approach for sync is checking if hash exists, but let's keep it
-                // simple.
-                // We check if this person has an order with same description on same day.
+                    // If barrio exists, create/find it as NEIGHBORHOOD
+                    if (!barrio.isEmpty()) {
+                        findOrCreateNeighborhood(barrio, cityLocation);
+                    }
+                }
 
-                java.time.LocalDate entryDate = parseDate(dateStr);
+                // 2. Find or Create Person
+                com.sgp.backend.entity.Person person = findOrCreatePerson(personName, phone, barrio, cityLocation);
+
+                // 3. Parse Dates
+                java.time.LocalDate entryDate = parseDate(entryDateStr);
+
+                // 4. Create Order (Check for duplicates)
+                String finalSolicitud = solicitud;
+                String finalDetalle = detalle;
 
                 boolean exists = orderRepository.findByPersonId(person.getId()).stream()
-                        .anyMatch(o -> o.getDescription() != null && o.getDescription().equals(description)
+                        .anyMatch(o -> o.getDescription() != null && o.getDescription().equals(finalSolicitud)
                                 && o.getEntryDate().equals(entryDate));
 
                 if (!exists) {
+                    // Determine status from "Resolución" column
+                    String status = "PENDING";
+                    if (!resolucion.isEmpty()) {
+                        if (resolucion.equalsIgnoreCase("COMPLETADO") || resolucion.equalsIgnoreCase("RESUELTO")) {
+                            status = "COMPLETED";
+                        } else if (resolucion.equalsIgnoreCase("EN PROCESO")
+                                || resolucion.equalsIgnoreCase("EN PROGRESO")) {
+                            status = "IN_PROGRESS";
+                        } else if (resolucion.equalsIgnoreCase("RECHAZADO")) {
+                            status = "REJECTED";
+                        }
+                    }
+
                     com.sgp.backend.entity.Order order = com.sgp.backend.entity.Order.builder()
                             .person(person)
-                            .description(description)
-                            .origin(origin.isEmpty() ? "IMPORTED" : origin)
+                            .description(solicitud)
+                            .origin(origin.isEmpty() ? "IMPORTED" : origin.toUpperCase())
                             .entryDate(entryDate)
-                            .status("PENDING")
+                            .status(status)
+                            .location(cityLocation)
                             .build();
                     orderRepository.save(order);
+                    createdCount++;
+                    log.debug("Created Order for {}: {}", personName, solicitud);
                 }
 
             } catch (Exception e) {
-                System.err.println("Error processing row: " + row + " -> " + e.getMessage());
+                errorCount++;
+                log.error("Error processing row: {}", row, e); // Log FULL stack trace
+
+                // Clear Hibernate session to prevent cascading failures
+                try {
+                    entityManager.clear();
+                    log.debug("EntityManager cleared after error");
+                } catch (Exception clearEx) {
+                    log.warn("Could not clear EntityManager: {}", clearEx.getMessage());
+                }
             }
         }
+        log.info("Hybrid Sync finished. Created Orders: {}, Row Errors: {}", createdCount, errorCount);
     }
 
     private String getValue(List<Object> row, int index) {
@@ -174,15 +258,148 @@ public class SyncService {
         return row.get(index).toString().trim();
     }
 
+    private String truncateString(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        log.warn("Truncating value from {} to {} chars: {}", value.length(), maxLength,
+                value.substring(0, Math.min(50, value.length())) + "...");
+        return value.substring(0, maxLength);
+    }
+
     private java.time.LocalDate parseDate(String dateStr) {
         try {
-            if (dateStr.isEmpty())
+            if (dateStr == null || dateStr.isEmpty())
                 return java.time.LocalDate.now();
-            // Basic parsing, improve as needed (e.g. DD/MM/YYYY)
-            // Google sheets often sends "DD/MM/YYYY" or "YYYY-MM-DD"
-            return java.time.LocalDate.now(); // Placeholder for safer sync first
-        } catch (Exception e) {
+
+            // Try DD/MM/YYYY format first (most common in Google Sheets for Spanish locale)
+            if (dateStr.contains("/")) {
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("d/M/yyyy");
+                return java.time.LocalDate.parse(dateStr, formatter);
+            }
+
+            // Try ISO format YYYY-MM-DD
+            if (dateStr.contains("-")) {
+                return java.time.LocalDate.parse(dateStr);
+            }
+
+            // If no separator, assume it's a number (Excel serial date)
+            // For now, default to today
+            log.warn("Unable to parse date: {}, using today", dateStr);
             return java.time.LocalDate.now();
+        } catch (Exception e) {
+            log.warn("Error parsing date '{}': {}, using today", dateStr, e.getMessage());
+            return java.time.LocalDate.now();
+        }
+    }
+
+    private com.sgp.backend.entity.Location findOrCreateCity(String cityName) {
+        try {
+            return locationRepository.findByType("CITY").stream()
+                    .filter(loc -> loc.getName().equalsIgnoreCase(cityName))
+                    .findFirst()
+                    .orElseGet(() -> {
+                        log.info("Creating new City: {}", cityName);
+                        com.sgp.backend.entity.Location newCity = com.sgp.backend.entity.Location.builder()
+                                .name(cityName)
+                                .type("CITY")
+                                .build();
+                        com.sgp.backend.entity.Location saved = locationRepository.save(newCity);
+                        log.info("City created with ID: {}", saved.getId());
+                        return saved;
+                    });
+        } catch (Exception e) {
+            log.error("FAILED to find/create city '{}'", cityName, e);
+            throw e;
+        }
+    }
+
+    private com.sgp.backend.entity.Location findOrCreateNeighborhood(String neighborhoodName,
+            com.sgp.backend.entity.Location parentCity) {
+        if (parentCity == null || parentCity.getId() == null) {
+            log.warn("Cannot create neighborhood '{}': parent city is null or has no ID", neighborhoodName);
+            return null;
+        }
+
+        try {
+            return locationRepository.findByParentId(parentCity.getId()).stream()
+                    .filter(loc -> loc.getName().equalsIgnoreCase(neighborhoodName))
+                    .findFirst()
+                    .orElseGet(() -> {
+                        log.info("Creating new Neighborhood: {} under City: {}", neighborhoodName,
+                                parentCity.getName());
+                        com.sgp.backend.entity.Location neighborhood = com.sgp.backend.entity.Location.builder()
+                                .name(neighborhoodName)
+                                .type("NEIGHBORHOOD")
+                                .parent(parentCity)
+                                .build();
+                        com.sgp.backend.entity.Location saved = locationRepository.save(neighborhood);
+                        log.info("Neighborhood created with ID: {}", saved.getId());
+                        return saved;
+                    });
+        } catch (Exception e) {
+            log.error("FAILED to find/create neighborhood '{}' under city '{}'", neighborhoodName,
+                    parentCity.getName(), e);
+            throw e;
+        }
+    }
+
+    private com.sgp.backend.entity.Person findOrCreatePerson(String name, String phone, String address,
+            com.sgp.backend.entity.Location location) {
+        try {
+            // Try to find existing person by name
+            List<com.sgp.backend.entity.Person> existingPersons = personRepository.findByNameContainingIgnoreCase(name);
+
+            if (!existingPersons.isEmpty()) {
+                // Person exists, update if needed
+                com.sgp.backend.entity.Person person = existingPersons.get(0);
+                log.debug("Found existing Person: {} (ID: {})", name, person.getId());
+                boolean updated = false;
+
+                if ((person.getPhone() == null || person.getPhone().isEmpty()) && phone != null && !phone.isEmpty()) {
+                    person.setPhone(phone);
+                    updated = true;
+                }
+                if ((person.getAddress() == null || person.getAddress().isEmpty()) && address != null
+                        && !address.isEmpty()) {
+                    person.setAddress(address);
+                    updated = true;
+                }
+                if (person.getLocation() == null && location != null) {
+                    person.setLocation(location);
+                    updated = true;
+                }
+
+                if (updated) {
+                    log.debug("Updating Person: {}", name);
+                    return personRepository.save(person);
+                }
+                return person;
+            }
+
+            // Person doesn't exist, create new one
+            log.info("Creating new Person: {} (phone: {}, location: {})", name, phone,
+                    location != null ? location.getName() : "none");
+
+            // Truncate long values to prevent DB constraints violations
+            String safeName = truncateString(name, 1000);
+            String safePhone = phone != null && !phone.isEmpty() ? truncateString(phone, 50) : null;
+            String safeAddress = address != null && !address.isEmpty() ? truncateString(address, 500) : null;
+
+            com.sgp.backend.entity.Person newPerson = com.sgp.backend.entity.Person.builder()
+                    .name(safeName)
+                    .type("INDIVIDUAL")
+                    .phone(safePhone)
+                    .address(safeAddress)
+                    .location(location)
+                    .build();
+
+            com.sgp.backend.entity.Person saved = personRepository.save(newPerson);
+            log.info("Person created with ID: {}", saved.getId());
+            return saved;
+        } catch (Exception e) {
+            log.error("FAILED to find/create person '{}'", name, e);
+            throw e;
         }
     }
 }

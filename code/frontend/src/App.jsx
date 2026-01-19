@@ -32,13 +32,15 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
 
-          <Route path="/" element={
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+          <Route path="/dashboard" element={
             <ProtectedRoute>
               <DashboardPage />
             </ProtectedRoute>
           } />
 
-          <Route path="/projects/:id" element={
+          <Route path="/projects/config/:configId" element={
             <ProtectedRoute>
               <ProjectDetailsPage />
             </ProtectedRoute>
