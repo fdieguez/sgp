@@ -21,6 +21,10 @@
     - Actualizado `.env.example` con la nueva URL: `http://solicitudes.ultrasoft.website/api`
     - Creada guía completa de deployment: `docs/DEPLOYMENT_GUIDE.md`
     - **Próxima fase**: Deployment en servidor VPS de DonWeb.
+- **🔧 Infraestructura: Nginx Reverse Proxy**:
+    - Implementado Reverse Proxy en Nginx (`nginx.conf`) para redirigir `/api` al backend.
+    - Soluciona problemas de CORS permitiendo que el frontend haga peticiones al mismo dominio (`/api`).
+    - Actualizado `.env.example` para usar URL relativa `VITE_API_URL=/api`.
 
 ### 17/01/2026
 - **🔥 FIX: DataIntegrityViolationException por valores largos**:

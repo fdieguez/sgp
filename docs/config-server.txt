@@ -7,4 +7,23 @@ POSTGRES_DB=sgp_db
 POSTGRES_USER=sgp_admin
 POSTGRES_PASSWORD=P10x#mK2$vL9qR!nW5z
 
+---------------------------------------------------------
+Rebuild Completo (Frontend + Backend + Database)
+# 1. Detener y limpiar todo
+docker-compose down
+
+# 2. Rebuild completo de todas las imágenes (sin caché)
+docker-compose build --no-cache
+
+# 3. Levantar todos los servicios
+docker-compose up -d
+
+# 4. Ver los logs en tiempo real
+docker-compose logs -f
+
+
+
+
+ admin@sgp.com / admin123
+
 
