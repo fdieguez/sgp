@@ -8,6 +8,14 @@
 
 ## 📅 Enero 2026
 
+### 21/01/2026
+- **🚀 Deployment Exitoso en Producción**:
+    - Desplegado sistema en `http://solicitudes.ultrasoft.website`.
+    - Configurado Nginx como Reverse Proxy para manejar rutas `/api` y eliminar problemas de CORS.
+    - Ajustada configuración de `VITE_API_URL` para usar rutas relativas en producción.
+    - Verificado login y navegación al Dashboard en entorno productivo.
+    - Intentado configurar conexión SSH Tunnel para DB (pendiente revisión de acceso por bloqueo de IP).
+
 ### 19/01/2026
 - **✅ Commit y Preparación para Deployment**:
     - Subido código con todos los fixes de mapeo y validaciones al repositorio GitHub.
