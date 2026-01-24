@@ -122,7 +122,7 @@ export default function ProjectDetailsPage() {
     const [visColumn, setVisColumn] = useState('');
     const [filters, setFilters] = useState({}); // { colIndex: 'value' }
     const [showFilters, setShowFilters] = useState(false);
-    const [rowsPerPage, setRowsPerPage] = useState(50);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
 
     useEffect(() => {
         const fetchProject = async () => {
