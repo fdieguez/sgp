@@ -18,13 +18,24 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         // 1. Seed Admin User
-        if (userRepository.findByEmail("admin@sgp.com").isEmpty()) {
-            User admin = new User();
-            admin.setEmail("admin@sgp.com");
-            admin.setPassword(passwordEncoder.encode("admin123"));
-            admin.setRole("ADMIN");
-            userRepository.save(admin);
-            System.out.println("✅ ADMIN user created: admin@sgp.com / admin123");
+        // 1. Seed Users
+        createUserIfNotFound("francisco@sgp.com", "SGP_StrongPass_2026!", "ADMIN");
+        createUserIfNotFound("juanmanuel@sgp.com", "SGP_StrongPass_2026!", "ADMIN");
+        createUserIfNotFound("user1@sgp.com", "User_Pass_2026!", "USER");
+        createUserIfNotFound("user2@sgp.com", "User_Pass_2026!", "USER");
+
+        // Remove old admin if exists (optional cleanup, or just ignore)
+        // userRepository.findByEmail("admin@sgp.com").ifPresent(userRepository::delete);
+    }
+
+    private void createUserIfNotFound(String email, String password, String role) {
+        if (userRepository.findByEmail(email).isEmpty()) {
+            User user = new User();
+            user.setEmail(email);
+            user.setPassword(passwordEncoder.encode(password));
+            user.setRole(role);
+            userRepository.save(user);
+            System.out.println("✅ User created: " + email + " (" + role + ") / " + password);
         }
 
         // 2. Seed Test Sheets Configuration
