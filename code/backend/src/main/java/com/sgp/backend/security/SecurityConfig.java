@@ -68,10 +68,11 @@ public class SecurityConfig {
         @Bean
         public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
                 org.springframework.web.cors.CorsConfiguration configuration = new org.springframework.web.cors.CorsConfiguration();
-                configuration.setAllowedOrigins(
-                                java.util.List.of("http://localhost:80", "http://149.50.128.168",
-                                                "http://localhost:5173", "https://solicitudes.ultrasoft.website",
-                                                "http://solicitudes.ultrasoft.website")); // Frontend
+                // configuration.setAllowedOrigins(
+                // java.util.List.of("http://localhost:80", "http://149.50.128.168",
+                // "http://localhost:5173", "https://solicitudes.ultrasoft.website",
+                // "http://solicitudes.ultrasoft.website")); // Frontend
+                configuration.setAllowedOriginPatterns(java.util.List.of("*")); // Allow ALL for debugging
                 // URL
                 configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
                 configuration.setAllowedHeaders(java.util.List.of("*"));
