@@ -130,7 +130,7 @@ public class SyncService {
     }
 
     private void processRows(List<List<Object>> rows) {
-        log.info("Processing {} rows into Order entities...", rows.size());
+        // log.info("Processing {} rows into Order entities...", rows.size());
         int createdCount = 0;
         int errorCount = 0;
 
@@ -233,7 +233,7 @@ public class SyncService {
                             .build();
                     orderRepository.save(order);
                     createdCount++;
-                    log.debug("Created Order for {}: {}", personName, solicitud);
+                    // log.debug("Created Order for {}: {}", personName, solicitud);
                 }
 
             } catch (Exception e) {
@@ -299,13 +299,13 @@ public class SyncService {
                     .filter(loc -> loc.getName().equalsIgnoreCase(cityName))
                     .findFirst()
                     .orElseGet(() -> {
-                        log.info("Creating new City: {}", cityName);
+                        // log.info("Creating new City: {}", cityName);
                         com.sgp.backend.entity.Location newCity = com.sgp.backend.entity.Location.builder()
                                 .name(cityName)
                                 .type("CITY")
                                 .build();
                         com.sgp.backend.entity.Location saved = locationRepository.save(newCity);
-                        log.info("City created with ID: {}", saved.getId());
+                        // log.info("City created with ID: {}", saved.getId());
                         return saved;
                     });
         } catch (Exception e) {
@@ -326,15 +326,15 @@ public class SyncService {
                     .filter(loc -> loc.getName().equalsIgnoreCase(neighborhoodName))
                     .findFirst()
                     .orElseGet(() -> {
-                        log.info("Creating new Neighborhood: {} under City: {}", neighborhoodName,
-                                parentCity.getName());
+                        // log.info("Creating new Neighborhood: {} under City: {}", neighborhoodName,
+                        // parentCity.getName());
                         com.sgp.backend.entity.Location neighborhood = com.sgp.backend.entity.Location.builder()
                                 .name(neighborhoodName)
                                 .type("NEIGHBORHOOD")
                                 .parent(parentCity)
                                 .build();
                         com.sgp.backend.entity.Location saved = locationRepository.save(neighborhood);
-                        log.info("Neighborhood created with ID: {}", saved.getId());
+                        // log.info("Neighborhood created with ID: {}", saved.getId());
                         return saved;
                     });
         } catch (Exception e) {
@@ -353,7 +353,7 @@ public class SyncService {
             if (!existingPersons.isEmpty()) {
                 // Person exists, update if needed
                 com.sgp.backend.entity.Person person = existingPersons.get(0);
-                log.debug("Found existing Person: {} (ID: {})", name, person.getId());
+                // log.debug("Found existing Person: {} (ID: {})", name, person.getId());
                 boolean updated = false;
 
                 if ((person.getPhone() == null || person.getPhone().isEmpty()) && phone != null && !phone.isEmpty()) {
@@ -371,15 +371,15 @@ public class SyncService {
                 }
 
                 if (updated) {
-                    log.debug("Updating Person: {}", name);
+                    // log.debug("Updating Person: {}", name);
                     return personRepository.save(person);
                 }
                 return person;
             }
 
             // Person doesn't exist, create new one
-            log.info("Creating new Person: {} (phone: {}, location: {})", name, phone,
-                    location != null ? location.getName() : "none");
+            // log.info("Creating new Person: {} (phone: {}, location: {})", name, phone,
+            // location != null ? location.getName() : "none");
 
             // Truncate long values to prevent DB constraints violations
             String safeName = truncateString(name, 1000);
@@ -395,7 +395,7 @@ public class SyncService {
                     .build();
 
             com.sgp.backend.entity.Person saved = personRepository.save(newPerson);
-            log.info("Person created with ID: {}", saved.getId());
+            // log.info("Person created with ID: {}", saved.getId());
             return saved;
         } catch (Exception e) {
             log.error("FAILED to find/create person '{}'", name, e);
