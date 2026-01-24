@@ -84,8 +84,9 @@ const TruncatedCell = ({ content, rowIndex }) => {
 
     if (!shouldTruncate) return <span className="text-sm text-gray-300">{text}</span>;
 
-    // Logic: If it's one of the first 2 rows, show popover BELOW (top-full). Otherwise show ABOVE (bottom-full).
-    const isTopRow = rowIndex < 2;
+    // Logic: If it's one of the first 5 rows, show popover BELOW (top-full). Otherwise show ABOVE (bottom-full).
+    // This prevents the popover from being clipped by the table header or top of screen.
+    const isTopRow = rowIndex < 5;
     const positionClasses = isTopRow ? 'top-full mt-2' : 'bottom-full mb-2';
 
     return (
