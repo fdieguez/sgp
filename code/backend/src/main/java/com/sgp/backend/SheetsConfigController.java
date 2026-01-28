@@ -8,12 +8,15 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import com.sgp.backend.repository.ProjectRepository;
+
 @RestController
 @RequestMapping("/api/config")
 @RequiredArgsConstructor
 public class SheetsConfigController {
 
     private final SheetsConfigRepository repository;
+    private final ProjectRepository projectRepository;
 
     @GetMapping
     public List<SheetsConfig> getAll() {
@@ -28,5 +31,14 @@ public class SheetsConfigController {
         }
         config.setStatus("ACTIVE");
         return repository.save(config);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        return repository.findById(id).map(config -> {
+            projectRepository.findBySheetsConfig(config).ifPresent(projectRepository::delete);
+            repository.delete(config);
+            return ResponseEntity.ok().<Void>build();
+        }).orElse(ResponseEntity.notFound().build());
     }
 }
