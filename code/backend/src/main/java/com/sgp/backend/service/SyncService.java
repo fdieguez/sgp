@@ -383,7 +383,7 @@ public class SyncService {
 
             // Truncate long values to prevent DB constraints violations
             String safeName = truncateString(name, 1000);
-            String safePhone = phone != null && !phone.isEmpty() ? truncateString(phone, 50) : null;
+            String safePhone = phone != null && !phone.isEmpty() ? truncateString(phone, 200) : null;
             String safeAddress = address != null && !address.isEmpty() ? truncateString(address, 500) : null;
 
             com.sgp.backend.entity.Person newPerson = com.sgp.backend.entity.Person.builder()
