@@ -10,7 +10,8 @@ import {
     Plus,
     LogOut,
     ChevronRight,
-    Users
+    Users,
+    Trash2 // Added Trash2
 } from 'lucide-react';
 
 import DashboardStats from '../components/DashboardStats';
@@ -20,7 +21,7 @@ export default function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const [syncingId, setSyncingId] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const { logout } = useAuth();
+    const { user, logout } = useAuth();
     const navigate = useNavigate();
     const [statsKey, setStatsKey] = useState(0);
 
@@ -50,6 +51,18 @@ export default function DashboardPage() {
             alert("Error al sincronizar");
         } finally {
             setSyncingId(null);
+        }
+    };
+
+    const handleDelete = async (id) => {
+        if (!window.confirm("¿Seguro que deseas eliminar esta planilla?")) return;
+
+        try {
+            await api.delete(`/api/config/${id}`);
+            fetchConfigs();
+        } catch (error) {
+            console.error("Delete failed", error);
+            alert("Error al eliminar");
         }
     };
 
@@ -149,6 +162,15 @@ export default function DashboardPage() {
                                             {config.lastSync ? `Updated: ${new Date(config.lastSync).toLocaleTimeString()}` : 'Never synced'}
                                         </div>
                                         <div className="flex gap-2">
+                                            {user?.role === 'ADMIN' && (
+                                                <button
+                                                    onClick={() => handleDelete(config.id)}
+                                                    className="p-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg transition-colors"
+                                                    title="Eliminar"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => handleSync(config.id)}
                                                 disabled={syncingId === config.id}
