@@ -7,6 +7,8 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
+
 @Component
 @RequiredArgsConstructor
 public class DataInitializer implements CommandLineRunner {
@@ -17,26 +19,16 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        // 1. Seed Admin User
         // 1. Seed Users
-        createUserIfNotFound("francisco@sgp.com", "SGP_StrongPass_2026!", "ADMIN");
-        createUserIfNotFound("juanmanuel@sgp.com", "SGP_StrongPass_2026!", "ADMIN");
-        createUserIfNotFound("user1@sgp.com", "User_Pass_2026!", "USER");
-        createUserIfNotFound("user2@sgp.com", "User_Pass_2026!", "USER");
+        createUserIfNotFound("francisco@sgp.com", "SGP_StrongPass_2026!", "ADMIN", "Francisco", "Admin",
+                LocalDate.of(1990, 1, 1));
+        createUserIfNotFound("juanmanuel@sgp.com", "SGP_StrongPass_2026!", "ADMIN", "Juan Manuel", "Admin",
+                LocalDate.of(1990, 1, 1));
+        createUserIfNotFound("user1@sgp.com", "User_Pass_2026!", "USER", "Usuario", "Uno", null);
+        createUserIfNotFound("user2@sgp.com", "User_Pass_2026!", "USER", "Usuario", "Dos", null);
 
-        // Remove old admin if exists (optional cleanup, or just ignore)
+        // Remove old admin if exists
         // userRepository.findByEmail("admin@sgp.com").ifPresent(userRepository::delete);
-    }
-
-    private void createUserIfNotFound(String email, String password, String role) {
-        if (userRepository.findByEmail(email).isEmpty()) {
-            User user = new User();
-            user.setEmail(email);
-            user.setPassword(passwordEncoder.encode(password));
-            user.setRole(role);
-            userRepository.save(user);
-            System.out.println("✅ User created: " + email + " (" + role + ") / " + password);
-        }
 
         // 2. Seed Test Sheets Configuration
         if (sheetsConfigRepository.count() == 0) {
@@ -47,6 +39,22 @@ public class DataInitializer implements CommandLineRunner {
             config.setStatus("PENDING");
             sheetsConfigRepository.save(config);
             System.out.println("✅ Test Sheet Config created automatically");
+        }
+    }
+
+    private void createUserIfNotFound(String email, String password, String role, String firstName, String lastName,
+            LocalDate birthDate) {
+        if (userRepository.findByEmail(email).isEmpty()) {
+            User user = new User();
+            user.setEmail(email);
+            user.setPassword(passwordEncoder.encode(password));
+            user.setRole(role);
+            user.setFirstName(firstName);
+            user.setLastName(lastName);
+            user.setBirthDate(birthDate);
+
+            userRepository.save(user);
+            System.out.println("✅ User created: " + email + " (" + role + ")");
         }
     }
 }

@@ -23,5 +23,14 @@ public class User {
     private String password; // Will store BCrypt hash
 
     @Column(nullable = false)
+    private String firstName;
+
+    @Column(nullable = false)
+    private String lastName;
+
+    @Column(nullable = true)
+    private java.time.LocalDate birthDate;
+
+    @Column(nullable = false)
     private String role; // e.g., "ADMIN", "USER"
 }
