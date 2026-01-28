@@ -8,6 +8,31 @@
 
 ## 📅 Enero 2026
 
+### 28/01/2026
+- **🐛 Fixes de Producción y UI**:
+    - **🗂️ Database Migration**: Forzado reseteo de base de datos (`docker-compose down -v`) para aplicar cambios de esquema (nuevos campos de usuario).
+    - **🔐 Roles y Permisos**:
+        - Ocultado botón de "Eliminar Planilla" en el Dashboard para usuarios no administradores.
+        - Verificado flujo de login con usuarios actualizados.
+    - **📱 Datos & Sincronización**:
+        - Aumentado límite de caracteres para el campo **Teléfono** de 50 a **200 caracteres** en `SyncService`, evitando truncamiento de datos múltiples.
+        - Ajustado truncamiento defensivo para evitar errores SQL.
+
+### 24/01/2026
+- **👥 Gestión de Usuarios Mejorada**:
+    - **Nuevos Campos**: Agregados `firstName`, `lastName` y `birthDate` a la entidad `User`.
+    - **Seed Users**: Actualizado `DataInitializer` para crear automáticamente:
+        - Admins: `francisco@sgp.com`, `juanmanuel@sgp.com`
+        - Users: `user1@sgp.com`, `user2@sgp.com`
+    - **Registro**: Endpoint de registro actualizado para aceptar los nuevos campos.
+- **🎨 UI/UX Improvements**:
+    - **Tooltips Inteligentes**: Mejorada la lógica de posicionamiento de popovers en tablas. Ahora las primeras 5 filas abren hacia abajo para evitar cortes con el header.
+
+### 22/01/2026
+- **🔒 Seguridad SSL en Proceso**:
+    - ✅ Certificado Let's Encrypt generado exitosamente en VPS.
+    - Próximo paso: Despliegue de Nginx y Docker con configuración HTTPS.
+
 ### 21/01/2026
 - **🚀 Deployment Exitoso en Producción**:
     - Desplegado sistema en `http://solicitudes.ultrasoft.website`.
@@ -15,6 +40,12 @@
     - Ajustada configuración de `VITE_API_URL` para usar rutas relativas en producción.
     - Verificado login y navegación al Dashboard en entorno productivo.
     - Intentado configurar conexión SSH Tunnel para DB (pendiente revisión de acceso por bloqueo de IP).
+    - **👮 Seguridad**:
+        - Cambiada contraseña por defecto (admin) a una credencial robusta.
+    - **🛠️ Backend Optimization**:
+        - Reducida drásticamente la verbosidad de los logs para operaciones masivas (solo se loguean errores durante la sincronización).
+    - **🗑️ Feature**:
+        - Agregada opción para eliminar planillas desde el dashboard.
 
 ### 19/01/2026
 - **✅ Commit y Preparación para Deployment**:
