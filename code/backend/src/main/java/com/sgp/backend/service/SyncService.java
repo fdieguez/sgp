@@ -3,8 +3,18 @@ package com.sgp.backend.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sgp.backend.entity.Project;
 import com.sgp.backend.entity.SheetsConfig;
+import com.sgp.backend.entity.Person;
+import com.sgp.backend.entity.Location;
+import com.sgp.backend.entity.Responsable;
+import com.sgp.backend.entity.Solicitud;
+import com.sgp.backend.entity.Pedido;
+import com.sgp.backend.entity.Subsidio;
 import com.sgp.backend.repository.ProjectRepository;
 import com.sgp.backend.repository.SheetsConfigRepository;
+import com.sgp.backend.repository.SolicitudRepository;
+import com.sgp.backend.repository.ResponsableRepository;
+import com.sgp.backend.repository.PersonRepository;
+import com.sgp.backend.repository.LocationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,7 +36,8 @@ public class SyncService {
     private final ObjectMapper objectMapper;
 
     // New Repositories
-    private final com.sgp.backend.repository.OrderRepository orderRepository;
+    private final com.sgp.backend.repository.SolicitudRepository solicitudRepository;
+    private final com.sgp.backend.repository.ResponsableRepository responsableRepository;
     private final com.sgp.backend.repository.PersonRepository personRepository;
     private final com.sgp.backend.repository.LocationRepository locationRepository;
 
@@ -35,6 +46,7 @@ public class SyncService {
 
     @Transactional
     public Project syncProject(Long sheetsConfigId) {
+        // ... (Keep existing logic until processRows call) ...
         log.info("Starting sync for SheetsConfig ID: {}", sheetsConfigId);
 
         // 1. Fetch Config
@@ -107,7 +119,7 @@ public class SyncService {
             if (rawData != null && rawData.size() > 1) { // Skip header
                 log.info("Starting Hybrid Sync processing for {} rows...", rawData.size() - 1);
                 List<List<Object>> dataRows = rawData.subList(1, rawData.size());
-                processRows(dataRows);
+                processRows(dataRows, config);
             } else {
                 log.warn("Not enough data rows to process hybrid sync (Size: {})",
                         rawData != null ? rawData.size() : "null");
@@ -129,31 +141,9 @@ public class SyncService {
         }
     }
 
-    private void processRows(List<List<Object>> rows) {
-        // log.info("Processing {} rows into Order entities...", rows.size());
+    private void processRows(List<List<Object>> rows, SheetsConfig config) {
         int createdCount = 0;
         int errorCount = 0;
-
-        // MAPEO REAL DE COLUMNAS DEL SHEET "SEGUIMIENTO":
-        // Col A (0): N° Orden
-        // Col B (1): Fecha de Ingreso
-        // Col C (2): Mes
-        // Col D (3): Origen
-        // Col E (4): Nombre / Institución
-        // Col F (5): Localidad
-        // Col G (6): Barrio
-        // Col H (7): Teléfono
-        // Col I (8): Solicitud
-        // Col J (9): ZONA / EJE
-        // Col K (10): (vacío)
-        // Col L (11): RESPONSABLE
-        // Col M (12): Fecha de Contacto
-        // Col N (13): Fecha de Resolución
-        // Col O (14): Resolución
-        // Col P (15): Detalle
-        // Col Q (16): Observación
-        // Col R (17): Monto
-        // Col S (18): CONTROL 1er contacto
 
         for (List<Object> row : rows) {
             try {
@@ -161,24 +151,25 @@ public class SyncService {
                     continue; // Skip empty/invalid rows
 
                 // Extract columns
-                String orderNumber = getValue(row, 0);
+                String orderNumber = getValue(row, 0); // Not used currently?
                 String entryDateStr = getValue(row, 1);
-                String month = getValue(row, 2);
+                // Col 2 Mes skipped
                 String origin = getValue(row, 3);
                 String personName = getValue(row, 4);
                 String localidad = getValue(row, 5);
                 String barrio = getValue(row, 6);
                 String phone = getValue(row, 7);
-                String solicitud = getValue(row, 8);
-                String zona = getValue(row, 9);
-                String responsable = getValue(row, 11);
+                String solicitudDesc = getValue(row, 8);
+                // Col 9 ZONA skipped
+                String responsableName = getValue(row, 11); // Changed index based on previous comments? Wait, map says
+                                                            // 11 is RESPONSABLE. Correct.
                 String contactDateStr = getValue(row, 12);
                 String resolutionDateStr = getValue(row, 13);
                 String resolucion = getValue(row, 14);
                 String detalle = getValue(row, 15);
                 String observacion = getValue(row, 16);
-                String monto = getValue(row, 17);
-                String control = getValue(row, 18);
+                String montoStr = getValue(row, 17);
+                // Col 18 CONTROL skipped
 
                 // Skip if no person name
                 if (personName.isEmpty())
@@ -196,24 +187,31 @@ public class SyncService {
                 }
 
                 // 2. Find or Create Person
-                com.sgp.backend.entity.Person person = findOrCreatePerson(personName, phone, barrio, cityLocation);
+                com.sgp.backend.entity.Person person = findOrCreatePerson(personName, phone, barrio, cityLocation); // Barrio
+                                                                                                                    // as
+                                                                                                                    // address?
 
-                // 3. Parse Dates
+                // 3. Find or Create Responsable
+                com.sgp.backend.entity.Responsable responsable = null;
+                if (!responsableName.isEmpty()) {
+                    responsable = findOrCreateResponsable(responsableName);
+                }
+
+                // 4. Parse Dates
                 java.time.LocalDate entryDate = parseDate(entryDateStr);
 
-                // 4. Create Order (Check for duplicates)
-                String finalSolicitud = solicitud;
-                String finalDetalle = detalle;
-
-                boolean exists = orderRepository.findByPersonId(person.getId()).stream()
-                        .anyMatch(o -> o.getDescription() != null && o.getDescription().equals(finalSolicitud)
-                                && o.getEntryDate().equals(entryDate));
+                // 5. Check for duplicates
+                String finalSolicitud = solicitudDesc;
+                boolean exists = solicitudRepository.findByPersonId(person.getId()).stream()
+                        .anyMatch(s -> s.getDescription() != null && s.getDescription().equals(finalSolicitud)
+                                && s.getEntryDate().equals(entryDate));
 
                 if (!exists) {
-                    // Determine status from "Resolución" column
+                    // Determine status
                     String status = "PENDING";
                     if (!resolucion.isEmpty()) {
-                        if (resolucion.equalsIgnoreCase("COMPLETADO") || resolucion.equalsIgnoreCase("RESUELTO")) {
+                        if (resolucion.equalsIgnoreCase("COMPLETADO") || resolucion.equalsIgnoreCase("RESUELTO")
+                                || resolucion.equalsIgnoreCase("FINALIZADO")) {
                             status = "COMPLETED";
                         } else if (resolucion.equalsIgnoreCase("EN PROCESO")
                                 || resolucion.equalsIgnoreCase("EN PROGRESO")) {
@@ -223,33 +221,85 @@ public class SyncService {
                         }
                     }
 
-                    com.sgp.backend.entity.Order order = com.sgp.backend.entity.Order.builder()
-                            .person(person)
-                            .description(solicitud)
-                            .origin(origin.isEmpty() ? "IMPORTED" : origin.toUpperCase())
-                            .entryDate(entryDate)
-                            .status(status)
-                            .location(cityLocation)
-                            .build();
-                    orderRepository.save(order);
+                    // Determine Type: Subsidio vs Pedido
+                    java.math.BigDecimal amount = parseAmount(montoStr);
+                    boolean isSubsidio = amount != null && amount.compareTo(java.math.BigDecimal.ZERO) > 0;
+
+                    com.sgp.backend.entity.Solicitud newSolicitud;
+
+                    if (isSubsidio) {
+                        newSolicitud = com.sgp.backend.entity.Subsidio.builder()
+                                .person(person)
+                                .description(solicitudDesc) // + (detalle.isEmpty() ? "" : " - " + detalle) ?
+                                .origin(origin.isEmpty() ? "IMPORTED" : origin.toUpperCase())
+                                .entryDate(entryDate)
+                                .status(status)
+                                .location(cityLocation)
+                                .responsable(responsable)
+                                .sheetsConfig(config)
+                                .amount(amount)
+                                .grantDate(parseDate(resolutionDateStr)) // Assuming grant date is resolution date
+                                .build();
+                    } else {
+                        newSolicitud = com.sgp.backend.entity.Pedido.builder()
+                                .person(person)
+                                .description(solicitudDesc)
+                                .origin(origin.isEmpty() ? "IMPORTED" : origin.toUpperCase())
+                                .entryDate(entryDate)
+                                .status(status)
+                                .location(cityLocation)
+                                .responsable(responsable)
+                                .sheetsConfig(config)
+                                .build();
+                    }
+
+                    solicitudRepository.save(newSolicitud);
                     createdCount++;
-                    // log.debug("Created Order for {}: {}", personName, solicitud);
                 }
 
             } catch (Exception e) {
                 errorCount++;
-                log.error("Error processing row: {}", row, e); // Log FULL stack trace
-
-                // Clear Hibernate session to prevent cascading failures
+                log.error("Error processing row: {}", row, e);
                 try {
                     entityManager.clear();
-                    log.debug("EntityManager cleared after error");
                 } catch (Exception clearEx) {
                     log.warn("Could not clear EntityManager: {}", clearEx.getMessage());
                 }
             }
         }
-        log.info("Hybrid Sync finished. Created Orders: {}, Row Errors: {}", createdCount, errorCount);
+        log.info("Hybrid Sync finished. Created Solicitudes: {}, Row Errors: {}", createdCount, errorCount);
+    }
+
+    private com.sgp.backend.entity.Responsable findOrCreateResponsable(String name) {
+        try {
+            return responsableRepository.findByName(name)
+                    .orElseGet(() -> responsableRepository.save(com.sgp.backend.entity.Responsable.builder()
+                            .name(name)
+                            .build()));
+        } catch (Exception e) {
+            log.error("Failed to find/create responsable: {}", name);
+            return null;
+        }
+    }
+
+    private java.math.BigDecimal parseAmount(String amountStr) {
+        if (amountStr == null || amountStr.trim().isEmpty())
+            return java.math.BigDecimal.ZERO;
+        try {
+            // Remove $ and spaces, replace comma with dot if needed?
+            // Ideally localized parsing, but simple cleanup for now:
+            String clean = amountStr.replace("$", "").replace(".", "").replace(",", ".").trim();
+            // CAUTION: Removing all dots assuming they are thousand separators and comma is
+            // decimal?
+            // Or standard US format?
+            // If "1.000,00" -> remove dot -> "1000,00" -> replace comma -> "1000.00" ->
+            // Correct.
+            // If "1000" -> "1000".
+            // If "100,50" -> "100.50".
+            return new java.math.BigDecimal(clean);
+        } catch (Exception e) {
+            return java.math.BigDecimal.ZERO;
+        }
     }
 
     private String getValue(List<Object> row, int index) {
@@ -322,7 +372,7 @@ public class SyncService {
         }
 
         try {
-            return locationRepository.findByParentId(parentCity.getId()).stream()
+            return locationRepository.findByParent(parentCity).stream()
                     .filter(loc -> loc.getName().equalsIgnoreCase(neighborhoodName))
                     .findFirst()
                     .orElseGet(() -> {

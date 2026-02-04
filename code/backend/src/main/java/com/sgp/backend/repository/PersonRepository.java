@@ -7,6 +7,8 @@ import java.util.List;
 
 @Repository
 public interface PersonRepository extends JpaRepository<Person, Long> {
+    java.util.Optional<Person> findByName(String name);
+
     List<Person> findByNameContainingIgnoreCase(String name);
 
     List<Person> findByType(String type);

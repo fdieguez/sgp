@@ -23,4 +23,16 @@ public class LocationController {
     public ResponseEntity<Location> createLocation(@RequestBody Location location) {
         return ResponseEntity.ok(locationService.createLocation(location));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteLocation(@PathVariable Long id) {
+        locationService.deleteLocation(id);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/cleanup")
+    public ResponseEntity<String> cleanup() {
+        int count = locationService.cleanupLocations();
+        return ResponseEntity.ok("Se eliminaron " + count + " registros inválidos.");
+    }
 }

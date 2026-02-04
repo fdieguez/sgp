@@ -30,16 +30,19 @@ public class DataInitializer implements CommandLineRunner {
         // Remove old admin if exists
         // userRepository.findByEmail("admin@sgp.com").ifPresent(userRepository::delete);
 
-        // 2. Seed Test Sheets Configuration
-        if (sheetsConfigRepository.count() == 0) {
-            com.sgp.backend.entity.SheetsConfig config = new com.sgp.backend.entity.SheetsConfig();
-            config.setSpreadsheetId("1wbFbc2CAX4w_NcXpWRYFJ8HGNJ0IxImRwyovwz35dq4");
-            config.setSheetName("Hoja 1");
-            config.setSyncFrequencyMinutes(60);
-            config.setStatus("PENDING");
-            sheetsConfigRepository.save(config);
-            System.out.println("✅ Test Sheet Config created automatically");
-        }
+        // 2. Seed Test Sheets Configuration (DISABLED to prevent data pollution)
+        /*
+         * if (sheetsConfigRepository.count() == 0) {
+         * com.sgp.backend.entity.SheetsConfig config = new
+         * com.sgp.backend.entity.SheetsConfig();
+         * config.setSpreadsheetId("1wbFbc2CAX4w_NcXpWRYFJ8HGNJ0IxImRwyovwz35dq4");
+         * config.setSheetName("Hoja 1");
+         * config.setSyncFrequencyMinutes(60);
+         * config.setStatus("PENDING");
+         * sheetsConfigRepository.save(config);
+         * System.out.println("✅ Test Sheet Config created automatically");
+         * }
+         */
     }
 
     private void createUserIfNotFound(String email, String password, String role, String firstName, String lastName,

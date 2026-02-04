@@ -1,8 +1,7 @@
 package com.sgp.backend.service;
 
 import com.sgp.backend.dto.DashboardStatsDTO;
-import com.sgp.backend.repository.OrderRepository;
-import com.sgp.backend.repository.SubsidyRepository;
+import com.sgp.backend.repository.SolicitudRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -15,35 +14,34 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DashboardService {
 
-    private final OrderRepository orderRepository;
-    private final SubsidyRepository subsidyRepository;
+    private final SolicitudRepository solicitudRepository;
 
     public DashboardStatsDTO getStats() {
-        long totalOrders = orderRepository.count();
-        long pendingOrders = orderRepository.countByStatus("PENDING");
-        long completedOrders = orderRepository.countByStatus("COMPLETED");
+        long totalSolicitudes = solicitudRepository.count();
+        long pendingSolicitudes = solicitudRepository.countByStatus("PENDING");
+        long completedSolicitudes = solicitudRepository.countByStatus("COMPLETED");
 
-        BigDecimal totalDelivered = subsidyRepository.sumAmountByStatus("DELIVERED");
+        BigDecimal totalDelivered = solicitudRepository.sumSubsidiosAmountByStatus("COMPLETED");
         if (totalDelivered == null) {
             totalDelivered = BigDecimal.ZERO;
         }
 
-        List<Object[]> originsRaw = orderRepository.countOrdersByOrigin();
-        Map<String, Long> ordersByOrigin = new HashMap<>();
+        List<Object[]> originsRaw = solicitudRepository.countSolicitudesByOrigin();
+        Map<String, Long> solicitudesByOrigin = new HashMap<>();
         for (Object[] row : originsRaw) {
             String origin = (String) row[0];
             Long count = (Long) row[1];
             if (origin == null)
                 origin = "UNKNOWN";
-            ordersByOrigin.put(origin, count);
+            solicitudesByOrigin.put(origin, count);
         }
 
         return DashboardStatsDTO.builder()
-                .totalOrders(totalOrders)
-                .pendingOrders(pendingOrders)
-                .completedOrders(completedOrders)
+                .totalSolicitudes(totalSolicitudes)
+                .pendingSolicitudes(pendingSolicitudes)
+                .completedSolicitudes(completedSolicitudes)
                 .totalSubsidiesDelivered(totalDelivered)
-                .ordersByOrigin(ordersByOrigin)
+                .solicitudesByOrigin(solicitudesByOrigin)
                 .build();
     }
 }
