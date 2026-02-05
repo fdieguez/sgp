@@ -160,16 +160,16 @@ public class SyncService {
                 String barrio = getValue(row, 6);
                 String phone = getValue(row, 7);
                 String solicitudDesc = getValue(row, 8);
-                // Col 9 ZONA skipped
-                String responsableName = getValue(row, 11); // Changed index based on previous comments? Wait, map says
-                                                            // 11 is RESPONSABLE. Correct.
+                String zone = getValue(row, 9);
+                // Col 10?
+                String responsableName = getValue(row, 11);
                 String contactDateStr = getValue(row, 12);
                 String resolutionDateStr = getValue(row, 13);
                 String resolucion = getValue(row, 14);
                 String detalle = getValue(row, 15);
                 String observacion = getValue(row, 16);
                 String montoStr = getValue(row, 17);
-                // Col 18 CONTROL skipped
+                String controlStr = getValue(row, 18); // Control 1er Contacto
 
                 // Skip if no person name
                 if (personName.isEmpty())
@@ -187,9 +187,7 @@ public class SyncService {
                 }
 
                 // 2. Find or Create Person
-                com.sgp.backend.entity.Person person = findOrCreatePerson(personName, phone, barrio, cityLocation); // Barrio
-                                                                                                                    // as
-                                                                                                                    // address?
+                com.sgp.backend.entity.Person person = findOrCreatePerson(personName, phone, barrio, cityLocation);
 
                 // 3. Find or Create Responsable
                 com.sgp.backend.entity.Responsable responsable = null;
@@ -197,8 +195,10 @@ public class SyncService {
                     responsable = findOrCreateResponsable(responsableName);
                 }
 
-                // 4. Parse Dates
+                // 4. Parse Dates & Booleans
                 java.time.LocalDate entryDate = parseDate(entryDateStr);
+                boolean isFirstContactOk = controlStr.equalsIgnoreCase("SI") || controlStr.equalsIgnoreCase("YES")
+                        || controlStr.equalsIgnoreCase("OK");
 
                 // 5. Check for duplicates
                 String finalSolicitud = solicitudDesc;
@@ -211,12 +211,14 @@ public class SyncService {
                     String status = "PENDING";
                     if (!resolucion.isEmpty()) {
                         if (resolucion.equalsIgnoreCase("COMPLETADO") || resolucion.equalsIgnoreCase("RESUELTO")
-                                || resolucion.equalsIgnoreCase("FINALIZADO")) {
+                                || resolucion.equalsIgnoreCase("FINALIZADO")
+                                || resolucion.equalsIgnoreCase("ENTREGADO")) {
                             status = "COMPLETED";
                         } else if (resolucion.equalsIgnoreCase("EN PROCESO")
                                 || resolucion.equalsIgnoreCase("EN PROGRESO")) {
                             status = "IN_PROGRESS";
-                        } else if (resolucion.equalsIgnoreCase("RECHAZADO")) {
+                        } else if (resolucion.equalsIgnoreCase("RECHAZADO")
+                                || resolucion.equalsIgnoreCase("CANCELADO")) {
                             status = "REJECTED";
                         }
                     }
@@ -230,15 +232,22 @@ public class SyncService {
                     if (isSubsidio) {
                         newSolicitud = com.sgp.backend.entity.Subsidio.builder()
                                 .person(person)
-                                .description(solicitudDesc) // + (detalle.isEmpty() ? "" : " - " + detalle) ?
+                                .description(solicitudDesc)
                                 .origin(origin.isEmpty() ? "IMPORTED" : origin.toUpperCase())
                                 .entryDate(entryDate)
                                 .status(status)
                                 .location(cityLocation)
                                 .responsable(responsable)
                                 .sheetsConfig(config)
+                                .zone(zone)
+                                .contactDate(parseDate(contactDateStr))
+                                .resolutionDate(parseDate(resolutionDateStr))
+                                .resolution(resolucion)
+                                .detail(detalle)
+                                .observation(observacion)
+                                .firstContactControl(isFirstContactOk)
                                 .amount(amount)
-                                .grantDate(parseDate(resolutionDateStr)) // Assuming grant date is resolution date
+                                .grantDate(parseDate(resolutionDateStr))
                                 .build();
                     } else {
                         newSolicitud = com.sgp.backend.entity.Pedido.builder()
@@ -250,6 +259,13 @@ public class SyncService {
                                 .location(cityLocation)
                                 .responsable(responsable)
                                 .sheetsConfig(config)
+                                .zone(zone)
+                                .contactDate(parseDate(contactDateStr))
+                                .resolutionDate(parseDate(resolutionDateStr))
+                                .resolution(resolucion)
+                                .detail(detalle)
+                                .observation(observacion)
+                                .firstContactControl(isFirstContactOk)
                                 .build();
                     }
 

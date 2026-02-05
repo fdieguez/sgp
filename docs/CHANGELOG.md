@@ -6,6 +6,44 @@
 
 ---
 
+## 📅 Febrero 2026
+
+### 05/02/2026
+- **🛠️ Refactorización y Ampliación del Modelo de Datos**:
+    - **Reestructuración de Entidades**:
+        - Se implementó `Solicitud` como clase abstracta padre de `Pedido` y `Subsidio` con herencia `JOINED`.
+        - Se añadieron nuevos campos a `Solicitud` para cumplir con nuevos requerimientos de seguimiento detallado:
+            - `zone` (Zona/Eje), `contactDate`, `resolutionDate`, `observation` (TEXT), `firstContactControl` (Boolean).
+            - `resolution` (Resultados breves) y `detail` (Detalle extendido), ambos TEXT.
+        - **Fix en Entidad `Location`**:
+            - Solucionada recursión infinita (`StackOverflowError`) en serialización JSON usando `@JsonManagedReference` y `@JsonBackReference` en la relación bidireccional padre-hijos.
+    - **Frontend - Planilla (`ProjectDetailsPage`)**:
+        - Reconstrucción total de la tabla para reflejar la estructura de 18 columnas solicitada por el usuario.
+        - Nuevas columnas visibles: N° Orden, Fecha Ingreso, Mes (calculado), Origen, Nombre/Institución, Localidad/Barrio (con lógica de jerarquía), Teléfono, Solicitud (Descripción), ZONA/EJE, RESPONSABLE, Fechas (Contacto/Resolución), Resolución, Detalle, Observación, Monto, Control 1er C.
+        - Mejoras visuales: Checkmarks para booleanos, manejo de textos largos con `title` tooltip, y formateo de monedas.
+    - **Frontend - ABM (`SolicitudModal` y `SolicitudDetailModal`)**:
+        - Formularios de creación y edición actualizados para permitir la carga y modificación de todos los nuevos campos.
+        - Vista de detalle rediseñada con secciones organizadas: "Tiempos y Seguimiento", "Observaciones", "Gestión", etc.
+    - **Validación**:
+        - Backend compilado exitosamente y listo para producción.
+        - Código sincronizado con repositorio remoto.
+    - **Backend - Sincronización (`SyncService`)**:
+        - Actualizado método `processRows` para mapear las nuevas columnas del Excel/Sheet:
+            - `zone` (Col J / Index 9)
+            - `contactDate` (Col M / Index 12)
+            - `resolutionDate` (Col N / Index 13)
+            - `resolution` (Col O / Index 14)
+            - `detail` (Col P / Index 15)
+            - `observation` (Col Q / Index 16)
+            - `firstContactControl` (Col S / Index 18 - Parsing de "SI"/"YES"/"OK")
+        - Lógica de parseo mejorada para fechas y booleanos.
+
+> **📝 NOTA PARA PROXIMA SESIÓN / NUEVO CHAT**:
+> El sistema se encuentra en un estado estable tras una refactorización mayor.
+> 1. **Acción Requerida**: Es necesario BORRAR la base de datos local (archivos H2 en `./data`) y/o remota (Postgres) para que Hibernate recree el esquema con las nuevas tablas (`solicitud`, `pedido`, `subsidio`).
+> 2. **Siguiente Paso**: Realizar una sincronización limpia desde el Dashboard para popular la nueva estructura.
+> 3. **Objetivo**: Proceder al despliegue en VPS (Docker) para validación final.
+
 ## 📅 Enero 2026
 
 ### 28/01/2026
@@ -193,11 +231,11 @@
 
 ## 📝 Próximos Pasos Sugeridos
 
-- [ ] Gestión de Usuarios (UI para crear/editar/borrar usuarios).
+- [x] Refactorización de Entidades (Solicitud/Pedido/Subsidio).
+- [ ] **DESPLIEGUE EN PRODUCCIÓN (Prioridad Alta)**.
+- [ ] Validación de la nueva estructura de datos en entorno real.
 - [ ] Exportación de datos (Excel/PDF).
-- [ ] Despliegue en servidor productivo (Docker Compose).
-- [ ] Roles avanzados (filtrado de filas por usuario).
-- [ ] PWA para acceso móvil.
+- [ ] Gestión de Usuarios (UI).
 
 ---
 
@@ -211,4 +249,4 @@
 
 ---
 
-**Última actualización**: 19/01/2026 07:42
+**Última actualización**: 05/02/2026 09:12

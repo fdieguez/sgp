@@ -33,3 +33,11 @@ curl -X POST http://localhost:8080/api/auth/register \
   -d '{"email":"admin@sgp.com", "password":"10203040.Fnd.2026", "role":"ADMIN"}'
 
 10203040.Fnd.2026
+
+
+
+
+admin@sgp.com
+SGP_StrongPass_2026!
+
+

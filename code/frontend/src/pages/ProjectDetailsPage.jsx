@@ -353,77 +353,98 @@ export default function ProjectDetailsPage() {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="bg-gray-900/80">
-                                    <th onClick={() => handleSort('entryDate')} className="p-3 text-[10px] font-black text-gray-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors">
-                                        Fecha {sortConfig.key === 'entryDate' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                <tr className="bg-gray-900/80 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                    <th className="p-3">N° Orden</th>
+                                    <th onClick={() => handleSort('entryDate')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                        Fecha Ingreso {sortConfig.key === 'entryDate' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
                                     </th>
-                                    <th onClick={() => handleSort('person')} className="p-3 text-[10px] font-black text-gray-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors">
-                                        Beneficiario
-                                    </th>
-                                    <th className="p-3 text-[10px] font-black text-gray-500 uppercase tracking-widest">Desc. / Obs.</th>
-                                    <th className="p-3 text-[10px] font-black text-gray-500 uppercase tracking-widest">Zona</th>
-                                    <th className="p-3 text-[10px] font-black text-gray-500 uppercase tracking-widest">Seguimiento</th>
-                                    <th className="p-3 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">1er C.</th>
-                                    <th onClick={() => handleSort('location')} className="p-3 text-[10px] font-black text-gray-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors">Ubicación</th>
-                                    <th className="p-3 text-[10px] font-black text-gray-500 uppercase tracking-widest">Responsable</th>
-                                    <th className="p-3 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Estado</th>
-                                    <th className="p-3 text-[10px] font-black text-gray-500 uppercase tracking-widest text-right">Acciones</th>
+                                    <th className="p-3">Mes</th>
+                                    <th className="p-3">Origen</th>
+                                    <th onClick={() => handleSort('person')} className="p-3 cursor-pointer hover:text-white transition-colors">Nombre / Institución</th>
+                                    <th onClick={() => handleSort('location')} className="p-3 cursor-pointer hover:text-white transition-colors">Localidad</th>
+                                    <th className="p-3">Barrio</th>
+                                    <th className="p-3">Teléfono</th>
+                                    <th className="p-3 min-w-[200px]">Solicitud</th>
+                                    <th className="p-3 text-center">ZONA / EJE</th>
+                                    <th className="p-3">RESPONSABLE</th>
+                                    <th className="p-3">F. Contacto</th>
+                                    <th className="p-3">F. Resolución</th>
+                                    <th className="p-3">Resolución</th>
+                                    <th className="p-3 min-w-[150px]">Detalle</th>
+                                    <th className="p-3 min-w-[150px]">Observación</th>
+                                    <th className="p-3 text-right">Monto</th>
+                                    <th className="p-3 text-center">CONTROL 1er C.</th>
+                                    <th className="p-3 text-right sticky right-0 bg-gray-900/90 shadow-xl">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-700/50">
-                                {currentRows.map((s) => (
-                                    <tr key={s.id} className="group hover:bg-gray-700/20 transition-all">
-                                        <td className="p-3 text-xs font-medium text-gray-400">
-                                            {s.entryDate ? new Date(s.entryDate).toLocaleDateString() : '-'}
-                                        </td>
-                                        <td className="p-3">
-                                            <div className="font-bold text-white text-xs">{s.person?.name}</div>
-                                            <div className="text-[10px] text-gray-500 font-mono">{s.person?.phone}</div>
-                                        </td>
-                                        <td className="p-3 max-w-[200px]">
-                                            <div className="text-xs text-gray-300 truncate font-medium" title={s.description}>{s.description}</div>
-                                            {s.observation && <div className="text-[10px] text-yellow-500/80 truncate mt-1 italic" title={s.observation}>{s.observation}</div>}
-                                            {s.amount > 0 && <div className="text-[10px] text-emerald-500 font-black tracking-tight mt-1">SUBSIDIO: ${s.amount.toLocaleString()}</div>}
-                                        </td>
-                                        <td className="p-3 text-xs text-gray-400 font-mono">
-                                            {s.zone || '-'}
-                                        </td>
-                                        <td className="p-3 text-[10px] text-gray-400">
-                                            {s.contactDate && <div><span className="text-gray-600">C:</span> {new Date(s.contactDate).toLocaleDateString()}</div>}
-                                            {s.resolutionDate && <div><span className="text-gray-600">R:</span> {new Date(s.resolutionDate).toLocaleDateString()}</div>}
-                                        </td>
-                                        <td className="p-3 text-center">
-                                            {s.firstContactControl ?
-                                                <span className="inline-flex items-center justify-center w-5 h-5 bg-emerald-500/20 text-emerald-400 rounded-full border border-emerald-500/30">
-                                                    <Check className="w-3 h-3" />
-                                                </span>
-                                                : <span className="text-gray-700">-</span>
-                                            }
-                                        </td>
-                                        <td className="p-3 text-xs text-gray-400 font-medium">
-                                            {s.location?.name || '-'}
-                                        </td>
-                                        <td className="p-3 text-[10px] text-indigo-300/80 font-bold uppercase">
-                                            {s.responsable?.name || '-'}
-                                        </td>
-                                        <td className="p-3 text-center">
-                                            <StatusBadge status={s.status} />
-                                        </td>
-                                        <td className="p-3">
-                                            <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => handleOpenDetail(s)} className="p-1.5 bg-gray-900 rounded-lg text-gray-400 hover:text-white hover:bg-indigo-600 transition-all border border-gray-700">
-                                                    <Eye className="h-3 w-3" />
-                                                </button>
-                                                <button onClick={() => handleOpenABM(s)} className="p-1.5 bg-gray-900 rounded-lg text-gray-400 hover:text-white hover:bg-emerald-600 transition-all border border-gray-700">
-                                                    <Edit3 className="h-3 w-3" />
-                                                </button>
-                                                <button onClick={() => handleDelete(s.id)} className="p-1.5 bg-gray-900 rounded-lg text-gray-400 hover:text-white hover:bg-red-600 transition-all border border-gray-700">
-                                                    <Trash2 className="h-3 w-3" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
+                                {currentRows.map((s) => {
+                                    const entryDate = s.entryDate ? new Date(s.entryDate) : null;
+                                    const monthName = entryDate ? entryDate.toLocaleString('es-ES', { month: 'long' }) : '-';
+
+                                    // Location Logic
+                                    let localidad = '-';
+                                    let barrio = '-';
+                                    if (s.location) {
+                                        if (s.location.type === 'NEIGHBORHOOD') {
+                                            barrio = s.location.name;
+                                            localidad = s.location.parent ? s.location.parent.name : '-';
+                                        } else {
+                                            localidad = s.location.name;
+                                        }
+                                    }
+
+                                    return (
+                                        <tr key={s.id} className="group hover:bg-gray-700/20 transition-all text-xs border-b border-gray-800">
+                                            <td className="p-3 font-mono text-gray-500">#{s.id}</td>
+                                            <td className="p-3 text-gray-300 whitespace-nowrap">
+                                                {entryDate ? entryDate.toLocaleDateString() : '-'}
+                                            </td>
+                                            <td className="p-3 text-gray-400 capitalize">{monthName}</td>
+                                            <td className="p-3 text-gray-400">{s.origin || '-'}</td>
+                                            <td className="p-3 font-bold text-white whitespace-nowrap">{s.person?.name || '-'}</td>
+                                            <td className="p-3 text-gray-400">{localidad}</td>
+                                            <td className="p-3 text-gray-400">{barrio}</td>
+                                            <td className="p-3 font-mono text-gray-500">{s.person?.phone || '-'}</td>
+                                            <td className="p-3 text-gray-300 font-medium leading-snug">
+                                                <div className="line-clamp-2" title={s.description}>{s.description}</div>
+                                            </td>
+                                            <td className="p-3 text-center font-mono text-indigo-400 font-bold">{s.zone || '-'}</td>
+                                            <td className="p-3 text-indigo-300 font-bold uppercase whitespace-nowrap">{s.responsable?.name || '-'}</td>
+                                            <td className="p-3 text-gray-400 whitespace-nowrap">
+                                                {s.contactDate ? new Date(s.contactDate).toLocaleDateString() : '-'}
+                                            </td>
+                                            <td className="p-3 text-gray-400 whitespace-nowrap">
+                                                {s.resolutionDate ? new Date(s.resolutionDate).toLocaleDateString() : '-'}
+                                            </td>
+                                            <td className="p-3 text-gray-300">
+                                                {s.resolution || <StatusBadge status={s.status} />}
+                                            </td>
+                                            <td className="p-3 text-gray-400 italic">
+                                                <div className="line-clamp-2" title={s.detail}>{s.detail || '-'}</div>
+                                            </td>
+                                            <td className="p-3 text-yellow-500/80 italic">
+                                                <div className="line-clamp-2" title={s.observation}>{s.observation || '-'}</div>
+                                            </td>
+                                            <td className="p-3 text-right font-mono text-emerald-400">
+                                                {s.amount ? `$${s.amount.toLocaleString()}` : '-'}
+                                            </td>
+                                            <td className="p-3 text-center">
+                                                {s.firstContactControl ?
+                                                    <Check className="inline h-4 w-4 text-emerald-500" /> :
+                                                    <span className="text-gray-700">-</span>
+                                                }
+                                            </td>
+                                            <td className="p-3 sticky right-0 bg-gray-900/90 shadow-xl group-hover:bg-gray-800 transition-colors">
+                                                <div className="flex justify-end gap-1 opacity-60 group-hover:opacity-100">
+                                                    <button onClick={() => handleOpenDetail(s)} title="Ver Detalle" className="p-1.5 hover:bg-indigo-600 rounded text-gray-400 hover:text-white"><Eye className="h-3 w-3" /></button>
+                                                    <button onClick={() => handleOpenABM(s)} title="Editar" className="p-1.5 hover:bg-emerald-600 rounded text-gray-400 hover:text-white"><Edit3 className="h-3 w-3" /></button>
+                                                    <button onClick={() => handleDelete(s.id)} title="Eliminar" className="p-1.5 hover:bg-red-600 rounded text-gray-400 hover:text-white"><Trash2 className="h-3 w-3" /></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>

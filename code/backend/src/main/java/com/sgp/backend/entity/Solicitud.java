@@ -46,6 +46,12 @@ public abstract class Solicitud {
     private LocalDate resolutionDate;
 
     @Column(columnDefinition = "TEXT")
+    private String resolution;
+
+    @Column(columnDefinition = "TEXT")
+    private String detail;
+
+    @Column(columnDefinition = "TEXT")
     private String observation;
 
     private String zone;
