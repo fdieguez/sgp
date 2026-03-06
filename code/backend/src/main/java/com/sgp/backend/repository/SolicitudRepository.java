@@ -3,6 +3,7 @@ package com.sgp.backend.repository;
 import com.sgp.backend.entity.Solicitud;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+
 import java.util.List;
 
 @Repository
@@ -20,5 +21,6 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long>,
     List<Object[]> countSolicitudesByOrigin();
 
     @org.springframework.data.jpa.repository.Query("SELECT SUM(s.amount) FROM Subsidio s WHERE s.status = :status")
-    java.math.BigDecimal sumSubsidiosAmountByStatus(String status);
+    java.math.BigDecimal sumSubsidiosAmountByStatus(
+            @org.springframework.data.repository.query.Param("status") String status);
 }

@@ -1,4 +1,5 @@
 import { X, Calendar, User, MapPin, Tag, Box, DollarSign, Clock, Hash } from 'lucide-react';
+import TicketSeguimiento from './TicketSeguimiento';
 
 export default function SolicitudDetailModal({ isOpen, onClose, solicitud }) {
     if (!isOpen || !solicitud) return null;
@@ -17,7 +18,9 @@ export default function SolicitudDetailModal({ isOpen, onClose, solicitud }) {
 
     const formatDate = (date) => {
         if (!date) return '-';
-        return new Date(date).toLocaleDateString();
+        if (date.includes('T')) return new Date(date).toLocaleDateString();
+        const [y, m, d] = date.split('-');
+        return new Date(y, m - 1, d).toLocaleDateString();
     };
 
     return (
@@ -96,6 +99,24 @@ export default function SolicitudDetailModal({ isOpen, onClose, solicitud }) {
 
                         <section>
                             <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3 mt-6 flex items-center gap-2">
+                                <Tag className="h-3 w-3" /> Resultado y Detalle
+                            </h3>
+                            {solicitud.resolution && (
+                                <div className="mb-3">
+                                    <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">Resolución Final</div>
+                                    <div className="bg-gray-900/50 p-3 rounded-xl border border-gray-700/50 text-sm text-white">
+                                        {solicitud.resolution}
+                                    </div>
+                                </div>
+                            )}
+                            <div className="bg-gray-900/50 p-5 rounded-2xl border border-gray-700/50 leading-relaxed text-gray-300 text-sm">
+                                <div className="text-[10px] text-gray-500 uppercase font-bold mb-2">Detalle de Gestión</div>
+                                {solicitud.detail || 'Sin detalle extendido.'}
+                            </div>
+                        </section>
+
+                        <section>
+                            <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3 mt-6 flex items-center gap-2">
                                 <Tag className="h-3 w-3" /> Observaciones
                             </h3>
                             <div className="bg-yellow-900/10 p-5 rounded-2xl border border-yellow-700/20 leading-relaxed text-yellow-100/80 text-sm italic">
@@ -150,6 +171,9 @@ export default function SolicitudDetailModal({ isOpen, onClose, solicitud }) {
                                 </div>
                             </div>
                         </section>
+
+                        {/* Ticket Seguimiento Component placed at bottom of right column */}
+                        <TicketSeguimiento solicitudId={solicitud.id} />
                     </div>
                 </div>
 
@@ -161,7 +185,7 @@ export default function SolicitudDetailModal({ isOpen, onClose, solicitud }) {
                         Cerrar Vista
                     </button>
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }

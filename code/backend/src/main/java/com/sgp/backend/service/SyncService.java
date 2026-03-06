@@ -45,7 +45,7 @@ public class SyncService {
     private final jakarta.persistence.EntityManager entityManager;
 
     @Transactional
-    public Project syncProject(Long sheetsConfigId) {
+    public Project syncProject(Long sheetsConfigId, boolean fullSync) {
         // ... (Keep existing logic until processRows call) ...
         log.info("Starting sync for SheetsConfig ID: {}", sheetsConfigId);
 
@@ -117,9 +117,10 @@ public class SyncService {
 
             // 5. HYBRID SYNC: Parse rows to Entities
             if (rawData != null && rawData.size() > 1) { // Skip header
-                log.info("Starting Hybrid Sync processing for {} rows...", rawData.size() - 1);
+                log.info("Starting Hybrid Sync processing for {} rows... (Full Sync: {})", rawData.size() - 1,
+                        fullSync);
                 List<List<Object>> dataRows = rawData.subList(1, rawData.size());
-                processRows(dataRows, config);
+                processRows(dataRows, config, fullSync);
             } else {
                 log.warn("Not enough data rows to process hybrid sync (Size: {})",
                         rawData != null ? rawData.size() : "null");
@@ -141,7 +142,7 @@ public class SyncService {
         }
     }
 
-    private void processRows(List<List<Object>> rows, SheetsConfig config) {
+    private void processRows(List<List<Object>> rows, SheetsConfig config, boolean fullSync) {
         int createdCount = 0;
         int errorCount = 0;
 
@@ -199,6 +200,14 @@ public class SyncService {
                 java.time.LocalDate entryDate = parseDate(entryDateStr);
                 boolean isFirstContactOk = controlStr.equalsIgnoreCase("SI") || controlStr.equalsIgnoreCase("YES")
                         || controlStr.equalsIgnoreCase("OK");
+
+                // Filter by Time Window if NOT Full Sync
+                if (!fullSync && config.getSyncWindowDays() != null && config.getSyncWindowDays() > 0) {
+                    java.time.LocalDate cutoffDate = java.time.LocalDate.now().minusDays(config.getSyncWindowDays());
+                    if (entryDate.isBefore(cutoffDate)) {
+                        continue; // Skip old rows in incremental sync
+                    }
+                }
 
                 // 5. Check for duplicates
                 String finalSolicitud = solicitudDesc;

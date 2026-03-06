@@ -14,9 +14,10 @@ public class SyncController {
     private final SyncService syncService;
 
     @PostMapping("/{configId}")
-    public ResponseEntity<?> syncProject(@PathVariable Long configId) {
+    public ResponseEntity<?> syncProject(@PathVariable Long configId,
+            @RequestParam(defaultValue = "false") boolean full) {
         try {
-            Project project = syncService.syncProject(configId);
+            Project project = syncService.syncProject(configId, full);
             return ResponseEntity.ok(project);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body("Sync failed: " + e.getMessage());

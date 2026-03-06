@@ -8,4 +8,6 @@ import java.util.Optional;
 @Repository
 public interface ResponsableRepository extends JpaRepository<Responsable, Long> {
     Optional<Responsable> findByName(String name);
+
+    Optional<Responsable> findByUserId(Long userId);
 }

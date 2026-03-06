@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar } from 'lucide-react';
 import api from '../config/axios';
+import { useAuth } from '../context/AuthContext';
 
 export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData, configId }) {
+    const { user } = useAuth();
+    const isResponsable = user?.role === 'USER';
     const [formData, setFormData] = useState({
         type: 'PEDIDO',
         description: '',
@@ -32,14 +35,16 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     locationName: initialData.location?.name || '',
                     responsableId: initialData.responsable?.id || '',
                     amount: initialData.amount || '',
-                    grantDate: initialData.grantDate || '',
+                    grantDate: initialData.grantDate ? initialData.grantDate.split('T')[0] : '',
                     zone: initialData.zone || '',
-                    contactDate: initialData.contactDate || '',
-                    resolutionDate: initialData.resolutionDate || '',
+                    contactDate: initialData.contactDate ? initialData.contactDate.split('T')[0] : '',
+                    resolutionDate: initialData.resolutionDate ? initialData.resolutionDate.split('T')[0] : '',
+                    entryDate: initialData.entryDate ? initialData.entryDate.split('T')[0] : '',
                     observation: initialData.observation || '',
                     resolution: initialData.resolution || '',
                     detail: initialData.detail || '',
-                    firstContactControl: initialData.firstContactControl || false
+                    firstContactControl: initialData.firstContactControl || false,
+                    origin: initialData.origin || 'MANUAL'
                 });
             } else {
                 setFormData({
@@ -51,10 +56,10 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     person: { name: '', phone: '' },
                     locationName: '',
                     barrio: '',
-                    responsableId: '',
+                    responsableId: (isResponsable && user?.responsable?.id) ? user.responsable.id : '',
                     amount: '',
                     grantDate: '',
-                    zone: '',
+                    zone: (isResponsable && user?.responsable?.zone) ? user.responsable.zone : '',
                     contactDate: '',
                     resolutionDate: '',
                     observation: '',
@@ -81,12 +86,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         try {
             const payload = {
                 ...formData,
-                sheetsConfig: { id: configId },
-                // Backend will handle finding/creating person and location based on these strings 
-                // In a real scenario, we might want separate lookups, but let's keep it simple for now
-                // Actually, our backend Solicitud entity expects Person and Location objects.
-                // For simplicity, let's just send names and let the backend service handle it?
-                // No, the backend SolicitudController expects the Solicitud object.
+                responsable: formData.responsableId ? { id: formData.responsableId } : null
             };
 
             if (formData.id) {
@@ -125,8 +125,9 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         <div>
                             <label className="block text-sm font-medium text-gray-400 mb-1">Tipo</label>
                             <select
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
                                 value={formData.type}
+                                disabled={!!formData.id}
                                 onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                             >
                                 <option value="PEDIDO">Pedido</option>
@@ -204,8 +205,9 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 <label className="block text-sm text-gray-500 mb-1">Zona / Eje</label>
                                 <input
                                     type="text"
-                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white disabled:opacity-50"
                                     value={formData.zone}
+                                    disabled={isResponsable}
                                     onChange={(e) => setFormData({ ...formData, zone: e.target.value })}
                                 />
                             </div>
@@ -232,6 +234,23 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             value={formData.observation}
                             onChange={(e) => setFormData({ ...formData, observation: e.target.value })}
                         />
+                    </div>
+
+                    {/* Origin Field */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-400 mb-1">Origen</label>
+                        <select
+                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                            value={formData.origin || 'MANUAL'}
+                            onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
+                        >
+                            <option value="MANUAL">Manual / Personal</option>
+                            <option value="WHATSAPP">WhatsApp</option>
+                            <option value="NOTE">Nota / Expediente</option>
+                            <option value="SOCIAL_MEDIA">Redes Sociales</option>
+                            <option value="PHONE">Teléfono</option>
+                            <option value="EMAIL">Email</option>
+                        </select>
                     </div>
 
                     {/* Subsidio specific fields */}
@@ -277,8 +296,9 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         <div>
                             <label className="block text-sm font-medium text-gray-400 mb-1">Responsable</label>
                             <select
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                                 value={formData.responsableId}
+                                disabled={isResponsable}
                                 onChange={(e) => setFormData({ ...formData, responsableId: e.target.value })}
                             >
                                 <option value="">Seleccionar...</option>

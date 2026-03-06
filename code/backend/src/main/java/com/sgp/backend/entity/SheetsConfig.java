@@ -26,6 +26,8 @@ public class SheetsConfig {
     @Column(nullable = false)
     private Integer syncFrequencyMinutes = 60; // Default: every hour
 
+    private Integer syncWindowDays = 30; // Default: last 30 days for incremental sync
+
     private LocalDateTime lastSync;
 
     private String status; // e.g., "ACTIVE", "ERROR", "SYNCING"

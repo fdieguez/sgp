@@ -6,6 +6,8 @@ import ProjectDetailsPage from './pages/ProjectDetailsPage';
 import UsersPage from './pages/UsersPage';
 import OrdersPage from './pages/OrdersPage';
 import SubsidiesPage from './pages/SubsidiesPage';
+import ProjectSettingsPage from './pages/ProjectSettingsPage';
+import HelpPage from './pages/HelpPage';
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { isAuthenticated, loading, user } = useAuth();
@@ -40,9 +42,21 @@ function App() {
             </ProtectedRoute>
           } />
 
+          <Route path="/mis-solicitudes" element={
+            <ProtectedRoute>
+              <ProjectDetailsPage />
+            </ProtectedRoute>
+          } />
+
           <Route path="/projects/config/:configId" element={
             <ProtectedRoute>
               <ProjectDetailsPage />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/projects/config/:configId/settings" element={
+            <ProtectedRoute>
+              <ProjectSettingsPage />
             </ProtectedRoute>
           } />
 
@@ -61,6 +75,12 @@ function App() {
           <Route path="/subsidies" element={
             <ProtectedRoute>
               <SubsidiesPage />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/help" element={
+            <ProtectedRoute>
+              <HelpPage />
             </ProtectedRoute>
           } />
         </Routes>

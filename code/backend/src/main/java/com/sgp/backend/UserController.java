@@ -4,6 +4,10 @@ import com.sgp.backend.entity.User;
 import com.sgp.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import com.sgp.backend.repository.ResponsableRepository;
+import com.sgp.backend.repository.UserRepository;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,8 +18,31 @@ import java.util.Map;
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
 public class UserController {
-
     private final UserService userService;
+    private final UserRepository userRepository;
+    private final ResponsableRepository responsableRepository;
+
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String email = auth.getName();
+        return userRepository.findByEmail(email).map(user -> {
+            user.setPassword(null);
+            java.util.Map<String, Object> response = new java.util.HashMap<>();
+            response.put("user", user);
+
+            // Fetch Responsable if exists
+            responsableRepository.findByUserId(user.getId()).ifPresent(resp -> {
+                response.put("responsable", resp);
+            });
+
+            return ResponseEntity.ok((Object) response);
+        }).orElse(ResponseEntity.notFound().build());
+    }
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")

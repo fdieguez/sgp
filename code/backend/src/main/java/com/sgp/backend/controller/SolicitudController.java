@@ -42,6 +42,11 @@ public class SolicitudController {
         return ResponseEntity.ok(solicitudService.updateStatus(id, status));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<Solicitud> updateSolicitud(@PathVariable Long id, @RequestBody Solicitud solicitud) {
+        return ResponseEntity.ok(solicitudService.updateSolicitud(id, solicitud));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteSolicitud(@PathVariable Long id) {
         solicitudService.deleteSolicitud(id);

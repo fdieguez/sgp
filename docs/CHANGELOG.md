@@ -2,13 +2,50 @@
 
 > **Propósito**: Este archivo registra todos los cambios, mejoras y decisiones técnicas del proyecto SGP para facilitar la continuidad entre sesiones de desarrollo.
 
-**Versión Actual**: `0.1.0` (MVP Funcional)
+**Versión Actual**: `0.3.0` (Dashboard de Responsables y Fixes Críticos)
+
+---
+
+## 📅 Marzo 2026
+
+### 06/03/2026
+- **⭐️ Versión 0.3.0**:
+    - **Dashboard de Responsables**:
+        - Implementado dashboard específico para usuarios Responsables (`/mis-solicitudes`).
+        - **FIX CRÍTICO**: Solucionado el error de pantalla en blanco (React `ReferenceError` por componentes faltantes).
+        - **FIX DE PERMISOS**: Controlado el acceso a `/api/config` en el frontend (`ProjectDetailsPage` y `DashboardPage`) para evitar errores `403 Forbidden` que colapsaban la app al ingresar usuarios sin rol `ADMIN`.
+        - Agregados indicadores estadísticos superiores: Pendientes, En Proceso, Completados, Rechazados, y Total Subsidios Entregados (en $ ARS).
+        - Nuevo buscador general por ID (Nº Orden), Nombre, DNI o Localidad.
+        - **UI/UX y Filtrado**:
+            - Traducción completa de estados y secciones al español (Pendiente, Completado, Panel, etc).
+            - El Panel Principal (`DashboardPage`) ahora filtra sus estadísticas globales matemáticamente mediante JPA Specifications considerando únicamente la zona/perfil del Responsable logueado.
+            - Eliminado el buscador duplicado en la vista de solicitudes para limpiar la interfaz.
+            - Se muestra el nombre y rol del usuario logueado en la barra superior del Dashboard.
+            - Ocultado filtro condicional "Por Responsable" en los gráficos para usuarios Responsables.
+    - **Filtros Avanzados y Ordenamiento**:
+        - Implementado selector de Rango de Fecha (Último mes, 6 meses, 1 año, 2 años, Personalizado).
+        - Ordenamiento funcional en las columnas de tabla: Fecha Ingreso, Origen, Nombre/Institución, Localidad y Estado.
+    - **Fixes de Fechas y Zona Horaria**:
+        - Implementado método robusto `parseLocalDate` en el frontend para evitar el desfasaje de fechas (off-by-one) por la zona horaria UTC.
+    - **Backend & Edición de Solicitudes**:
+        - **FIX JPA**: Deshabilitada la edición del campo "Tipo" en el frontend para solicitudes existentes, previniendo errores de actualización polimórfica (Hibernate/JPA).
+        - **FIX Backend**: Actualizado `SolicitudService` con método `PUT` para actualización completa, solucionando la validación y el reseteo de propiedades específicas de la clase subyacente (`Subsidio`), como monto y fechas.
+        - **Seguridad**: `DataInitializer` asegura roles `USER` persistentes para usuarios de prueba.
+
+> **📝 NOTA PARA PROXIMA SESIÓN / NUEVO CHAT**:
+> El dashboard visual y el backend del Responsable están estables. La pantalla en blanco fue completamente subsanada (era un fallo en el fetching de configuraciones sin rol ADMIN, combinado con un componente no renderizado).
+> **Siguiente Paso**: Pruebas funcionales del endpoint de listado de responsables, e inicio de mejoras o despliegue en caso de considerarlo completamente validado.
 
 ---
 
 ## 📅 Febrero 2026
 
-### 05/02/2026
+### 06/02/2026
+- **⭐️ Versión 0.2.0**:
+    - Inicio de ciclo de estabilización y mejoras.
+    - **FIX**: Corrección en edición de Solicitudes (error de mapeo de Responsable).
+    - **UI**: Visualización de versión en el sistema.
+    - **Mejora**: Campos completos en creación y detalle de solicitudes.
 - **🛠️ Refactorización y Ampliación del Modelo de Datos**:
     - **Reestructuración de Entidades**:
         - Se implementó `Solicitud` como clase abstracta padre de `Pedido` y `Subsidio` con herencia `JOINED`.
@@ -249,4 +286,4 @@
 
 ---
 
-**Última actualización**: 05/02/2026 09:12
+**Última actualización**: 06/03/2026 07:20

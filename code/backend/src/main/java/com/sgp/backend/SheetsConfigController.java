@@ -23,6 +23,26 @@ public class SheetsConfigController {
         return repository.findAll();
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<SheetsConfig> getById(@PathVariable Long id) {
+        return repository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<SheetsConfig> update(@PathVariable Long id, @RequestBody SheetsConfig configDetails) {
+        return repository.findById(id).map(config -> {
+            config.setSpreadsheetId(configDetails.getSpreadsheetId());
+            config.setSheetName(configDetails.getSheetName());
+            config.setSyncFrequencyMinutes(configDetails.getSyncFrequencyMinutes());
+            config.setSyncWindowDays(configDetails.getSyncWindowDays());
+            // Don't update status manually via this endpoint usually, but maybe helpful?
+            SheetsConfig updated = repository.save(config);
+            return ResponseEntity.ok(updated);
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
     @PostMapping
     public SheetsConfig create(@RequestBody SheetsConfig config) {
         // Defaults

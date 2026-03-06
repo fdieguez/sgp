@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import api from '../config/axios';
+import { useAuth } from '../context/AuthContext';
 import { useParams, Link } from 'react-router-dom';
 import {
     ArrowLeft,
@@ -21,7 +22,8 @@ import {
     Edit3,
     Trash2,
     Eye,
-    Check
+    Check,
+    Settings
 } from 'lucide-react';
 import {
     BarChart,
@@ -34,10 +36,25 @@ import {
     Cell
 } from 'recharts';
 
-import SolicitudModal from '../components/SolicitudModal';
 import SolicitudDetailModal from '../components/SolicitudDetailModal';
+import SolicitudModal from '../components/SolicitudModal';
+
+// --- Helpers ---
+const parseLocalDate = (dateStr) => {
+    if (!dateStr) return null;
+    if (dateStr.includes('T')) return new Date(dateStr);
+    const [y, m, d] = dateStr.split('-');
+    return new Date(y, m - 1, d);
+};
 
 // --- UI Components ---
+const STATUS_MAP = {
+    'PENDING': 'Pendiente',
+    'IN_PROGRESS': 'En Proceso',
+    'COMPLETED': 'Completado',
+    'REJECTED': 'Rechazado'
+};
+
 const StatusBadge = ({ status }) => {
     const styles = {
         COMPLETED: 'bg-green-900/30 text-green-400 border-green-800',
@@ -47,13 +64,14 @@ const StatusBadge = ({ status }) => {
     };
     return (
         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${styles[status] || 'bg-gray-700 text-gray-300 border-gray-600'}`}>
-            {status}
+            {STATUS_MAP[status] || status}
         </span>
     );
 };
 
 export default function ProjectDetailsPage() {
     const { configId } = useParams();
+    const { user } = useAuth();
     const [solicitudes, setSolicitudes] = useState([]);
     const [config, setConfig] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -75,8 +93,8 @@ export default function ProjectDetailsPage() {
 
     useEffect(() => {
         fetchData();
-        fetchConfig();
-    }, [configId]);
+        if (configId && user?.role === 'ADMIN') fetchConfig();
+    }, [configId, user]);
 
     const fetchConfig = async () => {
         try {
@@ -90,7 +108,8 @@ export default function ProjectDetailsPage() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const response = await api.get(`/api/solicitudes/config/${configId}`);
+            const endpoint = configId ? `/api/solicitudes/config/${configId}` : `/api/solicitudes`;
+            const response = await api.get(endpoint);
             setSolicitudes(response.data);
         } catch (err) {
             console.error(err);
@@ -118,6 +137,7 @@ export default function ProjectDetailsPage() {
         if (searchTerm) {
             const term = searchTerm.toLowerCase();
             result = result.filter(s =>
+                s.id?.toString().includes(term) ||
                 s.description?.toLowerCase().includes(term) ||
                 s.person?.name?.toLowerCase().includes(term) ||
                 s.location?.name?.toLowerCase().includes(term)
@@ -127,16 +147,50 @@ export default function ProjectDetailsPage() {
         // 2. Filters
         Object.entries(filters).forEach(([key, val]) => {
             if (!val) return;
-            if (key === 'year') {
-                result = result.filter(s => s.entryDate && s.entryDate.startsWith(val));
+            if (key === 'dateRange') {
+                const today = new Date();
+                let minDate = new Date('1900-01-01');
+                let maxDate = new Date('2100-01-01');
+
+                if (val === '1M') {
+                    minDate = new Date(); minDate.setMonth(today.getMonth() - 1);
+                } else if (val === '6M') {
+                    minDate = new Date(); minDate.setMonth(today.getMonth() - 6);
+                } else if (val === '1Y') {
+                    minDate = new Date(); minDate.setFullYear(today.getFullYear() - 1);
+                } else if (val === '2Y') {
+                    minDate = new Date(); minDate.setFullYear(today.getFullYear() - 2);
+                } else if (val === 'CUSTOM') {
+                    if (filters.customStartDate) minDate = parseLocalDate(filters.customStartDate);
+                    if (filters.customEndDate) {
+                        maxDate = parseLocalDate(filters.customEndDate);
+                        maxDate.setHours(23, 59, 59, 999);
+                    }
+                }
+
+                if (val !== '') {
+                    result = result.filter(s => {
+                        if (!s.entryDate) return false;
+                        const d = parseLocalDate(s.entryDate);
+                        return d >= minDate && d <= maxDate;
+                    });
+                }
             } else if (key === 'status') {
                 result = result.filter(s => s.status === val);
             } else if (key === 'location') {
                 result = result.filter(s => s.location?.name === val);
             } else if (key === 'responsable') {
+            } else if (key === 'responsable') {
                 result = result.filter(s => s.responsable?.name === val);
+            } else if (key === 'origin') {
+                result = result.filter(s => s.origin === val);
             }
         });
+
+        // Unique Values for Filters
+        const uniqueResponsables = [...new Set(solicitudes.map(s => s.responsable?.name).filter(Boolean))].sort();
+        const uniqueOrigins = [...new Set(solicitudes.map(s => s.origin).filter(Boolean))].sort();
+        const uniqueLocations = [...new Set(solicitudes.map(s => s.location?.name).filter(Boolean))].sort();
 
         // 3. Sort
         if (sortConfig.key) {
@@ -164,7 +218,7 @@ export default function ProjectDetailsPage() {
         const counts = {};
         result.forEach(s => {
             let val = '(Vacío)';
-            if (visColumn === 'status') val = s.status;
+            if (visColumn === 'status') val = STATUS_MAP[s.status] || s.status;
             else if (visColumn === 'location') val = s.location?.name || '(Vacío)';
             else if (visColumn === 'responsable') val = s.responsable?.name || 'Sin Asignar';
             else if (visColumn === 'origin') val = s.origin;
@@ -181,7 +235,7 @@ export default function ProjectDetailsPage() {
             .sort((a, b) => b.value - a.value)
             .slice(0, 10);
 
-        return { rows: result, chartData };
+        return { rows: result, chartData, uniqueResponsables, uniqueOrigins, uniqueLocations };
     }, [solicitudes, searchTerm, filters, sortConfig, visColumn]);
 
     // Pagination
@@ -223,7 +277,7 @@ export default function ProjectDetailsPage() {
                 <div className="flex items-center justify-between">
                     <Link to="/dashboard" className="flex items-center text-gray-400 hover:text-white transition-colors group">
                         <ArrowLeft className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform" />
-                        Dashboard
+                        Inicio
                     </Link>
                     <div className="flex gap-3">
                         <button
@@ -239,33 +293,161 @@ export default function ProjectDetailsPage() {
                             <Plus className="h-5 w-5" />
                             Nueva Solicitud
                         </button>
+                        {configId && user?.role === 'ADMIN' && (
+                            <Link
+                                to={`/projects/config/${configId}/settings`}
+                                className="bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white p-2.5 rounded-xl border border-gray-700 transition-all"
+                                title="Configuración Avanzada"
+                            >
+                                <Settings className="h-5 w-5" />
+                            </Link>
+                        )}
                     </div>
                 </div>
 
-                {/* Header Info */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                    <div>
-                        <h1 className="text-4xl font-black tracking-tight text-white mb-2">
-                            {config?.sheetName || 'Solicitudes'}
-                        </h1>
-                        <p className="text-gray-500 flex items-center gap-2 font-medium">
-                            <Database className="h-4 w-4" />
-                            {processedData.rows.length} registros encontrados
-                        </p>
+                {/* Filters Panel */}
+                {showFilters && (
+                    <div className="bg-gray-800 border border-gray-700 p-6 rounded-3xl shadow-xl animate-in slide-in-from-top-4 mb-8">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+                                <Filter className="h-4 w-4" /> Filtros Activos
+                            </h3>
+                            <button
+                                onClick={() => setFilters({})}
+                                className="text-xs text-gray-500 hover:text-white flex items-center gap-1 transition-colors"
+                            >
+                                <FilterX className="h-3 w-3" /> Limpiar todo
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Rango de Fecha</label>
+                                <select
+                                    className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none mb-2"
+                                    value={filters.dateRange || ''}
+                                    onChange={(e) => setFilters(prev => ({ ...prev, dateRange: e.target.value }))}
+                                >
+                                    <option value="">Todos</option>
+                                    <option value="1M">Último mes</option>
+                                    <option value="6M">Últimos 6 meses</option>
+                                    <option value="1Y">Último año</option>
+                                    <option value="2Y">Últimos 2 años</option>
+                                    <option value="CUSTOM">Personalizar...</option>
+                                </select>
+                                {filters.dateRange === 'CUSTOM' && (
+                                    <div className="flex gap-2 animate-in slide-in-from-top-2">
+                                        <input type="date" className="w-full bg-gray-900 border border-gray-700 rounded-xl px-2 py-1 text-xs text-white"
+                                            value={filters.customStartDate || ''}
+                                            onChange={(e) => setFilters(prev => ({ ...prev, customStartDate: e.target.value }))}
+                                            title="Desde" />
+                                        <input type="date" className="w-full bg-gray-900 border border-gray-700 rounded-xl px-2 py-1 text-xs text-white"
+                                            value={filters.customEndDate || ''}
+                                            onChange={(e) => setFilters(prev => ({ ...prev, customEndDate: e.target.value }))}
+                                            title="Hasta" />
+                                    </div>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Estado</label>
+                                <select
+                                    className="bg-gray-800 text-sm border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none w-full sm:w-auto"
+                                    value={filters.status}
+                                    onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                                >
+                                    <option value="">Todos los Estados</option>
+                                    <option value="PENDING">Pendiente</option>
+                                    <option value="IN_PROGRESS">En Proceso</option>
+                                    <option value="COMPLETED">Completado</option>
+                                    <option value="REJECTED">Rechazado</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Origen</label>
+                                <select
+                                    className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    value={filters.origin || ''}
+                                    onChange={(e) => setFilters(prev => ({ ...prev, origin: e.target.value }))}
+                                >
+                                    <option value="">Todos</option>
+                                    {processedData.uniqueOrigins.map(o => <option key={o} value={o}>{o}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Responsable</label>
+                                <select
+                                    className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    value={filters.responsable || ''}
+                                    onChange={(e) => setFilters(prev => ({ ...prev, responsable: e.target.value }))}
+                                >
+                                    <option value="">Todos</option>
+                                    {processedData.uniqueResponsables.map(r => <option key={r} value={r}>{r}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Header Info & Stats */}
+                <div className="flex flex-col gap-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <h1 className="text-4xl font-black tracking-tight text-white mb-2">
+                                {configId ? (config?.sheetName || 'Cargando...') : 'Mis Solicitudes'}
+                            </h1>
+                            <p className="text-gray-500 flex items-center gap-2 font-medium">
+                                <Database className="h-4 w-4" />
+                                Mostrar {processedData.rows.length} registros
+                            </p>
+                        </div>
+                        <div className="relative flex-1 max-w-md">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                            <input
+                                type="text"
+                                placeholder="Buscar por N° Orden, nombre, DNI, localidad..."
+                                className="w-full bg-gray-900 border border-gray-700 rounded-2xl pl-12 pr-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
                     </div>
 
-                    {/* Compact Filter Stats */}
-                    <div className="flex gap-4">
-                        <div className="bg-gray-800/50 border border-gray-700 p-4 rounded-2xl min-w-[120px]">
-                            <div className="text-[10px] uppercase font-black text-gray-500 mb-1">Pendientes</div>
-                            <div className="text-2xl font-bold text-yellow-500">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        <div className="bg-gray-800/50 border border-gray-700 p-4 rounded-2xl flex flex-col justify-center shadow-lg">
+                            <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]"></div> Pendientes
+                            </div>
+                            <div className="text-3xl font-black text-white">
                                 {processedData.rows.filter(s => s.status === 'PENDING').length}
                             </div>
                         </div>
-                        <div className="bg-gray-800/50 border border-gray-700 p-4 rounded-2xl min-w-[120px]">
-                            <div className="text-[10px] uppercase font-black text-gray-500 mb-1">Completados</div>
-                            <div className="text-2xl font-bold text-green-500">
+                        <div className="bg-gray-800/50 border border-gray-700 p-4 rounded-2xl flex flex-col justify-center shadow-lg">
+                            <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></div> En Proceso
+                            </div>
+                            <div className="text-3xl font-black text-white">
+                                {processedData.rows.filter(s => s.status === 'IN_PROGRESS').length}
+                            </div>
+                        </div>
+                        <div className="bg-gray-800/50 border border-gray-700 p-4 rounded-2xl flex flex-col justify-center shadow-lg">
+                            <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div> Completados
+                            </div>
+                            <div className="text-3xl font-black text-white">
                                 {processedData.rows.filter(s => s.status === 'COMPLETED').length}
+                            </div>
+                        </div>
+                        <div className="bg-gray-800/50 border border-gray-700 p-4 rounded-2xl flex flex-col justify-center shadow-lg">
+                            <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"></div> Rechazados
+                            </div>
+                            <div className="text-3xl font-black text-white">
+                                {processedData.rows.filter(s => s.status === 'REJECTED').length}
+                            </div>
+                        </div>
+                        <div className="bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border border-indigo-500/30 p-4 rounded-2xl flex flex-col justify-center shadow-lg lg:col-span-1 md:col-span-2 col-span-2">
+                            <div className="text-[10px] uppercase font-black text-indigo-300 mb-1 tracking-wider">Subsidios Entregados</div>
+                            <div className="text-2xl font-black text-white">
+                                ${processedData.rows.reduce((acc, s) => s.status === 'COMPLETED' ? acc + (s.amount || 0) : acc, 0).toLocaleString()} <span className="text-sm font-medium text-indigo-300/60">ARS</span>
                             </div>
                         </div>
                     </div>
@@ -285,7 +467,9 @@ export default function ProjectDetailsPage() {
                             >
                                 <option value="status">Por Estado</option>
                                 <option value="location">Por Localidad</option>
-                                <option value="responsable">Por Responsable</option>
+                                {user?.role === 'ADMIN' && (
+                                    <option value="responsable">Por Responsable</option>
+                                )}
                                 <option value="origin">Por Origen</option>
                             </select>
                         </div>
@@ -321,16 +505,6 @@ export default function ProjectDetailsPage() {
 
                     {/* Activity Feed / Search */}
                     <div className="bg-gray-800/40 p-6 rounded-3xl border border-gray-700/50 backdrop-blur-sm flex flex-col justify-between">
-                        <div className="relative mb-6">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-                            <input
-                                type="text"
-                                placeholder="Buscar solicitudes..."
-                                className="w-full bg-gray-900 border border-gray-700 rounded-2xl pl-12 pr-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </div>
                         <div className="space-y-4">
                             <div className="bg-indigo-900/10 border border-indigo-500/20 p-4 rounded-2xl">
                                 <p className="text-[10px] font-black uppercase text-indigo-400 tracking-tighter mb-2">Monto Total Subsidios</p>
@@ -359,9 +533,15 @@ export default function ProjectDetailsPage() {
                                         Fecha Ingreso {sortConfig.key === 'entryDate' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
                                     </th>
                                     <th className="p-3">Mes</th>
-                                    <th className="p-3">Origen</th>
-                                    <th onClick={() => handleSort('person')} className="p-3 cursor-pointer hover:text-white transition-colors">Nombre / Institución</th>
-                                    <th onClick={() => handleSort('location')} className="p-3 cursor-pointer hover:text-white transition-colors">Localidad</th>
+                                    <th onClick={() => handleSort('origin')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                        Origen {sortConfig.key === 'origin' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                    </th>
+                                    <th onClick={() => handleSort('person')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                        Nombre / Institución {sortConfig.key === 'person' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                    </th>
+                                    <th onClick={() => handleSort('location')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                        Localidad {sortConfig.key === 'location' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                    </th>
                                     <th className="p-3">Barrio</th>
                                     <th className="p-3">Teléfono</th>
                                     <th className="p-3 min-w-[200px]">Solicitud</th>
@@ -369,7 +549,9 @@ export default function ProjectDetailsPage() {
                                     <th className="p-3">RESPONSABLE</th>
                                     <th className="p-3">F. Contacto</th>
                                     <th className="p-3">F. Resolución</th>
-                                    <th className="p-3">Resolución</th>
+                                    <th onClick={() => handleSort('status')} className="p-3 cursor-pointer hover:text-white transition-colors min-w-[120px]">
+                                        Estado {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                    </th>
                                     <th className="p-3 min-w-[150px]">Detalle</th>
                                     <th className="p-3 min-w-[150px]">Observación</th>
                                     <th className="p-3 text-right">Monto</th>
@@ -379,7 +561,7 @@ export default function ProjectDetailsPage() {
                             </thead>
                             <tbody className="divide-y divide-gray-700/50">
                                 {currentRows.map((s) => {
-                                    const entryDate = s.entryDate ? new Date(s.entryDate) : null;
+                                    const entryDate = parseLocalDate(s.entryDate);
                                     const monthName = entryDate ? entryDate.toLocaleString('es-ES', { month: 'long' }) : '-';
 
                                     // Location Logic
@@ -412,10 +594,10 @@ export default function ProjectDetailsPage() {
                                             <td className="p-3 text-center font-mono text-indigo-400 font-bold">{s.zone || '-'}</td>
                                             <td className="p-3 text-indigo-300 font-bold uppercase whitespace-nowrap">{s.responsable?.name || '-'}</td>
                                             <td className="p-3 text-gray-400 whitespace-nowrap">
-                                                {s.contactDate ? new Date(s.contactDate).toLocaleDateString() : '-'}
+                                                {s.contactDate ? parseLocalDate(s.contactDate).toLocaleDateString() : '-'}
                                             </td>
                                             <td className="p-3 text-gray-400 whitespace-nowrap">
-                                                {s.resolutionDate ? new Date(s.resolutionDate).toLocaleDateString() : '-'}
+                                                {s.resolutionDate ? parseLocalDate(s.resolutionDate).toLocaleDateString() : '-'}
                                             </td>
                                             <td className="p-3 text-gray-300">
                                                 {s.resolution || <StatusBadge status={s.status} />}

@@ -36,11 +36,27 @@ export const AuthProvider = ({ children }) => {
                 email,
                 password,
             });
-            setToken(response.data.token);
-            setUser({
-                email: response.data.email,
-                role: response.data.role
-            });
+            const newToken = response.data.token;
+            setToken(newToken);
+            localStorage.setItem('token', newToken); // Save immediately for the next request
+
+            // Fetch full profile info
+            try {
+                const profileRes = await api.get('/api/users/me', {
+                    headers: { Authorization: `Bearer ${newToken}` }
+                });
+                setUser({
+                    ...profileRes.data.user,
+                    responsable: profileRes.data.responsable
+                });
+            } catch (err) {
+                console.error("Failed to fetch full profile", err);
+                // Fallback to basic info from login
+                setUser({
+                    email: response.data.email,
+                    role: response.data.role
+                });
+            }
             return true;
         } catch (error) {
             console.error("Login failed", error);
@@ -55,7 +71,26 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('user');
     };
 
-    const [loading, setLoading] = useState(false); // Can be improved with actual token validation
+    const [loading, setLoading] = useState(false);
+
+    // Try to restore user profile fully on load if token exists but user lacks responsable details
+    useEffect(() => {
+        if (token && user && (!user.id || (user.role === 'USER' && user.responsable === undefined))) {
+            api.get('/api/users/me')
+                .then(res => {
+                    setUser({
+                        ...res.data.user,
+                        responsable: res.data.responsable
+                    });
+                })
+                .catch(err => {
+                    console.error("Could not refresh user profile", err);
+                    if (err.response?.status === 401) {
+                        logout(); // Invalid token
+                    }
+                });
+        }
+    }, [token]);
 
     return (
         <AuthContext.Provider value={{ token, isAuthenticated: !!token, login, logout, user, loading }}>

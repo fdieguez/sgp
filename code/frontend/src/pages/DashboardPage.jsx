@@ -11,7 +11,9 @@ import {
     LogOut,
     ChevronRight,
     Users,
-    Trash2 // Added Trash2
+    Trash2,
+    HelpCircle,
+    ClipboardList
 } from 'lucide-react';
 
 import DashboardStats from '../components/DashboardStats';
@@ -26,8 +28,12 @@ export default function DashboardPage() {
     const [statsKey, setStatsKey] = useState(0);
 
     useEffect(() => {
-        fetchConfigs();
-    }, []);
+        if (user?.role === 'ADMIN') {
+            fetchConfigs();
+        } else {
+            setLoading(false);
+        }
+    }, [user]);
 
     const fetchConfigs = async () => {
         try {
@@ -79,15 +85,28 @@ export default function DashboardPage() {
                     <div className="flex items-center justify-between h-16">
                         <div className="flex items-center">
                             <LayoutDashboard className="h-8 w-8 text-indigo-500" />
-                            <span className="ml-2 text-xl font-bold tracking-tight">SGP Dashboard</span>
+                            <span className="ml-2 text-xl font-bold tracking-tight">Panel SGP</span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-4">
+                            {user && (
+                                <div className="hidden md:flex flex-col items-end mr-2">
+                                    <span className="text-sm font-bold text-white">{user.firstName || user.email}</span>
+                                    <span className="text-xs text-indigo-400 font-medium">{user.role === 'ADMIN' ? 'Administrador' : 'Responsable'}</span>
+                                </div>
+                            )}
                             <button
                                 onClick={() => navigate('/users')}
                                 className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
                             >
                                 <Users className="h-5 w-5" />
                                 <span>Usuarios</span>
+                            </button>
+                            <button
+                                onClick={() => navigate('/help')}
+                                className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
+                            >
+                                <HelpCircle className="h-5 w-5" />
+                                <span>Ayuda</span>
                             </button>
                             <button
                                 onClick={handleLogout}
@@ -105,31 +124,47 @@ export default function DashboardPage() {
                 <DashboardStats key={statsKey} />
 
                 <div className="flex justify-between items-center mb-8">
-                    <h1 className="text-2xl font-bold">Mis Planillas</h1>
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg font-medium transition-colors"
-                    >
-                        <Plus className="h-5 w-5" />
-                        Nueva Planilla
-                    </button>
+                    <h1 className="text-2xl font-bold">{user?.role === 'ADMIN' ? 'Mis Planillas' : 'Panel de Control'}</h1>
+                    {user?.role === 'ADMIN' && (
+                        <button
+                            onClick={() => setIsModalOpen(true)}
+                            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg font-medium transition-colors"
+                        >
+                            <Plus className="h-5 w-5" />
+                            Nueva Planilla
+                        </button>
+                    )}
                 </div>
 
                 {loading ? (
                     <div className="flex justify-center p-12">
                         <RefreshCw className="h-8 w-8 animate-spin text-indigo-500" />
                     </div>
+                ) : user?.role === 'USER' ? (
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                        <Link to="/mis-solicitudes" className="bg-gray-800 rounded-xl border border-gray-700 shadow-lg overflow-hidden hover:border-indigo-500/50 transition-all duration-300 group">
+                            <div className="p-6">
+                                <div className="p-3 bg-indigo-900/50 rounded-lg inline-block mb-4">
+                                    <ClipboardList className="h-6 w-6 text-indigo-400" />
+                                </div>
+                                <h3 className="text-lg font-semibold mb-1 text-white group-hover:text-indigo-400 transition-colors">Ver Mis Solicitudes</h3>
+                                <p className="text-gray-400 text-sm">Gestiona tus trámites y subsidios asignados o de tu zona.</p>
+                            </div>
+                        </Link>
+                    </div>
                 ) : configs.length === 0 ? (
                     <div className="text-center py-20 bg-gray-800 rounded-2xl border border-gray-700 bg-opacity-50">
                         <FileSpreadsheet className="h-16 w-16 mx-auto text-gray-600 mb-4" />
                         <h3 className="text-xl font-medium text-gray-300">No hay planillas configuradas</h3>
                         <p className="text-gray-500 mt-2">Agrega tu primera conexión a Google Sheets para comenzar.</p>
-                        <button
-                            onClick={() => setIsModalOpen(true)}
-                            className="mt-6 border border-indigo-500 text-indigo-400 hover:bg-indigo-900/30 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                        >
-                            Crear Configuración
-                        </button>
+                        {user?.role === 'ADMIN' && (
+                            <button
+                                onClick={() => setIsModalOpen(true)}
+                                className="mt-6 border border-indigo-500 text-indigo-400 hover:bg-indigo-900/30 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                            >
+                                Crear Configuración
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -200,6 +235,10 @@ export default function DashboardPage() {
                     onSuccess={fetchConfigs}
                 />
             </main>
+
+            <footer className="text-center py-6 text-gray-600 text-xs">
+                SGP v0.2.0 &copy; 2026
+            </footer>
         </div>
     );
 }
