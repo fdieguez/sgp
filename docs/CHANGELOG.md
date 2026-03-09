@@ -8,6 +8,17 @@
 
 ## 📅 Marzo 2026
 
+### 09/03/2026
+- **⭐️ Versión 0.3.1** (UI/UX & Accesibilidad):
+    - **Mejoras Visuales & Filtros**:
+        - Convertidas las tarjetas estadísticas (Pendientes, En Proceso, etc.) del Dashboard en botones interactivos que filtran directamente la tabla de solicitudes al hacerles clic.
+        - Agregada etiqueta de Versión Global flotante (`v0.3.1`) persistente en todas las pantallas.
+        - Solucionado el desborde visual (overflow) de texto en el modal de detalles (`SolicitudDetailModal`) cuando se introducían enlaces o textos muy largos sin espacios.
+    - **Accesibilidad (Modo Daltónico)**:
+        - Implementado `ThemeContext` global en React.
+        - Creado un **Modo Daltónico** (Protanopía/Deuteranopía) que, al activarse, sobrescribe las variables CSS reemplazando los colores conflictivos (Verde de "Completado" por Azul, y Rojo de "Rechazado" por Naranja).
+        - Añadido un interruptor en `ProjectSettingsPage` (Preferencias Visuales) para activar/desactivar el modo, el cual se persiste en el `localStorage` del navegador.
+
 ### 06/03/2026
 - **⭐️ Versión 0.3.0**:
     - **Dashboard de Responsables**:

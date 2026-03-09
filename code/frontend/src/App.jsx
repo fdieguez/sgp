@@ -30,61 +30,70 @@ function ProtectedRoute({ children, adminOnly = false }) {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
+      <div className="relative min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+        <Router>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
 
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          } />
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            } />
 
-          <Route path="/mis-solicitudes" element={
-            <ProtectedRoute>
-              <ProjectDetailsPage />
-            </ProtectedRoute>
-          } />
+            <Route path="/mis-solicitudes" element={
+              <ProtectedRoute>
+                <ProjectDetailsPage />
+              </ProtectedRoute>
+            } />
 
-          <Route path="/projects/config/:configId" element={
-            <ProtectedRoute>
-              <ProjectDetailsPage />
-            </ProtectedRoute>
-          } />
+            <Route path="/projects/config/:configId" element={
+              <ProtectedRoute>
+                <ProjectDetailsPage />
+              </ProtectedRoute>
+            } />
 
-          <Route path="/projects/config/:configId/settings" element={
-            <ProtectedRoute>
-              <ProjectSettingsPage />
-            </ProtectedRoute>
-          } />
+            <Route path="/projects/config/:configId/settings" element={
+              <ProtectedRoute>
+                <ProjectSettingsPage />
+              </ProtectedRoute>
+            } />
 
-          <Route path="/users" element={
-            <ProtectedRoute adminOnly={true}>
-              <UsersPage />
-            </ProtectedRoute>
-          } />
+            <Route path="/users" element={
+              <ProtectedRoute adminOnly={true}>
+                <UsersPage />
+              </ProtectedRoute>
+            } />
 
-          <Route path="/orders" element={
-            <ProtectedRoute>
-              <OrdersPage />
-            </ProtectedRoute>
-          } />
+            <Route path="/orders" element={
+              <ProtectedRoute>
+                <OrdersPage />
+              </ProtectedRoute>
+            } />
 
-          <Route path="/subsidies" element={
-            <ProtectedRoute>
-              <SubsidiesPage />
-            </ProtectedRoute>
-          } />
+            <Route path="/subsidies" element={
+              <ProtectedRoute>
+                <SubsidiesPage />
+              </ProtectedRoute>
+            } />
 
-          <Route path="/help" element={
-            <ProtectedRoute>
-              <HelpPage />
-            </ProtectedRoute>
-          } />
-        </Routes>
-      </Router>
+            <Route path="/help" element={
+              <ProtectedRoute>
+                <HelpPage />
+              </ProtectedRoute>
+            } />
+          </Routes>
+        </Router>
+
+        {/* Global Version Indicator */}
+        <div className="fixed bottom-4 right-4 z-[9999] pointer-events-none opacity-50 px-3 py-1 bg-black/30 backdrop-blur-md rounded-full text-white text-[10px] font-mono tracking-widest flex items-center gap-2">
+          <span>SGP</span>
+          <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
+          <span>v0.3.0</span>
+        </div>
+      </div>
     </AuthProvider>
   );
 }

@@ -6,3 +6,23 @@
 body {
     @apply bg-gray-50 text-gray-900;
 }
+
+/* Modo Daltónico (Protanopia / Deuteranopia) Overrides 
+   Cambia el Verde por Azul y el Rojo por Naranja */
+.colorblind-mode .bg-green-500 { background-color: #3b82f6 !important; } 
+.colorblind-mode .text-green-500 { color: #3b82f6 !important; }
+.colorblind-mode .border-green-500 { border-color: #3b82f6 !important; }
+.colorblind-mode .bg-green-900\/30 { background-color: rgba(30, 58, 138, 0.3) !important; }
+.colorblind-mode .bg-green-900\/40 { background-color: rgba(30, 58, 138, 0.4) !important; }
+.colorblind-mode .text-green-400 { color: #60a5fa !important; }
+.colorblind-mode .border-green-800 { border-color: #1e3a8a !important; }
+.colorblind-mode .shadow-\[0_0_8px_rgba\(34\,197\,94\,0\.6\)\] { box-shadow: 0 0 8px rgba(59, 130, 246, 0.6) !important; }
+
+.colorblind-mode .bg-red-500 { background-color: #f97316 !important; } 
+.colorblind-mode .text-red-500 { color: #f97316 !important; }
+.colorblind-mode .border-red-500 { border-color: #f97316 !important; }
+.colorblind-mode .bg-red-900\/30 { background-color: rgba(124, 45, 18, 0.3) !important; }
+.colorblind-mode .bg-red-900\/40 { background-color: rgba(124, 45, 18, 0.4) !important; }
+.colorblind-mode .text-red-400 { color: #fb923c !important; }
+.colorblind-mode .border-red-800 { border-color: #7c2d12 !important; }
+.colorblind-mode .shadow-\[0_0_8px_rgba\(239\,68\,68\,0\.6\)\] { box-shadow: 0 0 8px rgba(249, 115, 22, 0.6) !important; }

@@ -412,38 +412,38 @@ export default function ProjectDetailsPage() {
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                        <div className="bg-gray-800/50 border border-gray-700 p-4 rounded-2xl flex flex-col justify-center shadow-lg">
+                        <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'PENDING' ? '' : 'PENDING' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'PENDING' ? 'bg-yellow-900/40 border-2 border-yellow-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
                             <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]"></div> Pendientes
                             </div>
                             <div className="text-3xl font-black text-white">
                                 {processedData.rows.filter(s => s.status === 'PENDING').length}
                             </div>
-                        </div>
-                        <div className="bg-gray-800/50 border border-gray-700 p-4 rounded-2xl flex flex-col justify-center shadow-lg">
+                        </button>
+                        <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'IN_PROGRESS' ? '' : 'IN_PROGRESS' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'IN_PROGRESS' ? 'bg-blue-900/40 border-2 border-blue-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
                             <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></div> En Proceso
                             </div>
                             <div className="text-3xl font-black text-white">
                                 {processedData.rows.filter(s => s.status === 'IN_PROGRESS').length}
                             </div>
-                        </div>
-                        <div className="bg-gray-800/50 border border-gray-700 p-4 rounded-2xl flex flex-col justify-center shadow-lg">
+                        </button>
+                        <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'COMPLETED' ? '' : 'COMPLETED' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'COMPLETED' ? 'bg-green-900/40 border-2 border-green-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
                             <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div> Completados
                             </div>
                             <div className="text-3xl font-black text-white">
                                 {processedData.rows.filter(s => s.status === 'COMPLETED').length}
                             </div>
-                        </div>
-                        <div className="bg-gray-800/50 border border-gray-700 p-4 rounded-2xl flex flex-col justify-center shadow-lg">
+                        </button>
+                        <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'REJECTED' ? '' : 'REJECTED' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'REJECTED' ? 'bg-red-900/40 border-2 border-red-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
                             <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"></div> Rechazados
                             </div>
                             <div className="text-3xl font-black text-white">
                                 {processedData.rows.filter(s => s.status === 'REJECTED').length}
                             </div>
-                        </div>
+                        </button>
                         <div className="bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border border-indigo-500/30 p-4 rounded-2xl flex flex-col justify-center shadow-lg lg:col-span-1 md:col-span-2 col-span-2">
                             <div className="text-[10px] uppercase font-black text-indigo-300 mb-1 tracking-wider">Subsidios Entregados</div>
                             <div className="text-2xl font-black text-white">

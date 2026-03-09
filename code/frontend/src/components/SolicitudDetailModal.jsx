@@ -61,7 +61,7 @@ export default function SolicitudDetailModal({ isOpen, onClose, solicitud }) {
                             <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                                 <Box className="h-3 w-3" /> Detalles de la Solicitud
                             </h3>
-                            <div className="bg-gray-900/50 p-5 rounded-2xl border border-gray-700/50 leading-relaxed text-gray-200">
+                            <div className="bg-gray-900/50 p-5 rounded-2xl border border-gray-700/50 leading-relaxed text-gray-200 whitespace-pre-wrap break-words max-w-full">
                                 {solicitud.description}
                             </div>
                         </section>

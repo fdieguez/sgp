@@ -235,10 +235,6 @@ export default function DashboardPage() {
                     onSuccess={fetchConfigs}
                 />
             </main>
-
-            <footer className="text-center py-6 text-gray-600 text-xs">
-                SGP v0.2.0 &copy; 2026
-            </footer>
         </div>
     );
 }

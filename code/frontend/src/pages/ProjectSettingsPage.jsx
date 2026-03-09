@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import api from '../config/axios';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useTheme } from '../context/ThemeContext';
 import {
     ArrowLeft,
+    Eye,
     Save,
     Trash2,
     RefreshCw,
@@ -16,6 +18,7 @@ import {
 
 export default function ProjectSettingsPage() {
     const { configId } = useParams();
+    const { colorblindMode, setColorblindMode } = useTheme();
     const navigate = useNavigate();
     const [config, setConfig] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -187,6 +190,24 @@ export default function ProjectSettingsPage() {
 
                     {/* Sidebar Actions */}
                     <div className="space-y-6">
+                        <section className="bg-gray-800 rounded-3xl border border-gray-700 p-6 shadow-xl">
+                            <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <Eye className="h-4 w-4 text-emerald-400" /> Preferencias Visuales
+                            </h3>
+                            <div className="flex items-center justify-between p-4 bg-gray-900/50 rounded-xl border border-gray-800">
+                                <div className="pr-2">
+                                    <div className="font-bold text-white text-sm">Modo para Daltónicos</div>
+                                    <div className="text-xs text-gray-400 mt-1">Mejora constraste (Protanopía)</div>
+                                </div>
+                                <button
+                                    onClick={() => setColorblindMode(!colorblindMode)}
+                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${colorblindMode ? 'bg-indigo-500' : 'bg-gray-600'}`}
+                                >
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${colorblindMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
+                        </section>
+
                         <section className="bg-gray-800 rounded-3xl border border-gray-700 p-6 shadow-xl">
                             <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-4">Acciones de Sincronización</h3>
 
