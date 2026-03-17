@@ -35,3 +35,6 @@ code/backend/jconsole.exe
 # Docker
 code/backend/data/
 postgres_data/
+
+# propios
+/private/

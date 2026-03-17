@@ -1,0 +1,142 @@
+PROVINCE|Santa Fe
+
+# Cities with neighborhoods
+CITY|Santa Fe
+NEIGHBORHOOD|7 Jefes
+NEIGHBORHOOD|Alberdi
+NEIGHBORHOOD|Alto Verde
+NEIGHBORHOOD|Acería
+NEIGHBORHOOD|Barranquitas
+NEIGHBORHOOD|Candioti
+NEIGHBORHOOD|Centenario
+NEIGHBORHOOD|Ciudadela
+NEIGHBORHOOD|Constituyentes
+NEIGHBORHOOD|Coronel Dorrego
+NEIGHBORHOOD|Escalante
+NEIGHBORHOOD|Fomento 9 de Julio
+NEIGHBORHOOD|Guadalupe
+NEIGHBORHOOD|Los Hornos
+NEIGHBORHOOD|Roma
+NEIGHBORHOOD|San Lorenzo
+NEIGHBORHOOD|Sargento Cabral
+NEIGHBORHOOD|Santa Rosa de Lima
+NEIGHBORHOOD|Sur
+NEIGHBORHOOD|Villa del Parque
+NEIGHBORHOOD|Yapeyú
+NEIGHBORHOOD|Varadero Sarsotti
+NEIGHBORHOOD|El Pozo
+NEIGHBORHOOD|Las Flores
+NEIGHBORHOOD|Scarafía
+NEIGHBORHOOD|San Agustín
+NEIGHBORHOOD|Cabal
+NEIGHBORHOOD|Las Lomas
+NEIGHBORHOOD|Santo Domingo
+
+CITY|Rosario
+NEIGHBORHOOD|Abasto
+NEIGHBORHOOD|Alberdi
+NEIGHBORHOOD|Alvear
+NEIGHBORHOOD|Antártida Argentina
+NEIGHBORHOOD|Arroyito
+NEIGHBORHOOD|Azcuénaga
+NEIGHBORHOOD|Bella Vista
+NEIGHBORHOOD|Belgrano
+NEIGHBORHOOD|Centro
+NEIGHBORHOOD|Echesortu
+NEIGHBORHOOD|Fisherton
+NEIGHBORHOOD|Godoy
+NEIGHBORHOOD|Hospitales
+NEIGHBORHOOD|Industrial
+NEIGHBORHOOD|Larrea
+NEIGHBORHOOD|Las Heras
+NEIGHBORHOOD|Lisandro de la Torre
+NEIGHBORHOOD|Ludueña
+NEIGHBORHOOD|Matheu
+NEIGHBORHOOD|Parque Casado
+NEIGHBORHOOD|Parque Field
+NEIGHBORHOOD|Pichincha
+NEIGHBORHOOD|Refinería
+NEIGHBORHOOD|República de la Sexta
+NEIGHBORHOOD|Roque Sáenz Peña
+NEIGHBORHOOD|Rucci
+NEIGHBORHOOD|Saladillo
+NEIGHBORHOOD|Sarmiento
+NEIGHBORHOOD|Tablada
+NEIGHBORHOOD|Tiro Suizo
+NEIGHBORHOOD|Triángulo
+NEIGHBORHOOD|Urquiza
+
+# Localities (cities, towns, communes)
+LOCALITY|Aaron Castellanos
+LOCALITY|Acebal
+LOCALITY|Aguará Grande
+LOCALITY|Albarellos
+LOCALITY|Alcorta
+LOCALITY|Aldao
+LOCALITY|Alejandra
+LOCALITY|Álvarez
+LOCALITY|Ambrosetti
+LOCALITY|Amenábar
+LOCALITY|Andino
+LOCALITY|Angélica
+LOCALITY|Angeloni
+LOCALITY|Arequito
+LOCALITY|Arminda
+LOCALITY|Armstrong
+LOCALITY|Arocena
+LOCALITY|Arroyo Aguiar
+LOCALITY|Arroyo Ceibal
+LOCALITY|Arroyo Leyes
+LOCALITY|Arroyo Seco
+LOCALITY|Arrufó
+LOCALITY|Arteaga
+LOCALITY|Ataliva
+LOCALITY|Aurelia
+LOCALITY|Avellaneda
+LOCALITY|Barrancas
+LOCALITY|Bauer y Sigel
+LOCALITY|Bella Italia
+LOCALITY|Berabevú
+LOCALITY|Bigand
+LOCALITY|Bombal
+LOCALITY|Cafferata
+LOCALITY|Calchaquí
+LOCALITY|Campo Piaggio
+LOCALITY|Cañada de Gómez
+LOCALITY|Cañada Rica
+LOCALITY|Capitán Bermúdez
+LOCALITY|Carcarañá
+LOCALITY|Casilda
+LOCALITY|Ceres
+LOCALITY|Coronda
+LOCALITY|El Trébol
+LOCALITY|Esperanza
+LOCALITY|Firmat
+LOCALITY|Funes
+LOCALITY|Gálvez
+LOCALITY|Laguna Paiva
+LOCALITY|Las Parejas
+LOCALITY|Las Rosas
+LOCALITY|Melincué
+LOCALITY|Pérez
+LOCALITY|Rafaela
+LOCALITY|Reconquista
+LOCALITY|Roldán
+LOCALITY|San Carlos Centro
+LOCALITY|San Cristóbal
+LOCALITY|San Genaro
+LOCALITY|San Jorge
+LOCALITY|San Justo
+LOCALITY|San Lorenzo
+LOCALITY|San Vicente
+LOCALITY|Santo Tomé
+LOCALITY|Sastre
+LOCALITY|Suardi
+LOCALITY|Tostado
+LOCALITY|Venado Tuerto
+LOCALITY|Villa Constitución
+LOCALITY|Villa Gobernador Gálvez
+LOCALITY|Villa Ocampo
+LOCALITY|Villa Trinidad
+LOCALITY|Wheelwright
+LOCALITY|Zenón Pereyra
