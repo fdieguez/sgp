@@ -38,6 +38,7 @@ import {
 
 import SolicitudDetailModal from '../components/SolicitudDetailModal';
 import SolicitudModal from '../components/SolicitudModal';
+import Navbar from '../components/Navbar';
 
 // --- Helpers ---
 const parseLocalDate = (dateStr) => {
@@ -271,8 +272,10 @@ export default function ProjectDetailsPage() {
     const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6'];
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white p-8">
-            <div className="max-w-7xl mx-auto space-y-8">
+        <div className="min-h-screen bg-gray-900 text-white">
+            <Navbar />
+            
+            <div className="p-8 max-w-7xl mx-auto space-y-8">
                 {/* Top Nav */}
                 <div className="flex items-center justify-between">
                     <Link to="/dashboard" className="flex items-center text-gray-400 hover:text-white transition-colors group">

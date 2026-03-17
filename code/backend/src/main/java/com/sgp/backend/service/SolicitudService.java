@@ -98,12 +98,43 @@ public class SolicitudService {
             solicitud.setPerson(p);
         }
 
-        // 2. Handle Location
-        if (solicitud.getLocation() != null) {
+        // 2. Handle Location (using locationName and barrio from frontend payload)
+        if (solicitud.getLocationName() != null && !solicitud.getLocationName().trim().isEmpty()) {
+            final String cityName = solicitud.getLocationName().trim();
+            final String inputBarrio = (solicitud.getBarrio() != null && !solicitud.getBarrio().trim().isEmpty()) ? solicitud.getBarrio().trim() : null;
+
+            // Find or create City
+            Location cityLocation = locationRepository.findFirstByNameAndType(cityName, "CITY")
+                    .orElseGet(() -> locationRepository.findFirstByNameAndType(cityName, "LOCALITY")
+                    .orElseGet(() -> locationRepository.findFirstByName(cityName)
+                    .orElseGet(() -> {
+                        Location newCity = new Location();
+                        newCity.setName(cityName);
+                        newCity.setType("CITY");
+                        return locationRepository.save(newCity);
+                    })));
+
+            if (inputBarrio != null) {
+                // Find or create Neighborhood
+                Location finalCityLocation = cityLocation;
+                Location neighborhood = locationRepository.findFirstByNameAndParentId(inputBarrio, cityLocation.getId())
+                        .orElseGet(() -> {
+                            Location newNeighborhood = new Location();
+                            newNeighborhood.setName(inputBarrio);
+                            newNeighborhood.setType("NEIGHBORHOOD");
+                            newNeighborhood.setParent(finalCityLocation);
+                            return locationRepository.save(newNeighborhood);
+                        });
+                solicitud.setLocation(neighborhood);
+            } else {
+                solicitud.setLocation(cityLocation);
+            }
+        } else if (solicitud.getLocation() != null) {
+            // Fallback for older approach
             Location l = solicitud.getLocation();
             if (l.getId() == null && l.getName() != null) {
                 final Location locationToSave = l;
-                l = locationRepository.findByName(l.getName())
+                l = locationRepository.findFirstByName(l.getName())
                         .orElseGet(() -> {
                             locationToSave.setType("CITY"); // Default for manual
                             return locationRepository.save(locationToSave);
@@ -150,14 +181,42 @@ public class SolicitudService {
         }
 
         // 2. Handle Location (using location fields from frontend)
-        // Note: The frontend sends locationName and barrio in the payload, but we need
-        // to map it if we are manually constructing it, or if it sends full location
-        // object
-        if (solicitudPayload.getLocation() != null) {
+        if (solicitudPayload.getLocationName() != null && !solicitudPayload.getLocationName().trim().isEmpty()) {
+            final String cityName = solicitudPayload.getLocationName().trim();
+            final String inputBarrio = (solicitudPayload.getBarrio() != null && !solicitudPayload.getBarrio().trim().isEmpty()) ? solicitudPayload.getBarrio().trim() : null;
+
+            // Find or create City
+            Location cityLocation = locationRepository.findFirstByNameAndType(cityName, "CITY")
+                    .orElseGet(() -> locationRepository.findFirstByNameAndType(cityName, "LOCALITY")
+                    .orElseGet(() -> locationRepository.findFirstByName(cityName)
+                    .orElseGet(() -> {
+                        Location newCity = new Location();
+                        newCity.setName(cityName);
+                        newCity.setType("CITY");
+                        return locationRepository.save(newCity);
+                    })));
+
+            if (inputBarrio != null) {
+                // Find or create Neighborhood
+                Location finalCityLocation = cityLocation;
+                Location neighborhood = locationRepository.findFirstByNameAndParentId(inputBarrio, cityLocation.getId())
+                        .orElseGet(() -> {
+                            Location newNeighborhood = new Location();
+                            newNeighborhood.setName(inputBarrio);
+                            newNeighborhood.setType("NEIGHBORHOOD");
+                            newNeighborhood.setParent(finalCityLocation);
+                            return locationRepository.save(newNeighborhood);
+                        });
+                existing.setLocation(neighborhood);
+            } else {
+                existing.setLocation(cityLocation);
+            }
+        } else if (solicitudPayload.getLocation() != null) {
+            // Fallback for older approach
             Location l = solicitudPayload.getLocation();
             if (l.getId() == null && l.getName() != null) {
                 final Location locationToSave = l;
-                l = locationRepository.findByName(l.getName())
+                l = locationRepository.findFirstByName(l.getName())
                         .orElseGet(() -> {
                             locationToSave.setType("CITY"); // Default for manual
                             return locationRepository.save(locationToSave);

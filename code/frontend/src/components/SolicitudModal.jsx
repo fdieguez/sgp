@@ -21,18 +21,21 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     });
 
     const [responsables, setResponsables] = useState([]);
+    const [locations, setLocations] = useState([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
             fetchResponsables();
+            fetchLocations();
             if (initialData) {
                 // Map entity to form
                 setFormData({
                     ...initialData,
                     type: initialData.amount !== undefined ? 'SUBSIDIO' : 'PEDIDO',
                     person: initialData.person || { name: '', phone: '' },
-                    locationName: initialData.location?.name || '',
+                    locationName: initialData.location?.type === 'NEIGHBORHOOD' ? (initialData.location?.parent?.name || '') : (initialData.location?.name || ''),
+                    barrio: initialData.location?.type === 'NEIGHBORHOOD' ? (initialData.location?.name || '') : '',
                     responsableId: initialData.responsable?.id || '',
                     amount: initialData.amount || '',
                     grantDate: initialData.grantDate ? initialData.grantDate.split('T')[0] : '',
@@ -79,6 +82,22 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             console.error("Error fetching responsables", err);
         }
     };
+
+    const fetchLocations = async () => {
+        try {
+            const res = await api.get('/api/locations');
+            setLocations(res.data);
+        } catch (err) {
+            console.error("Error fetching locations", err);
+        }
+    };
+
+    // Computar listas dinámicas
+    const availableCities = locations.filter(l => l.type === 'CITY' || l.type === 'LOCALITY');
+    const selectedCity = availableCities.find(c => c.name.toLowerCase() === (formData.locationName || '').trim().toLowerCase());
+    const availableNeighborhoods = selectedCity
+        ? locations.filter(l => l.type === 'NEIGHBORHOOD' && l.parent?.id === selectedCity.id)
+        : [];
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -187,28 +206,45 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 <label className="block text-sm text-gray-500 mb-1">Localidad</label>
                                 <input
                                     type="text"
+                                    list="cities-list"
+                                    autoComplete="off"
                                     className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
                                     value={formData.locationName}
-                                    onChange={(e) => setFormData({ ...formData, locationName: e.target.value })}
+                                    onChange={(e) => setFormData({ ...formData, locationName: e.target.value, barrio: '' })} // Reset barrio al cambiar ciudad
+                                    placeholder="Ej: Santa Fe"
                                 />
+                                <datalist id="cities-list">
+                                    {availableCities.map(c => (
+                                        <option key={c.id} value={c.name} />
+                                    ))}
+                                </datalist>
                             </div>
                             <div>
                                 <label className="block text-sm text-gray-500 mb-1">Barrio</label>
                                 <input
                                     type="text"
+                                    list="neighborhoods-list"
+                                    autoComplete="off"
                                     className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
                                     value={formData.barrio}
                                     onChange={(e) => setFormData({ ...formData, barrio: e.target.value })}
+                                    placeholder={selectedCity ? "Seleccionar o escribir..." : "Primero elija localidad"}
+                                    disabled={!formData.locationName}
                                 />
+                                <datalist id="neighborhoods-list">
+                                    {availableNeighborhoods.map(n => (
+                                        <option key={n.id} value={n.name} />
+                                    ))}
+                                </datalist>
                             </div>
                             <div>
                                 <label className="block text-sm text-gray-500 mb-1">Zona / Eje</label>
                                 <input
                                     type="text"
-                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white disabled:opacity-50"
-                                    value={formData.zone}
-                                    disabled={isResponsable}
-                                    onChange={(e) => setFormData({ ...formData, zone: e.target.value })}
+                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-gray-400 cursor-not-allowed"
+                                    value={formData.zone || ''}
+                                    readOnly
+                                    placeholder="Auto-asignada por Responsable"
                                 />
                             </div>
                         </div>
@@ -298,8 +334,15 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             <select
                                 className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                                 value={formData.responsableId}
-                                disabled={isResponsable}
-                                onChange={(e) => setFormData({ ...formData, responsableId: e.target.value })}
+                                onChange={(e) => {
+                                    const respId = e.target.value;
+                                    const selectedResp = responsables.find(r => r.id.toString() === respId.toString());
+                                    setFormData({ 
+                                        ...formData, 
+                                        responsableId: respId,
+                                        zone: selectedResp ? (selectedResp.zone || '') : ''
+                                    });
+                                }}
                             >
                                 <option value="">Seleccionar...</option>
                                 {responsables.map(r => (

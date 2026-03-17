@@ -17,6 +17,7 @@ public class DataInitializer implements CommandLineRunner {
     private final com.sgp.backend.repository.SheetsConfigRepository sheetsConfigRepository;
     private final PasswordEncoder passwordEncoder;
     private final com.sgp.backend.repository.ResponsableRepository responsableRepository;
+    private final com.sgp.backend.repository.LocationRepository locationRepository;
 
     @Override
     public void run(String... args) throws Exception {
@@ -51,7 +52,10 @@ public class DataInitializer implements CommandLineRunner {
         // Remove old admin if exists
         // userRepository.findByEmail("admin@sgp.com").ifPresent(userRepository::delete);
 
-        // 2. Seed Test Sheets Configuration (DISABLED to prevent data pollution)
+        // 2. Initialize Locations from dataset
+        initializeLocations();
+
+        // 3. Seed Test Sheets Configuration (DISABLED to prevent data pollution)
         /*
          * if (sheetsConfigRepository.count() == 0) {
          * com.sgp.backend.entity.SheetsConfig config = new
@@ -64,6 +68,62 @@ public class DataInitializer implements CommandLineRunner {
          * System.out.println("✅ Test Sheet Config created automatically");
          * }
          */
+    }
+
+    private void initializeLocations() {
+        if (locationRepository.count() > 0) {
+            return;
+        }
+
+        System.out.println("⏳ Cargando dataset de localidades de Santa Fe...");
+        try (java.io.InputStream is = getClass().getResourceAsStream("/dataset/santa_fe_locations_dataset.txt");
+             java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(is, java.nio.charset.StandardCharsets.UTF_8))) {
+
+            String line;
+            com.sgp.backend.entity.Location currentProvince = null;
+            com.sgp.backend.entity.Location currentCity = null;
+            int count = 0;
+
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("#")) {
+                    continue;
+                }
+
+                String[] parts = line.split("\\|");
+                if (parts.length != 2) continue;
+
+                String type = parts[0];
+                String name = parts[1];
+
+                if ("PROVINCE".equals(type)) {
+                    currentProvince = new com.sgp.backend.entity.Location();
+                    currentProvince.setName(name);
+                    currentProvince.setType("PROVINCE");
+                    currentProvince = locationRepository.save(currentProvince);
+                    count++;
+                } else if ("CITY".equals(type) || "LOCALITY".equals(type)) {
+                    currentCity = new com.sgp.backend.entity.Location();
+                    currentCity.setName(name);
+                    currentCity.setType("CITY");
+                    currentCity.setParent(currentProvince);
+                    currentCity = locationRepository.save(currentCity);
+                    count++;
+                } else if ("NEIGHBORHOOD".equals(type) && currentCity != null) {
+                    com.sgp.backend.entity.Location neighborhood = new com.sgp.backend.entity.Location();
+                    neighborhood.setName(name);
+                    neighborhood.setType("NEIGHBORHOOD");
+                    neighborhood.setParent(currentCity);
+                    locationRepository.save(neighborhood);
+                    count++;
+                }
+            }
+            System.out.println("✅ Se inicializaron " + count + " registros de ubicación exitosamente.");
+        } catch (Exception e) {
+            System.err.println("❌ Error al cargar las localidades: " + e.getMessage());
+            e.printStackTrace();
+        }
+
     }
 
     private User createUserIfNotFound(String email, String password, String role, String firstName, String lastName,

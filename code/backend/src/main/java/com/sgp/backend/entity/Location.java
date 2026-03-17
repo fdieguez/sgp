@@ -1,7 +1,6 @@
 package com.sgp.backend.entity;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -30,10 +29,10 @@ public class Location {
 
     @ManyToOne
     @JoinColumn(name = "parent_id")
-    @JsonBackReference
+    @JsonIgnoreProperties("children")
     private Location parent;
 
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
-    @JsonManagedReference
+    @JsonIgnoreProperties("parent")
     private List<Location> children;
 }

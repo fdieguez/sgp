@@ -13,10 +13,12 @@ import {
     Users,
     Trash2,
     HelpCircle,
-    ClipboardList
+    ClipboardList,
+    Globe
 } from 'lucide-react';
 
 import DashboardStats from '../components/DashboardStats';
+import Navbar from '../components/Navbar';
 
 export default function DashboardPage() {
     const [configs, setConfigs] = useState([]);
@@ -80,45 +82,7 @@ export default function DashboardPage() {
     return (
         <div className="min-h-screen bg-gray-900 text-white">
             {/* Navbar */}
-            <nav className="bg-gray-800 border-b border-gray-700">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16">
-                        <div className="flex items-center">
-                            <LayoutDashboard className="h-8 w-8 text-indigo-500" />
-                            <span className="ml-2 text-xl font-bold tracking-tight">Panel SGP</span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            {user && (
-                                <div className="hidden md:flex flex-col items-end mr-2">
-                                    <span className="text-sm font-bold text-white">{user.firstName || user.email}</span>
-                                    <span className="text-xs text-indigo-400 font-medium">{user.role === 'ADMIN' ? 'Administrador' : 'Responsable'}</span>
-                                </div>
-                            )}
-                            <button
-                                onClick={() => navigate('/users')}
-                                className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
-                            >
-                                <Users className="h-5 w-5" />
-                                <span>Usuarios</span>
-                            </button>
-                            <button
-                                onClick={() => navigate('/help')}
-                                className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
-                            >
-                                <HelpCircle className="h-5 w-5" />
-                                <span>Ayuda</span>
-                            </button>
-                            <button
-                                onClick={handleLogout}
-                                className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
-                            >
-                                <LogOut className="h-5 w-5" />
-                                <span>Salir</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </nav>
+            <Navbar />
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <DashboardStats key={statsKey} />
@@ -168,6 +132,32 @@ export default function DashboardPage() {
                     </div>
                 ) : (
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                        {user?.role === 'ADMIN' && (
+                            <div className="bg-gray-800 rounded-xl border border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.2)] overflow-hidden transition-all duration-300 group">
+                                <div className="p-6">
+                                    <div className="flex items-start justify-between mb-4">
+                                        <div className="p-3 bg-indigo-900/50 rounded-lg">
+                                            <Globe className="h-6 w-6 text-indigo-400" />
+                                        </div>
+                                    </div>
+                                    <h3 className="text-lg font-bold mb-1 text-white truncate">
+                                        Todas las Solicitudes
+                                    </h3>
+                                    <p className="text-gray-400 text-xs mb-6 truncate" title="Sincronizadas y Manuales">
+                                        Visión Global de Sincronizadas y Manuales
+                                    </p>
+                                    <div className="flex items-center justify-end pt-4 border-t border-gray-700">
+                                        <Link
+                                            to="/mis-solicitudes"
+                                            className="p-2 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/20 rounded-lg transition-colors"
+                                            title="Ver Datos Globales"
+                                        >
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Link>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         {configs.map((config) => (
                             <div key={config.id} className="bg-gray-800 rounded-xl border border-gray-700 shadow-lg overflow-hidden hover:border-indigo-500/50 transition-all duration-300 group">
                                 <div className="p-6">

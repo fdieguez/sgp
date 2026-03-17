@@ -7,7 +7,13 @@ import java.util.List;
 
 @Repository
 public interface LocationRepository extends JpaRepository<Location, Long> {
-    java.util.Optional<Location> findByName(String name);
+    java.util.Optional<Location> findFirstByName(String name);
+    
+    java.util.Optional<Location> findFirstByNameAndType(String name, String type);
+
+    java.util.Optional<Location> findFirstByNameAndParentId(String name, Long parentId);
+    
+    java.util.Optional<Location> findFirstByNameAndParentIdAndType(String name, Long parentId, String type);
 
     List<Location> findByParent(Location parent);
 

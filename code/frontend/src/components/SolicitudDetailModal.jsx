@@ -23,6 +23,15 @@ export default function SolicitudDetailModal({ isOpen, onClose, solicitud }) {
         return new Date(y, m - 1, d).toLocaleDateString();
     };
 
+    let locationText = '-';
+    if (solicitud.location) {
+        if (solicitud.location.type === 'NEIGHBORHOOD') {
+            locationText = `${solicitud.location.parent ? solicitud.location.parent.name : ''} - B° ${solicitud.location.name}`;
+        } else {
+            locationText = solicitud.location.name;
+        }
+    }
+
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-300">
             <div className="bg-gray-800 border border-gray-700 rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
@@ -149,7 +158,7 @@ export default function SolicitudDetailModal({ isOpen, onClose, solicitud }) {
                                     <div>
                                         <div className="text-[10px] text-gray-500 uppercase font-bold">Ubicación</div>
                                         <div className="text-sm font-medium">
-                                            {solicitud.location?.name}
+                                            {locationText}
                                             {solicitud.person?.address && <span className="text-gray-500 block text-xs">{solicitud.person.address}</span>}
                                             {solicitud.zone && <span className="text-indigo-400 block text-xs font-bold mt-1">Zona: {solicitud.zone}</span>}
                                         </div>

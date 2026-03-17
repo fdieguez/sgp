@@ -58,6 +58,14 @@ public abstract class Solicitud {
 
     private Boolean firstContactControl;
 
+    @Transient
+    @com.fasterxml.jackson.annotation.JsonProperty("locationName")
+    private String locationName;
+
+    @Transient
+    @com.fasterxml.jackson.annotation.JsonProperty("barrio")
+    private String barrio;
+
     @ManyToOne(optional = false)
     @JoinColumn(name = "person_id")
     private Person person; // The beneficiary
