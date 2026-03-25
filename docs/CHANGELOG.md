@@ -8,6 +8,29 @@
 
 ## 📅 Marzo 2026
 
+### 20/03/2026
+- **⭐️ Versión 0.3.2** (Gestión Geográfica & Mejoras de Estabilidad):
+    - **Dataset de Localidades Automático**:
+        - Integración de padrón completo de localidades y barrios de Santa Fe (`santa_fe_locations_dataset.txt`).
+        - Programado el `DataInitializer.java` para poblar automáticamente la base de datos de producción con miles de registros (Provincias, Ciudades, Barrios) en el primer inicio del sistema, respetando relaciones jerárquicas.
+    - **Mejora Interfaz de Ubicaciones (React)**:
+        - Reemplazados los campos de texto libre de `Localidad` y `Barrio` en `SolicitudModal` por selectores predictivos nativos (`<datalist>`).
+        - Añadida lógica en cascada: el listado de Barrios disponibles se filtra instantáneamente y con exclusividad según la Ciudad previamente seleccionada.
+        - Apagado el historial invasivo del navegador web en campos clave usando `autoComplete="off"` y saneada la búsqueda aplicando `.trim().toLowerCase()`.
+        - Actualizada la tarjeta de detalles (`SolicitudDetailModal`) para que combine inteligentemente "Nombre De Ciudad - B° Nombre Del Barrio" si detecta un entorno de vecindario.
+    - **Gestión Automática de Zona**:
+        - Implementado el autocompletado en cascada en la asignación de reclamos. Al seleccionar a un usuario "Responsable", su "Eje/Zona" se inyecta y se bloquea directamente en el formulario en modo sólo-lectura (`readonly`, `cursor-not-allowed`).
+    - **Fixes Críticos del Backend**:
+        - **JPA Error**: Solucionado el error `NonUniqueResultException` o `IncorrectResultSizeDataAccessException` que colapsaba la app al crear solicitudes. Refactorizado el `LocationRepository` (añadiendo métodos como `findFirstByNameAndType`) para saber discernir correctamente entre un departamento y una ciudad que comparten idéntico nombre (ej. "Santa Fe").
+        - **Jackson Parsing**: Modificada la entidad `Location.java` cambiando sus decoradores por `@JsonIgnoreProperties("children")` y anulando el `@JsonBackReference` previo. Esto reparó el problema oculto que impedía que la base de datos retransmitiera la "Ciudad Padre" asociada a un "Barrio" hacia el cliente web, solucionando las vistas en las tablas y ediciones.
+    - **Desarrollo y Ops Locales**:
+        - Creados scripts en lote (batch files) seguros (`compilar_y_ejecutar.bat`, `iniciar_frontend.bat`) para habilitar entornos de prueba limpiamente evadiendo posibles políticas de restricción de PowerShell de Windows.
+        - Arreglado bug en compilación de Producción de Vite purgado un archivo sin trackear (`Navbar.jsx`).
+
+> **📝 NOTA PARA PROXIMA SESIÓN / NUEVO CHAT**:
+> Frontend y Backend acaban de alcanzar un hito de estabilidad crítico en la geolocalización de las solicitudes. La versión está productiva. Se testeó toda la pipeline y el dataset (`santa_fe_locations_dataset.txt`) se carga dinámicamente.
+> **Punto de Partida**: Evaluar las nuevas necesidades del sistema y testear la subida definitiva al VPS si fuera el caso de buscar publicar la app real.
+
 ### 09/03/2026
 - **⭐️ Versión 0.3.1** (UI/UX & Accesibilidad):
     - **Mejoras Visuales & Filtros**:
