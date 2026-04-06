@@ -5,7 +5,9 @@ import { useAuth } from '../context/AuthContext';
 
 export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData, configId }) {
     const { user } = useAuth();
-    const isResponsable = user?.role === 'USER';
+    const isResponsable = user?.role === 'RESPONSABLE' || user?.role === 'RESOLUTOR';
+    const canSuggestResolutor = user?.role === 'RESPONSABLE';
+    const isResolutor = user?.role === 'RESOLUTOR';
     const [formData, setFormData] = useState({
         type: 'PEDIDO',
         description: '',
@@ -17,17 +19,20 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         barrio: '',
         responsableId: '',
         amount: '',
-        grantDate: ''
+        grantDate: '',
+        resolutionApproved: false
     });
 
     const [responsables, setResponsables] = useState([]);
     const [locations, setLocations] = useState([]);
+    const [resolutorConfigs, setResolutorConfigs] = useState([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
             fetchResponsables();
             fetchLocations();
+            fetchResolutorConfigs();
             if (initialData) {
                 // Map entity to form
                 setFormData({
@@ -45,6 +50,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     entryDate: initialData.entryDate ? initialData.entryDate.split('T')[0] : '',
                     observation: initialData.observation || '',
                     resolution: initialData.resolution || '',
+                    suggestedResolutionType: initialData.suggestedResolutionType || '',
+                    resolutionApproved: initialData.resolutionApproved || false,
                     detail: initialData.detail || '',
                     firstContactControl: initialData.firstContactControl || false,
                     origin: initialData.origin || 'MANUAL'
@@ -67,6 +74,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     resolutionDate: '',
                     observation: '',
                     resolution: '',
+                    suggestedResolutionType: '',
+                    resolutionApproved: false,
                     detail: '',
                     firstContactControl: false
                 });
@@ -89,6 +98,15 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             setLocations(res.data);
         } catch (err) {
             console.error("Error fetching locations", err);
+        }
+    };
+
+    const fetchResolutorConfigs = async () => {
+        try {
+            const res = await api.get('/api/resolutor-configs');
+            setResolutorConfigs(res.data);
+        } catch (err) {
+            console.error("Error fetching resolutor configs", err);
         }
     };
 
@@ -241,10 +259,11 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 <label className="block text-sm text-gray-500 mb-1">Zona / Eje</label>
                                 <input
                                     type="text"
-                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-gray-400 cursor-not-allowed"
+                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                                     value={formData.zone || ''}
-                                    readOnly
-                                    placeholder="Auto-asignada por Responsable"
+                                    disabled={isResponsable}
+                                    onChange={(e) => setFormData({ ...formData, zone: e.target.value })}
+                                    placeholder="Auto-asignada, o escriba aquí..."
                                 />
                             </div>
                         </div>
@@ -334,6 +353,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             <select
                                 className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                                 value={formData.responsableId}
+                                disabled={isResponsable}
                                 onChange={(e) => {
                                     const respId = e.target.value;
                                     const selectedResp = responsables.find(r => r.id.toString() === respId.toString());
@@ -385,6 +405,37 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 placeholder="Resultado breve..."
                             />
                         </div>
+
+                        {canSuggestResolutor && (
+                            <div>
+                                <label className="block text-sm font-medium text-indigo-400 mb-1">Sugerir Resolutor / Derivar</label>
+                                <select
+                                    className="w-full bg-indigo-900/20 border border-indigo-700/50 rounded-lg px-3 py-2 text-indigo-300 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    value={formData.suggestedResolutionType || ''}
+                                    onChange={(e) => setFormData({ ...formData, suggestedResolutionType: e.target.value })}
+                                >
+                                    <option value="">Ninguna / No derivar</option>
+                                    {resolutorConfigs.map(c => (
+                                        <option key={c.id} value={c.tipoResolucion}>{c.tipoResolucion}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        {isResolutor && (
+                            <div className="flex items-center gap-3 pt-3 pb-3 bg-green-900/20 p-4 rounded-xl border border-green-700/50">
+                                <input
+                                    type="checkbox"
+                                    id="resolutionApproved"
+                                    className="w-5 h-5 rounded border-green-600 bg-gray-800 text-green-500 focus:ring-green-500"
+                                    checked={formData.resolutionApproved}
+                                    onChange={(e) => setFormData({ ...formData, resolutionApproved: e.target.checked })}
+                                />
+                                <label htmlFor="resolutionApproved" className="text-sm font-bold text-green-400">
+                                    Aprobar Resolución (Devolver a Responsable originario)
+                                </label>
+                            </div>
+                        )}
 
                         <div>
                             <label className="block text-sm font-medium text-gray-400 mb-1">Detalle</label>

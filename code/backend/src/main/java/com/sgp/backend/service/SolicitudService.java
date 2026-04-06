@@ -10,7 +10,11 @@ import com.sgp.backend.repository.PersonRepository;
 import com.sgp.backend.repository.LocationRepository;
 import com.sgp.backend.repository.ResponsableRepository;
 import com.sgp.backend.repository.UserRepository;
+import com.sgp.backend.repository.AsignacionHistorialRepository;
+import com.sgp.backend.repository.ResolutorConfigRepository;
+import com.sgp.backend.entity.AsignacionHistorial;
 import lombok.RequiredArgsConstructor;
+import java.time.LocalDateTime;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -25,6 +29,8 @@ public class SolicitudService {
     private final LocationRepository locationRepository;
     private final ResponsableRepository responsableRepository;
     private final UserRepository userRepository;
+    private final AsignacionHistorialRepository asignacionHistorialRepository;
+    private final ResolutorConfigRepository resolutorConfigRepository;
 
     public List<Solicitud> getAllSolicitudes(String status, String search) {
         org.springframework.data.jpa.domain.Specification<Solicitud> spec = org.springframework.data.jpa.domain.Specification
@@ -43,34 +49,24 @@ public class SolicitudService {
 
         // Apply Role Based Filtering
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.isAuthenticated()
-                && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_USER"))) {
+        if (auth != null && auth.isAuthenticated()) {
             String email = auth.getName();
             User user = userRepository.findByEmail(email).orElse(null);
             if (user != null) {
-                Responsable resp = responsableRepository.findByUserId(user.getId()).orElse(null);
-                if (resp != null) {
-                    final String zoneStr = resp.getZone();
-                    final Responsable responsableCriteria = resp;
-
-                    org.springframework.data.jpa.domain.Specification<Solicitud> roleSpec = (root, query, cb) -> {
-                        System.out.println("USER ROLE MATCHED: " + email + ", zone: " + zoneStr + ", RespId: "
-                                + responsableCriteria.getId());
-                        jakarta.persistence.criteria.Predicate zonePredicate = cb.disjunction();
-                        if (zoneStr != null && !zoneStr.trim().isEmpty()) {
-                            zonePredicate = cb.equal(
-                                    cb.lower(cb.trim(root.get("zone"))),
-                                    zoneStr.trim().toLowerCase());
-                        }
-                        jakarta.persistence.criteria.Predicate respPredicate = cb.equal(root.get("responsable"),
-                                responsableCriteria);
-                        return cb.or(zonePredicate, respPredicate);
-                    };
-                    spec = spec.and(roleSpec);
-                } else {
-                    // If user is USER but has no Responsable profile, hide
-                    spec = spec.and((root, query, cb) -> cb.disjunction());
+                if (user.getRole().equals("OPERADOR")) {
+                    spec = spec.and((root, query, cb) -> cb.equal(root.get("createdBy"), user));
+                } else if (user.getRole().equals("RESPONSABLE")) {
+                    Responsable resp = responsableRepository.findByUserId(user.getId()).orElse(null);
+                    if (resp != null) {
+                        spec = spec.and((root, query, cb) -> cb.equal(root.get("responsable"), resp));
+                    } else {
+                        // Responsable profile not found, hide all
+                        spec = spec.and((root, query, cb) -> cb.disjunction());
+                    }
+                } else if (user.getRole().equals("RESOLUTOR")) {
+                    spec = spec.and((root, query, cb) -> cb.equal(root.get("resolutor"), user));
                 }
+                // DISTRIBUIDOR and ADMINISTRADOR see everything (no additional predicates).
             }
         }
 
@@ -151,12 +147,26 @@ public class SolicitudService {
             solicitud.setEntryDate(java.time.LocalDate.now());
         }
 
-        return solicitudRepository.save(solicitud);
+        // Set creation tracking
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !auth.getName().equals("anonymousUser")) {
+            userRepository.findByEmail(auth.getName()).ifPresent(solicitud::setCreatedBy);
+        }
+
+        Solicitud saved = solicitudRepository.save(solicitud);
+
+        if (saved.getResponsable() != null) {
+            logAssignmentChange(saved, saved.getResponsable(), "ASSIGNED");
+        }
+
+        return saved;
     }
 
     public Solicitud updateSolicitud(Long id, Solicitud solicitudPayload) {
         Solicitud existing = solicitudRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Solicitud not found"));
+
+        Responsable oldResponsable = existing.getResponsable();
 
         // 1. Handle Person
         if (solicitudPayload.getPerson() != null) {
@@ -249,14 +259,71 @@ public class SolicitudService {
             existing.setEntryDate(solicitudPayload.getEntryDate());
         }
 
+        // Handle Resolutor Suggestion Workflow (It assigns the Solicitud to the Resolutor user seamlessly without removing the original Responsable)
+        String newSuggestedType = solicitudPayload.getSuggestedResolutionType();
+        
+        // If a new suggested resolution type is set
+        if (newSuggestedType != null && !newSuggestedType.trim().isEmpty() && 
+            !newSuggestedType.equals(existing.getSuggestedResolutionType())) {
+            
+            existing.setSuggestedResolutionType(newSuggestedType);
+            existing.setResolutionApproved(false); // reset approval state on new derivation
+            
+            // Auto assign to the corresponding Resolutor
+            java.util.Optional<com.sgp.backend.entity.ResolutorConfig> configOpt = resolutorConfigRepository.findByTipoResolucionIgnoreCase(newSuggestedType);
+            if (configOpt.isPresent() && configOpt.get().getResolutor() != null) {
+                existing.setResolutor(configOpt.get().getResolutor());
+            }
+        } else if (solicitudPayload.getResolutionApproved() != null) {
+            existing.setResolutionApproved(solicitudPayload.getResolutionApproved());
+            // Optionally, if approved by a resolutor, they could reset the derivacion or notify someone, but setting the flag is enough for the UI to represent the "devolution".
+        }
+
+        // Resolutors cannot override the primary Responsable, so only perform responsible override logic normally if not AutoAssigned.
+        // Also frontend payload from a Resolutor might miss the responsable fields, so only apply updates if explicitly sent.
         if (solicitudPayload.getResponsable() != null && solicitudPayload.getResponsable().getId() != null) {
             responsableRepository.findById(solicitudPayload.getResponsable().getId())
                     .ifPresent(existing::setResponsable);
-        } else {
+        } else if (solicitudPayload.getResponsable() == null) {
+            // we only unassign if they explicitly send `{ responsable: null }`. 
+            // the frontend should be careful not to wipe out existing state if sending partial updates
             existing.setResponsable(null);
         }
 
-        return solicitudRepository.save(existing);
+        Solicitud saved = solicitudRepository.save(existing);
+
+        Responsable newResponsable = saved.getResponsable();
+        if (oldResponsable == null && newResponsable != null) {
+            logAssignmentChange(saved, newResponsable, "ASSIGNED");
+        } else if (oldResponsable != null && newResponsable == null) {
+            logAssignmentChange(saved, oldResponsable, "UNASSIGNED");
+        } else if (oldResponsable != null && newResponsable != null && !oldResponsable.getId().equals(newResponsable.getId())) {
+            logAssignmentChange(saved, newResponsable, "REASSIGNED");
+        }
+
+        return saved;
+    }
+
+    private void logAssignmentChange(Solicitud solicitud, Responsable responsable, String actionType) {
+        String username = "Sistema";
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !auth.getName().equals("anonymousUser")) {
+            username = auth.getName();
+            User user = userRepository.findByEmail(username).orElse(null);
+            if (user != null) {
+                username = user.getEmail(); // Or user.getName() if it exists? Email is safer.
+            }
+        }
+
+        AsignacionHistorial history = AsignacionHistorial.builder()
+                .solicitud(solicitud)
+                .responsable(responsable) // Even for UNASSIGNED, records who was unassigned
+                .actionType(actionType)
+                .assignedByUsername(username)
+                .actionDate(LocalDateTime.now())
+                .build();
+        
+        asignacionHistorialRepository.save(history);
     }
 
     public Solicitud updateStatus(Long id, String status) {

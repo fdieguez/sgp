@@ -25,10 +25,10 @@ export default function Navbar() {
                         {user && (
                             <div className="hidden md:flex flex-col items-end mr-2 text-right">
                                 <span className="text-sm font-bold text-white uppercase">{user.firstName} {user.lastName}</span>
-                                <span className="text-[10px] tracking-widest uppercase text-indigo-400 font-black">{user.role === 'ADMIN' ? 'Administrador' : 'Responsable'}</span>
+                                <span className="text-[10px] tracking-widest uppercase text-indigo-400 font-black">{user.role}</span>
                             </div>
                         )}
-                        {user?.role === 'ADMIN' && (
+                        {user?.role === 'ADMINISTRADOR' && (
                             <button
                                 onClick={() => navigate('/users')}
                                 className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"

@@ -14,6 +14,7 @@ import java.util.List;
 public class SolicitudController {
 
     private final SolicitudService solicitudService;
+    private final com.sgp.backend.repository.AsignacionHistorialRepository asignacionHistorialRepository;
 
     @GetMapping
     public List<Solicitud> getAllSolicitudes(
@@ -51,5 +52,10 @@ public class SolicitudController {
     public ResponseEntity<Void> deleteSolicitud(@PathVariable Long id) {
         solicitudService.deleteSolicitud(id);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/{id}/historial")
+    public ResponseEntity<List<com.sgp.backend.entity.AsignacionHistorial>> getHistorial(@PathVariable Long id) {
+        return ResponseEntity.ok(asignacionHistorialRepository.findBySolicitudIdOrderByActionDateDesc(id));
     }
 }

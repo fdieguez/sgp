@@ -75,7 +75,7 @@ export const AuthProvider = ({ children }) => {
 
     // Try to restore user profile fully on load if token exists but user lacks responsable details
     useEffect(() => {
-        if (token && user && (!user.id || (user.role === 'USER' && user.responsable === undefined))) {
+        if (token && user && (!user.id || (user.role === 'RESPONSABLE' && user.responsable === undefined))) {
             api.get('/api/users/me')
                 .then(res => {
                     setUser({

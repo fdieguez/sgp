@@ -22,7 +22,7 @@ export default function UsersPage() {
     const [users, setUsers] = useState([]);
     const [showUserModal, setShowUserModal] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
-    const [userFormData, setUserFormData] = useState({ email: '', password: '', role: 'USER' });
+    const [userFormData, setUserFormData] = useState({ email: '', password: '', role: 'OPERADOR' });
 
     // Responsables State
     const [responsables, setResponsables] = useState([]);
@@ -61,7 +61,7 @@ export default function UsersPage() {
                 await api.post('/api/users', userFormData);
             }
             setShowUserModal(false);
-            setUserFormData({ email: '', password: '', role: 'USER' });
+            setUserFormData({ email: '', password: '', role: 'OPERADOR' });
             setEditingUser(null);
             fetchAll();
         } catch (err) {
@@ -177,7 +177,7 @@ export default function UsersPage() {
                         <button
                             onClick={activeTab === 'users' ? () => {
                                 setEditingUser(null);
-                                setUserFormData({ email: '', password: '', role: 'USER' });
+                                setUserFormData({ email: '', password: '', role: 'OPERADOR' });
                                 setShowUserModal(true);
                             } : () => {
                                 setEditingResp(null);
@@ -222,8 +222,8 @@ export default function UsersPage() {
                                             </div>
                                         </td>
                                         <td className="p-4">
-                                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${user.role === 'ADMIN' ? 'bg-purple-900/30 text-purple-400 border-purple-700' : 'bg-gray-700 text-gray-300 border-gray-600'}`}>
-                                                {user.role === 'ADMIN' && <Shield className="h-3 w-3" />}
+                                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${user.role === 'ADMINISTRADOR' ? 'bg-purple-900/30 text-purple-400 border-purple-700' : 'bg-gray-700 text-gray-300 border-gray-600'}`}>
+                                                {user.role === 'ADMINISTRADOR' && <Shield className="h-3 w-3" />}
                                                 {user.role}
                                             </span>
                                         </td>
@@ -311,8 +311,11 @@ export default function UsersPage() {
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Rol</label>
                                 <select value={userFormData.role} onChange={(e) => setUserFormData({ ...userFormData, role: e.target.value })} className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                    <option value="USER">USER</option>
-                                    <option value="ADMIN">ADMIN</option>
+                                    <option value="OPERADOR">OPERADOR</option>
+                                    <option value="DISTRIBUIDOR">DISTRIBUIDOR</option>
+                                    <option value="RESPONSABLE">RESPONSABLE</option>
+                                    <option value="RESOLUTOR">RESOLUTOR</option>
+                                    <option value="ADMINISTRADOR">ADMINISTRADOR</option>
                                 </select>
                             </div>
                             <div className="flex gap-3 pt-4">
@@ -353,7 +356,7 @@ export default function UsersPage() {
                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Vincular Usuario</label>
                                     <select value={respFormData.userId} onChange={(e) => setRespFormData({ ...respFormData, userId: e.target.value })} className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
                                         <option value="">Ninguno</option>
-                                        {users.filter(u => u.role === 'USER').map(u => (
+                                        {users.filter(u => u.role !== 'ADMINISTRADOR').map(u => (
                                             <option key={u.id} value={u.id}>{u.email}</option>
                                         ))}
                                     </select>

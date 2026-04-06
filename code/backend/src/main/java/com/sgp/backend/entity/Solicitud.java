@@ -58,6 +58,19 @@ public abstract class Solicitud {
 
     private Boolean firstContactControl;
 
+    @Column(name = "suggested_resolution_type")
+    private String suggestedResolutionType;
+
+    private Boolean resolutionApproved;
+
+    @ManyToOne
+    @JoinColumn(name = "created_by_id")
+    private User createdBy;
+
+    @ManyToOne
+    @JoinColumn(name = "resolutor_asignado_id")
+    private User resolutor;
+
     @Transient
     @com.fasterxml.jackson.annotation.JsonProperty("locationName")
     private String locationName;

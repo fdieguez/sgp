@@ -20,7 +20,7 @@ function ProtectedRoute({ children, adminOnly = false }) {
     return <Navigate to="/login" />;
   }
 
-  if (adminOnly && user?.role !== 'ADMIN') {
+  if (adminOnly && user?.role !== 'ADMINISTRADOR') {
     return <div className="p-4 text-red-600">Acceso denegado. Se requieren permisos de administrador.</div>;
   }
 

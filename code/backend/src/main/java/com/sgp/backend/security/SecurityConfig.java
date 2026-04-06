@@ -50,11 +50,11 @@ public class SecurityConfig {
                                                 .requestMatchers(
                                                                 new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
                                                                                 "/api/sync/**"))
-                                                .hasRole("ADMIN")
+                                                .hasRole("ADMINISTRADOR")
                                                 .requestMatchers(
                                                                 new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
                                                                                 "/api/config/**"))
-                                                .hasRole("ADMIN")
+                                                .hasRole("ADMINISTRADOR")
                                                 // Secured Endpoints (everything else)
                                                 .anyRequest().authenticated())
                                 .sessionManagement(session -> session

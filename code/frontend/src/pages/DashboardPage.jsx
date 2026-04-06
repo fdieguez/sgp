@@ -30,7 +30,7 @@ export default function DashboardPage() {
     const [statsKey, setStatsKey] = useState(0);
 
     useEffect(() => {
-        if (user?.role === 'ADMIN') {
+        if (user?.role === 'ADMINISTRADOR') {
             fetchConfigs();
         } else {
             setLoading(false);
@@ -46,7 +46,7 @@ export default function DashboardPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }
 
     const handleSync = async (id) => {
         setSyncingId(id);
@@ -88,8 +88,8 @@ export default function DashboardPage() {
                 <DashboardStats key={statsKey} />
 
                 <div className="flex justify-between items-center mb-8">
-                    <h1 className="text-2xl font-bold">{user?.role === 'ADMIN' ? 'Mis Planillas' : 'Panel de Control'}</h1>
-                    {user?.role === 'ADMIN' && (
+                    <h1 className="text-2xl font-bold">{user?.role === 'ADMINISTRADOR' ? 'Mis Planillas' : 'Panel de Control'}</h1>
+                    {user?.role === 'ADMINISTRADOR' && (
                         <button
                             onClick={() => setIsModalOpen(true)}
                             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg font-medium transition-colors"
@@ -104,7 +104,7 @@ export default function DashboardPage() {
                     <div className="flex justify-center p-12">
                         <RefreshCw className="h-8 w-8 animate-spin text-indigo-500" />
                     </div>
-                ) : user?.role === 'USER' ? (
+                ) : user?.role !== 'ADMINISTRADOR' ? (
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                         <Link to="/mis-solicitudes" className="bg-gray-800 rounded-xl border border-gray-700 shadow-lg overflow-hidden hover:border-indigo-500/50 transition-all duration-300 group">
                             <div className="p-6">
@@ -121,7 +121,7 @@ export default function DashboardPage() {
                         <FileSpreadsheet className="h-16 w-16 mx-auto text-gray-600 mb-4" />
                         <h3 className="text-xl font-medium text-gray-300">No hay planillas configuradas</h3>
                         <p className="text-gray-500 mt-2">Agrega tu primera conexión a Google Sheets para comenzar.</p>
-                        {user?.role === 'ADMIN' && (
+                        {user?.role === 'ADMINISTRADOR' && (
                             <button
                                 onClick={() => setIsModalOpen(true)}
                                 className="mt-6 border border-indigo-500 text-indigo-400 hover:bg-indigo-900/30 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -132,7 +132,7 @@ export default function DashboardPage() {
                     </div>
                 ) : (
                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                        {user?.role === 'ADMIN' && (
+                        {user?.role === 'ADMINISTRADOR' && (
                             <div className="bg-gray-800 rounded-xl border border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.2)] overflow-hidden transition-all duration-300 group">
                                 <div className="p-6">
                                     <div className="flex items-start justify-between mb-4">
@@ -187,7 +187,7 @@ export default function DashboardPage() {
                                             {config.lastSync ? `Updated: ${new Date(config.lastSync).toLocaleTimeString()}` : 'Never synced'}
                                         </div>
                                         <div className="flex gap-2">
-                                            {user?.role === 'ADMIN' && (
+                                            {user?.role === 'ADMINISTRADOR' && (
                                                 <button
                                                     onClick={() => handleDelete(config.id)}
                                                     className="p-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg transition-colors"
