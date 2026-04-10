@@ -16,8 +16,11 @@ import com.sgp.backend.repository.ResponsableRepository;
 import com.sgp.backend.repository.UserRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.data.jpa.domain.Specification;
 import com.sgp.backend.entity.Solicitud;
+import com.sgp.backend.entity.SolicitudResolutorAssignment;
+import org.springframework.data.jpa.domain.Specification;
+import jakarta.persistence.criteria.Subquery;
+import jakarta.persistence.criteria.Root;
 
 @Service
 @RequiredArgsConstructor
@@ -30,32 +33,44 @@ public class DashboardService {
     public DashboardStatsDTO getStats() {
         Specification<Solicitud> spec = Specification.where(null);
 
-        // Apply Role Based Filtering (same logic as SolicitudService)
+        // Apply Role Based Filtering (aligned with SolicitudService)
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.isAuthenticated()
-                && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_USER"))) {
+        if (auth != null && auth.isAuthenticated()) {
             String email = auth.getName();
             User user = userRepository.findByEmail(email).orElse(null);
             if (user != null) {
-                Responsable resp = responsableRepository.findByUserId(user.getId()).orElse(null);
-                if (resp != null) {
-                    final String zoneStr = resp.getZone();
-                    final Responsable responsableCriteria = resp;
-
-                    Specification<Solicitud> roleSpec = (root, query, cb) -> {
-                        jakarta.persistence.criteria.Predicate zonePredicate = cb.disjunction();
-                        if (zoneStr != null && !zoneStr.trim().isEmpty()) {
-                            zonePredicate = cb.equal(
-                                    cb.lower(cb.trim(root.get("zone"))),
-                                    zoneStr.trim().toLowerCase());
-                        }
-                        jakarta.persistence.criteria.Predicate respPredicate = cb.equal(root.get("responsable"),
-                                responsableCriteria);
-                        return cb.or(zonePredicate, respPredicate);
-                    };
-                    spec = spec.and(roleSpec);
-                } else {
-                    spec = spec.and((root, query, cb) -> cb.disjunction());
+                if (user.getRole().equals("OPERADOR")) {
+                    spec = spec.and((root, query, cb) -> cb.equal(root.get("createdBy"), user));
+                } else if (user.getRole().equals("RESPONSABLE")) {
+                    Responsable resp = responsableRepository.findByUserId(user.getId()).orElse(null);
+                    if (resp != null) {
+                        final String zoneStr = resp.getZone();
+                        final Responsable responsableCriteria = resp;
+                        spec = spec.and((root, query, cb) -> {
+                            jakarta.persistence.criteria.Predicate zonePredicate = cb.disjunction();
+                            if (zoneStr != null && !zoneStr.trim().isEmpty()) {
+                                zonePredicate = cb.equal(
+                                        cb.lower(cb.trim(root.get("zone"))),
+                                        zoneStr.trim().toLowerCase());
+                            }
+                            jakarta.persistence.criteria.Predicate respPredicate = cb.equal(root.get("responsable"), responsableCriteria);
+                            return cb.or(zonePredicate, respPredicate);
+                        });
+                    } else {
+                        spec = spec.and((root, query, cb) -> cb.disjunction());
+                    }
+                } else if (user.getRole().equals("RESOLUTOR")) {
+                    spec = spec.and((root, query, cb) -> {
+                        Subquery<Long> subquery = query.subquery(Long.class);
+                        Root<SolicitudResolutorAssignment> assignmentRoot = subquery.from(SolicitudResolutorAssignment.class);
+                        subquery.select(assignmentRoot.get("solicitud").get("id"))
+                                .where(cb.equal(assignmentRoot.get("resolutor"), user));
+                        
+                        return cb.or(
+                            cb.equal(root.get("resolutor"), user),
+                            cb.in(root.get("id")).value(subquery)
+                        );
+                    });
                 }
             }
         }

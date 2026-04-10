@@ -61,6 +61,10 @@ public abstract class Solicitud {
     @Column(name = "suggested_resolution_type")
     private String suggestedResolutionType;
 
+    // Transient field to receive assignment data from the frontend
+    @Transient
+    private java.util.List<com.sgp.backend.dto.ResolutorAssignmentDTO> assignments;
+
     private Boolean resolutionApproved;
 
     @ManyToOne
@@ -69,7 +73,13 @@ public abstract class Solicitud {
 
     @ManyToOne
     @JoinColumn(name = "resolutor_asignado_id")
+    // Existing field kept for compatibility
     private User resolutor;
+
+    // New collection for multiple resolutor assignments
+    @OneToMany(mappedBy = "solicitud", cascade = CascadeType.ALL, orphanRemoval = true)
+    @lombok.Builder.Default
+    private java.util.List<com.sgp.backend.entity.SolicitudResolutorAssignment> resolutorAssignments = new java.util.ArrayList<>();
 
     @Transient
     @com.fasterxml.jackson.annotation.JsonProperty("locationName")

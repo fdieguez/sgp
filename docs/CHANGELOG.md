@@ -2,9 +2,24 @@
 
 > **Propósito**: Este archivo registra todos los cambios, mejoras y decisiones técnicas del proyecto SGP para facilitar la continuidad entre sesiones de desarrollo.
 
-**Versión Actual**: `0.3.0` (Dashboard de Responsables y Fixes Críticos)
+**Versión Actual**: `0.3.3` (Silos de Roles y Flujo de Resolución)
 
 ---
+
+## 📅 Abril 2026
+
+### 06/04/2026
+- **⭐️ Versión 0.3.3** (Refinamiento Extremo de Roles y Flujo de Resolución):
+    - **Reestructuración de Privilegios**:
+        - **OPERADOR**: Ahora confinado estrictamente a su silo operativo. Solo visualiza y edita solicitudes en donde su propia firma matriz (`createdBy`) conste. La Interfaz web desestima (oculta) automáticamente la caja de "Sugerir Resolutor".
+        - **DISTRIBUIDOR**: Habilitado como el hub receptor universal. Ve todas las solicitudes (creadas por cualquier Operador) con la principal utilidad de asignarles un Responsable final.
+    - **Independencia Responsable / Resolutor**:
+        - Modificado el enrutador en el backend. Derivar a un `Resolutor` ya no sobrescribe ni expulsa al `Responsable` de su titularidad en la Solicitud. Permite derivación múltiple manteniendo la atadura de control original (`resolutor_asignado_id` vs `responsable_id`).
+    - **Checkbox de Emisión Resolutiva**:
+        - Añadido mecanismo front-end visualizado como un "Checkbox Verde de Aprobación", estrictamente condicionado para usuarios con Rol RESOLUTOR. Marca orgánicamente hitos de validación (`resolutionApproved: true`).
+    - **Manejo de Restricciones BD e Inyección Base (Fix)**:
+        - Rectificada la ingeniería del `DataInitializer.java`. Subsanada una potencial cascada de bloqueos `ConstraintViolationException` purgando primero historiales referenciados antes de resetear las tablas padres de Responsables.
+        - Sembrada la base de datos con solo dos Responsables duros para pruebas cliente: `jperez@sgp.com` (Juan Perez) y `pgrillo@sgp.com` (Pepe Grillo).
 
 ## 📅 Marzo 2026
 
@@ -320,4 +335,4 @@
 
 ---
 
-**Última actualización**: 06/03/2026 07:20
+**Última actualización**: 07/04/2026 07:25

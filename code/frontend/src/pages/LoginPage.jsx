@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Mail, Loader2 } from 'lucide-react';
+import { Lock, Mail, Loader2, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const { login } = useAuth();
     const navigate = useNavigate();
 
@@ -61,14 +62,25 @@ export default function LoginPage() {
                             <input
                                 id="password"
                                 name="password"
-                                type="password"
+                                type={showPassword ? "text" : "password"}
                                 autoComplete="current-password"
                                 required
-                                className="relative block w-full rounded-b-md border-0 bg-gray-700 py-3 pl-10 text-white placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-indigo-500 sm:text-sm"
+                                className="relative block w-full rounded-b-md border-0 bg-gray-700 py-3 pl-10 pr-10 text-white placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-indigo-500 sm:text-sm"
                                 placeholder="Contraseña"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                             />
+                            <button
+                                type="button"
+                                className="absolute inset-y-0 right-0 flex items-center pr-3"
+                                onClick={() => setShowPassword(!showPassword)}
+                            >
+                                {showPassword ? (
+                                    <EyeOff className="h-5 w-5 text-gray-400" />
+                                ) : (
+                                    <Eye className="h-5 w-5 text-gray-400" />
+                                )}
+                            </button>
                         </div>
                     </div>
 

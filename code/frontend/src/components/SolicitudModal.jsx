@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar } from 'lucide-react';
+import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar, Users, Plus, Trash2 } from 'lucide-react';
 import api from '../config/axios';
 import { useAuth } from '../context/AuthContext';
 
@@ -20,7 +20,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         responsableId: '',
         amount: '',
         grantDate: '',
-        resolutionApproved: false
+        resolutionApproved: false,
+        assignments: []
     });
 
     const [responsables, setResponsables] = useState([]);
@@ -54,7 +55,12 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     resolutionApproved: initialData.resolutionApproved || false,
                     detail: initialData.detail || '',
                     firstContactControl: initialData.firstContactControl || false,
-                    origin: initialData.origin || 'MANUAL'
+                    origin: initialData.origin || 'MANUAL',
+                    assignments: initialData.resolutorAssignments?.map(a => ({
+                        resolutorEmail: a.resolutor?.email || '',
+                        tipoResolucion: a.tipoResolucion || '',
+                        detalle: a.detalle || ''
+                    })) || []
                 });
             } else {
                 setFormData({
@@ -77,7 +83,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     suggestedResolutionType: '',
                     resolutionApproved: false,
                     detail: '',
-                    firstContactControl: false
+                    firstContactControl: false,
+                    assignments: []
                 });
             }
         }
@@ -123,7 +130,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         try {
             const payload = {
                 ...formData,
-                responsable: formData.responsableId ? { id: formData.responsableId } : null
+                responsable: formData.responsableId ? { id: formData.responsableId } : null,
+                assignments: formData.assignments.filter(a => a.resolutorEmail && a.tipoResolucion)
             };
 
             if (formData.id) {
@@ -460,6 +468,89 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 Control 1er Contacto Realizado
                             </label>
                         </div>
+                    </div>
+
+                    {/* Multi-Resolutor Assignments Section */}
+                    <div className="p-4 bg-indigo-900/10 rounded-xl border border-indigo-700/30 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-semibold text-indigo-300 flex items-center gap-2">
+                                <Users className="h-4 w-4" /> Asignaciones Múltiples (Resolutores)
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setFormData({
+                                        ...formData,
+                                        assignments: [...formData.assignments, { resolutorEmail: '', tipoResolucion: '', detalle: '' }]
+                                    });
+                                }}
+                                className="text-xs flex items-center gap-1 bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded transition-colors"
+                            >
+                                <Plus className="h-3 w-3" /> Agregar
+                            </button>
+                        </div>
+
+                        {formData.assignments.length === 0 ? (
+                            <p className="text-xs text-gray-500 italic">No hay asignaciones secundarias.</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {formData.assignments.map((assignment, index) => (
+                                    <div key={index} className="flex flex-col gap-2 p-3 bg-gray-900/60 rounded-lg border border-gray-700 relative group">
+                                        <div className="flex items-center gap-2">
+                                            <select
+                                                className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"
+                                                value={assignment.tipoResolucion}
+                                                onChange={(e) => {
+                                                    const type = e.target.value;
+                                                    const config = resolutorConfigs.find(c => c.tipoResolucion === type);
+                                                    const newAssignments = [...formData.assignments];
+                                                    newAssignments[index] = { 
+                                                        ...assignment, 
+                                                        tipoResolucion: type,
+                                                        resolutorEmail: config?.resolutor?.email || ''
+                                                    };
+                                                    setFormData({ ...formData, assignments: newAssignments });
+                                                }}
+                                            >
+                                                <option value="">Seleccione Área...</option>
+                                                {resolutorConfigs.map(c => (
+                                                    <option key={c.id} value={c.tipoResolucion}>{c.tipoResolucion}</option>
+                                                ))}
+                                            </select>
+                                            <button 
+                                                type="button"
+                                                onClick={() => {
+                                                    const newAssignments = formData.assignments.filter((_, i) => i !== index);
+                                                    setFormData({ ...formData, assignments: newAssignments });
+                                                }}
+                                                className="text-red-400 hover:text-red-300 p-1"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <input 
+                                                type="text"
+                                                maxLength="100"
+                                                placeholder="Detalle (máx 100 caracteres)"
+                                                className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-gray-300"
+                                                value={assignment.detalle}
+                                                onChange={(e) => {
+                                                    const newAssignments = [...formData.assignments];
+                                                    newAssignments[index].detalle = e.target.value;
+                                                    setFormData({ ...formData, assignments: newAssignments });
+                                                }}
+                                            />
+                                            {assignment.resolutorEmail && (
+                                                <span className="text-[10px] text-gray-500 mt-1 ml-1">
+                                                    Asignado a: {assignment.resolutorEmail}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </form>
 

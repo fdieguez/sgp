@@ -13,8 +13,13 @@ import com.sgp.backend.repository.UserRepository;
 import com.sgp.backend.repository.AsignacionHistorialRepository;
 import com.sgp.backend.repository.ResolutorConfigRepository;
 import com.sgp.backend.entity.AsignacionHistorial;
+import com.sgp.backend.entity.SolicitudResolutorAssignment;
+import com.sgp.backend.repository.SolicitudResolutorAssignmentRepository;
+import com.sgp.backend.dto.ResolutorAssignmentDTO;
 import lombok.RequiredArgsConstructor;
 import java.time.LocalDateTime;
+import jakarta.persistence.criteria.Subquery;
+import jakarta.persistence.criteria.Root;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -64,7 +69,17 @@ public class SolicitudService {
                         spec = spec.and((root, query, cb) -> cb.disjunction());
                     }
                 } else if (user.getRole().equals("RESOLUTOR")) {
-                    spec = spec.and((root, query, cb) -> cb.equal(root.get("resolutor"), user));
+                    spec = spec.and((root, query, cb) -> {
+                        Subquery<Long> subquery = query.subquery(Long.class);
+                        Root<SolicitudResolutorAssignment> assignmentRoot = subquery.from(SolicitudResolutorAssignment.class);
+                        subquery.select(assignmentRoot.get("solicitud").get("id"))
+                                .where(cb.equal(assignmentRoot.get("resolutor"), user));
+                        
+                        return cb.or(
+                            cb.equal(root.get("resolutor"), user),
+                            cb.in(root.get("id")).value(subquery)
+                        );
+                    });
                 }
                 // DISTRIBUIDOR and ADMINISTRADOR see everything (no additional predicates).
             }
@@ -154,6 +169,9 @@ public class SolicitudService {
         }
 
         Solicitud saved = solicitudRepository.save(solicitud);
+
+        // Process assignments if present
+        processAssignments(saved, solicitud.getAssignments());
 
         if (saved.getResponsable() != null) {
             logAssignmentChange(saved, saved.getResponsable(), "ASSIGNED");
@@ -292,6 +310,9 @@ public class SolicitudService {
 
         Solicitud saved = solicitudRepository.save(existing);
 
+        // Process assignments if present (Sync the collection)
+        processAssignments(saved, solicitudPayload.getAssignments());
+
         Responsable newResponsable = saved.getResponsable();
         if (oldResponsable == null && newResponsable != null) {
             logAssignmentChange(saved, newResponsable, "ASSIGNED");
@@ -324,6 +345,29 @@ public class SolicitudService {
                 .build();
         
         asignacionHistorialRepository.save(history);
+    }
+
+    private void processAssignments(Solicitud solicitud, List<ResolutorAssignmentDTO> dtos) {
+        if (dtos == null) return;
+        
+        // Clear existing assignments if any (Sync logic)
+        solicitud.getResolutorAssignments().clear();
+        
+        for (ResolutorAssignmentDTO dto : dtos) {
+            if (dto.getResolutorEmail() == null || dto.getTipoResolucion() == null) continue;
+            
+            User resolutor = userRepository.findByEmail(dto.getResolutorEmail()).orElse(null);
+            if (resolutor != null) {
+                SolicitudResolutorAssignment assignment = SolicitudResolutorAssignment.builder()
+                        .solicitud(solicitud)
+                        .resolutor(resolutor)
+                        .tipoResolucion(dto.getTipoResolucion())
+                        .detalle(dto.getDetalle())
+                        .build();
+                solicitud.getResolutorAssignments().add(assignment);
+            }
+        }
+        solicitudRepository.save(solicitud);
     }
 
     public Solicitud updateStatus(Long id, String status) {
