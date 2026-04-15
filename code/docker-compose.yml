@@ -1,26 +1,7 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15-alpine
-    container_name: sgp-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-sgp_db}
-      POSTGRES_USER: ${POSTGRES_USER:-sgp_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme123}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - sgp-network
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sgp_user}" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    ports:
-      - "127.0.0.1:5432:5432"
+
 
   # Backend (Spring Boot)
   backend:
@@ -33,13 +14,10 @@ services:
       - "8080:8080"
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-sgp_db}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-sgp_user}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme123}
+      SPRING_DATASOURCE_URL: jdbc:mysql://${DB_HOST:-172.17.0.1}:3306/${DB_NAME:-sgp_db}?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-sgp_user}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-changeme}
       JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production-min-256-bits}
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks:
       - sgp-network
     volumes:
@@ -66,9 +44,7 @@ services:
     networks:
       - sgp-network
 
-volumes:
-  postgres_data:
-    driver: local
+
 
 networks:
   sgp-network:

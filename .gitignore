@@ -38,3 +38,10 @@ postgres_data/
 
 # propios
 /private/
+
+# Documentación AI y seguimiento de etapas (no subir a repo)
+docs/etapa*/
+docs/task*.md
+docs/implementation_plan*.md
+docs/PROMPT_*.md
+docs/Resumen_*.md

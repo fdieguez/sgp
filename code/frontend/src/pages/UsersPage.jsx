@@ -13,7 +13,7 @@ import {
     Users
 } from 'lucide-react';
 
-export default function UsersPage() {
+export default function UsersPage({ isEmbedded = false }) {
     const [activeTab, setActiveTab] = useState('users'); // 'users' or 'responsables'
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -145,17 +145,17 @@ export default function UsersPage() {
     );
 
     return (
-        <div className="min-h-screen bg-gray-900 text-white p-8">
-            <div className="max-w-5xl mx-auto space-y-6">
-                {/* Header */}
-                <div>
+        <div className={isEmbedded ? "w-full" : "min-h-screen bg-gray-900 text-white p-8"}>
+            <div className="w-full mx-auto space-y-6">
+                {!isEmbedded && (
                     <Link to="/dashboard" className="inline-flex items-center text-gray-400 hover:text-white transition-colors mb-4 group">
                         <ArrowLeft className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform" />
                         Volver al Dashboard
                     </Link>
+                )}
 
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <h1 className="text-3xl font-bold text-white tracking-tight">Gestión de Accesos y Personal</h1>
+                        <h2 className="text-2xl font-bold text-white tracking-tight">Gestión de Accesos y Personal</h2>
 
                         <div className="flex bg-gray-800 p-1 rounded-xl border border-gray-700">
                             <button
@@ -190,7 +190,6 @@ export default function UsersPage() {
                             {activeTab === 'users' ? 'Nuevo Usuario' : 'Nuevo Responsable'}
                         </button>
                     </div>
-                </div>
 
                 {/* Error */}
                 {error && (

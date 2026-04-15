@@ -8,6 +8,32 @@
 
 ## 📅 Abril 2026
 
+### 15/04/2026
+- **⭐️ Versión 0.4.1** (Formularios Dinámicos Nivel 2 y ABM de Configuración Central):
+    - **Nuevo Hub de Configuración**:
+        - Se reemplazó el antiguo acceso genérico a "Usuarios" por un módulo robusto de **"Configuración"** (`SettingsPage.jsx`).
+        - Posee un diseño moderno de navegación por pestañas (Tabs): Usuarios/Responsables, Catálogo de Atributos, y Tipos de Resolución.
+    - **Arquitectura de Formularios Relacionales**:
+        - Retiradas las clases antiguas rígidas (`ResolutorConfig`).
+        - Implementado nuevo esquema de base de datos (`TipoResolucion`, `AtributoResolucion`, `TipoResolucionAtributo`) que permite a los administradores crear plantillas de formularios de manera tipo "Lego".
+        - Los administradores ahora pueden agregar campos globales al catálogo (ej. "Monto", "CBU", "DNI") y luego "prenderlos" o "apagarlos" dentro de los diferentes Tipos de Resolución, dictando además su orden de visualización y si son obligatorios (`requerido`).
+    - **Frontend Modal Inteligente**:
+        - `SolicitudModal.jsx` fue recodificado para soportar y parsear las asignaciones dinámicas. Si un Responsable selecciona derivar al Tipo "Subsidio", el frontend lee la configuración y renderiza automáticamente en pantalla inputs nativos de HTML adaptados al `tipo_dato` que fijó el Admin.
+    - **Despliegue y Scripts Locales**:
+        - Revisión cruzada de borrados lógicos para toda la historia estadística (`activo: boolean`).
+        - Validado y preparado el script de despliegue a producción `setup_mysql_prod.sh` (Configuración de MySQL silenciosa local, purga de anonimatos, bind-address y habilitación de Túnel Seguro SSH).
+        - Implementación nativa de un Selector de Tema (Modo Claro/Oscuro dinámicos y estilizados con sombras refinadas) integrado de raíz en el `Navbar`.
+
+### 10/04/2026
+- **⭐️ Versión 0.4.0** (Asignaciones Múltiples de Resolutores):
+    - **Estructura Dinámica**:
+        - Ahora una misma solicitud puede derivarse simultáneamente a múltiples áreas/resolutores integrando la información.
+        - Creada entidad `SolicitudResolutorAssignment` para alojar asignaciones iterativas y persistidas como detalles (`OneToMany`).
+    - **Filtrado Avanzado JPA**:
+        - `SolicitudService` y `DashboardService` refactorizados usando `Subquery` para roles `RESOLUTOR`, garantizando que puedan visualizar correctamente todo su backlog global cruzando ambas tablas.
+    - **Frontend UI Mejorado**:
+        - Nueva área visual en `SolicitudModal.jsx` para instanciar asignaciones dinámicas.
+
 ### 06/04/2026
 - **⭐️ Versión 0.3.3** (Refinamiento Extremo de Roles y Flujo de Resolución):
     - **Reestructuración de Privilegios**:

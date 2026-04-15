@@ -26,14 +26,14 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
 
     const [responsables, setResponsables] = useState([]);
     const [locations, setLocations] = useState([]);
-    const [resolutorConfigs, setResolutorConfigs] = useState([]);
+    const [tiposResolucion, setTiposResolucion] = useState([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
             fetchResponsables();
             fetchLocations();
-            fetchResolutorConfigs();
+            fetchTiposResolucion();
             if (initialData) {
                 // Map entity to form
                 setFormData({
@@ -56,11 +56,19 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     detail: initialData.detail || '',
                     firstContactControl: initialData.firstContactControl || false,
                     origin: initialData.origin || 'MANUAL',
-                    assignments: initialData.resolutorAssignments?.map(a => ({
-                        resolutorEmail: a.resolutor?.email || '',
-                        tipoResolucion: a.tipoResolucion || '',
-                        detalle: a.detalle || ''
-                    })) || []
+                    assignments: initialData.resolutorAssignments?.map(a => {
+                        let parsedDetalle = a.detalle || '';
+                        try {
+                            if (a.detalle && typeof a.detalle === 'string' && a.detalle.startsWith('{')) {
+                                parsedDetalle = JSON.parse(a.detalle);
+                            }
+                        } catch (e) {}
+                        return {
+                            resolutorEmail: a.resolutor?.email || '',
+                            tipoResolucion: a.tipoResolucion || '',
+                            detalle: parsedDetalle
+                        };
+                    }) || []
                 });
             } else {
                 setFormData({
@@ -108,12 +116,12 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         }
     };
 
-    const fetchResolutorConfigs = async () => {
+    const fetchTiposResolucion = async () => {
         try {
-            const res = await api.get('/api/resolutor-configs');
-            setResolutorConfigs(res.data);
+            const res = await api.get('/api/tipos-resolucion');
+            setTiposResolucion(res.data);
         } catch (err) {
-            console.error("Error fetching resolutor configs", err);
+            console.error("Error fetching tipos resolucion", err);
         }
     };
 
@@ -131,7 +139,10 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             const payload = {
                 ...formData,
                 responsable: formData.responsableId ? { id: formData.responsableId } : null,
-                assignments: formData.assignments.filter(a => a.resolutorEmail && a.tipoResolucion)
+                assignments: formData.assignments.filter(a => a.resolutorEmail && a.tipoResolucion).map(a => ({
+                    ...a,
+                    detalle: typeof a.detalle === 'object' ? JSON.stringify(a.detalle) : a.detalle
+                }))
             };
 
             if (formData.id) {
@@ -414,21 +425,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             />
                         </div>
 
-                        {canSuggestResolutor && (
-                            <div>
-                                <label className="block text-sm font-medium text-indigo-400 mb-1">Sugerir Resolutor / Derivar</label>
-                                <select
-                                    className="w-full bg-indigo-900/20 border border-indigo-700/50 rounded-lg px-3 py-2 text-indigo-300 focus:ring-2 focus:ring-indigo-500 outline-none"
-                                    value={formData.suggestedResolutionType || ''}
-                                    onChange={(e) => setFormData({ ...formData, suggestedResolutionType: e.target.value })}
-                                >
-                                    <option value="">Ninguna / No derivar</option>
-                                    {resolutorConfigs.map(c => (
-                                        <option key={c.id} value={c.tipoResolucion}>{c.tipoResolucion}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
+
 
                         {isResolutor && (
                             <div className="flex items-center gap-3 pt-3 pb-3 bg-green-900/20 p-4 rounded-xl border border-green-700/50">
@@ -471,6 +468,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     </div>
 
                     {/* Multi-Resolutor Assignments Section */}
+                    {user?.role === 'RESPONSABLE' && (
                     <div className="p-4 bg-indigo-900/10 rounded-xl border border-indigo-700/30 space-y-4">
                         <div className="flex items-center justify-between">
                             <h3 className="text-sm font-semibold text-indigo-300 flex items-center gap-2">
@@ -502,7 +500,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                 value={assignment.tipoResolucion}
                                                 onChange={(e) => {
                                                     const type = e.target.value;
-                                                    const config = resolutorConfigs.find(c => c.tipoResolucion === type);
+                                                    const config = tiposResolucion.find(c => c.tipo === type);
                                                     const newAssignments = [...formData.assignments];
                                                     newAssignments[index] = { 
                                                         ...assignment, 
@@ -513,8 +511,10 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                 }}
                                             >
                                                 <option value="">Seleccione Área...</option>
-                                                {resolutorConfigs.map(c => (
-                                                    <option key={c.id} value={c.tipoResolucion}>{c.tipoResolucion}</option>
+                                                {tiposResolucion.map(c => (
+                                                    <option key={c.id} value={c.tipo}>
+                                                        {c.tipo} - {c.resolutor?.firstName ? `${c.resolutor.firstName} ${c.resolutor.lastName}` : c.resolutor?.email}
+                                                    </option>
                                                 ))}
                                             </select>
                                             <button 
@@ -528,22 +528,85 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                 <Trash2 className="h-4 w-4" />
                                             </button>
                                         </div>
-                                        <div className="flex flex-col">
-                                            <input 
-                                                type="text"
-                                                maxLength="100"
-                                                placeholder="Detalle (máx 100 caracteres)"
-                                                className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-gray-300"
-                                                value={assignment.detalle}
-                                                onChange={(e) => {
-                                                    const newAssignments = [...formData.assignments];
-                                                    newAssignments[index].detalle = e.target.value;
-                                                    setFormData({ ...formData, assignments: newAssignments });
-                                                }}
-                                            />
+                                        <div className="flex flex-col mt-2">
+                                            {(() => {
+                                                const config = tiposResolucion.find(c => c.tipo === assignment.tipoResolucion);
+                                                if (config && config.atributosConfig && config.atributosConfig.length > 0) {
+                                                    const sortedCampos = [...config.atributosConfig].sort((a,b) => a.orden - b.orden);
+                                                    const currentData = typeof assignment.detalle === 'object' && assignment.detalle !== null ? assignment.detalle : {};
+                                                    return (
+                                                        <div className="space-y-4 p-4 bg-gray-800/80 border border-gray-600 rounded-lg shadow-inner">
+                                                            {sortedCampos.map(ac => {
+                                                                const campo = ac.atributo;
+                                                                return (
+                                                                <div key={campo.id}>
+                                                                    <label className="block text-[11px] text-gray-400 mb-1 uppercase tracking-wider font-semibold">
+                                                                        {campo.nombre} {ac.requerido && <span className="text-red-400">*</span>}
+                                                                    </label>
+                                                                    {campo.tipoDato === 'SELECT' ? (
+                                                                        <select
+                                                                            value={currentData[campo.nombre] || ''}
+                                                                            onChange={e => {
+                                                                                const newAssignments = [...formData.assignments];
+                                                                                newAssignments[index].detalle = { ...currentData, [campo.nombre]: e.target.value };
+                                                                                setFormData({ ...formData, assignments: newAssignments });
+                                                                            }}
+                                                                            className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                                        >
+                                                                            <option value="">Seleccionar...</option>
+                                                                            {campo.opciones && campo.opciones.split(',').map(opt => (
+                                                                                <option key={opt.trim()} value={opt.trim()}>{opt.trim()}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    ) : campo.tipoDato === 'TEXTAREA' ? (
+                                                                        <textarea
+                                                                            value={currentData[campo.nombre] || ''}
+                                                                            onChange={e => {
+                                                                                const newAssignments = [...formData.assignments];
+                                                                                newAssignments[index].detalle = { ...currentData, [campo.nombre]: e.target.value };
+                                                                                setFormData({ ...formData, assignments: newAssignments });
+                                                                            }}
+                                                                            rows="2"
+                                                                            className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none block"
+                                                                        />
+                                                                    ) : (
+                                                                        <input
+                                                                            type={campo.tipoDato === 'DATE' ? 'date' : 'text'}
+                                                                            placeholder={campo.tipoDato === 'FILE' ? 'Suba en Adjuntos y pegue el link / ref aquí...' : ''}
+                                                                            value={currentData[campo.nombre] || ''}
+                                                                            onChange={e => {
+                                                                                const newAssignments = [...formData.assignments];
+                                                                                newAssignments[index].detalle = { ...currentData, [campo.nombre]: e.target.value };
+                                                                                setFormData({ ...formData, assignments: newAssignments });
+                                                                            }}
+                                                                            className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none block"
+                                                                        />
+                                                                    )}
+                                                                </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    );
+                                                } else {
+                                                    return (
+                                                        <input 
+                                                            type="text"
+                                                            placeholder="Detalle de la asignación..."
+                                                            className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-300"
+                                                            value={typeof assignment.detalle === 'string' ? assignment.detalle : ''}
+                                                            onChange={(e) => {
+                                                                const newAssignments = [...formData.assignments];
+                                                                newAssignments[index].detalle = e.target.value;
+                                                                setFormData({ ...formData, assignments: newAssignments });
+                                                            }}
+                                                        />
+                                                    );
+                                                }
+                                            })()}
+
                                             {assignment.resolutorEmail && (
-                                                <span className="text-[10px] text-gray-500 mt-1 ml-1">
-                                                    Asignado a: {assignment.resolutorEmail}
+                                                <span className="text-[10px] text-gray-400 mt-2 ml-1">
+                                                    Asignado a: <span className="font-semibold text-gray-300">{assignment.resolutorEmail}</span>
                                                 </span>
                                             )}
                                         </div>
@@ -552,6 +615,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             </div>
                         )}
                     </div>
+                    )}
                 </form>
 
                 <div className="p-6 border-t border-gray-700 bg-gray-800/50 flex justify-end gap-3">

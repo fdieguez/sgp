@@ -3,7 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ProjectDetailsPage from './pages/ProjectDetailsPage';
-import UsersPage from './pages/UsersPage';
+import SettingsPage from './pages/SettingsPage';
 import OrdersPage from './pages/OrdersPage';
 import SubsidiesPage from './pages/SubsidiesPage';
 import ProjectSettingsPage from './pages/ProjectSettingsPage';
@@ -61,9 +61,9 @@ function App() {
               </ProtectedRoute>
             } />
 
-            <Route path="/users" element={
+            <Route path="/settings" element={
               <ProtectedRoute adminOnly={true}>
-                <UsersPage />
+                <SettingsPage />
               </ProtectedRoute>
             } />
 

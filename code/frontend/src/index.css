@@ -26,3 +26,73 @@ body {
 .colorblind-mode .text-red-400 { color: #fb923c !important; }
 .colorblind-mode .border-red-800 { border-color: #7c2d12 !important; }
 .colorblind-mode .shadow-\[0_0_8px_rgba\(239\,68\,68\,0\.6\)\] { box-shadow: 0 0 8px rgba(249, 115, 22, 0.6) !important; }
+
+
+/* ========================================= */
+/* LIGHT MODE MEJORADO (Estándar Profesional)*/
+/* ========================================= */
+.light-mode body { background-color: #f8fafc !important; color: #0f172a !important; }
+.light-mode .text-white { color: #0f172a !important; }
+
+/* Contenedores y Tarjetas Base */
+.light-mode .bg-gray-900, .light-mode .bg-gray-900\/80 { background-color: #ffffff !important; }
+.light-mode .bg-gray-900\/90 { background-color: #f1f5f9 !important; box-shadow: -4px 0 6px -1px rgba(0,0,0,0.05) !important; }
+.light-mode .bg-gray-800, .light-mode .bg-gray-800\/50, .light-mode .bg-gray-800\/40 { background-color: #ffffff !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05) !important; border-color: #e2e8f0 !important; }
+.light-mode .bg-gray-700, .light-mode .bg-gray-700\/50 { background-color: #e2e8f0 !important; color: #1e293b !important; }
+
+/* Bordes en Modo Claro */
+.light-mode .border-gray-700, .light-mode .border-gray-700\/50, .light-mode .border-gray-700\/30 { border-color: #e2e8f0 !important; }
+.light-mode .border-gray-800 { border-color: #f1f5f9 !important; }
+.light-mode .border-gray-600 { border-color: #cbd5e1 !important; }
+
+/* Gráficos y Tarjetas Especiales (Subsidios) */
+.light-mode .from-indigo-900\/40 { --tw-gradient-from: #6366f1 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+.light-mode .to-purple-900\/40 { --tw-gradient-to: #a855f7 !important; }
+.light-mode .bg-gradient-to-br { box-shadow: 0 10px 15px -3px rgba(99,102,241,0.2), 0 4px 6px -4px rgba(99,102,241,0.1) !important; color: white !important;}
+
+/* Forzar textos limpios dentro del gradiente especial */
+.light-mode .bg-gradient-to-br .text-indigo-300, .light-mode .bg-gradient-to-br .text-white { color: #ffffff !important; }
+.light-mode .bg-gradient-to-br .text-indigo-300\/60 { color: rgba(255,255,255,0.8) !important; }
+
+/* Analytics Mini Cards (Monto total, Promedio) */
+.light-mode .bg-indigo-900\/10 { background-color: #eef2ff !important; border-color: #c7d2fe !important; }
+.light-mode .bg-gray-900\/30 { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
+
+/* Textos Generales de la Interface */
+.light-mode .text-gray-300 { color: #334155 !important; }
+.light-mode .text-gray-400 { color: #475569 !important; }
+.light-mode .text-gray-500 { color: #64748b !important; }
+.light-mode .text-gray-600 { color: #94a3b8 !important; }
+.light-mode .text-indigo-400 { color: #4f46e5 !important; font-weight: 600 !important; }
+.light-mode .text-indigo-300 { color: #6366f1 !important; }
+.light-mode .text-indigo-500 { color: #4f46e5 !important; }
+
+/* Inputs y Selects */
+.light-mode input, .light-mode select, .light-mode textarea {
+    background-color: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+}
+.light-mode input:disabled, .light-mode select:disabled { background-color: #f1f5f9 !important; }
+.light-mode input::placeholder { color: #94a3b8 !important; }
+
+/* Efectos Hover */
+.light-mode .hover\:bg-gray-700:hover, .light-mode .hover\:bg-gray-700\/50:hover, .light-mode .hover\:bg-gray-700\/20:hover { background-color: #f1f5f9 !important; border-color: #cbd5e1 !important; }
+.light-mode .hover\:text-white:hover { color: #0f172a !important; }
+
+/* Tablas */
+.light-mode th { background-color: #f8fafc !important; color: #475569 !important; border-bottom: 2px solid #e2e8f0 !important; }
+.light-mode td { border-bottom-color: #f1f5f9 !important; }
+.light-mode tr.border-gray-800 { border-color: #f1f5f9 !important; }
+
+/* Status Badges en Claro para las tarjetas pequeñas arriba */
+.light-mode .bg-yellow-900\/20 { background-color: #fef9c3 !important; border-color: #fef08a !important; }
+.light-mode .bg-blue-900\/20 { background-color: #e0f2fe !important; border-color: #bae6fd !important; }
+.light-mode .bg-green-900\/20 { background-color: #dcfce3 !important; border-color: #bbf7d0 !important; }
+.light-mode .bg-indigo-900\/20 { background-color: #e0e7ff !important; border-color: #c7d2fe !important; }
+
+.light-mode .border-yellow-800 { border-color: #fef08a !important; }
+.light-mode .border-blue-800 { border-color: #bae6fd !important; }
+.light-mode .border-green-800 { border-color: #bbf7d0 !important; }
+.light-mode .border-indigo-800 { border-color: #c7d2fe !important; }

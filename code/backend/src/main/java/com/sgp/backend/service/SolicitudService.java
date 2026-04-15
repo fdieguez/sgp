@@ -11,7 +11,7 @@ import com.sgp.backend.repository.LocationRepository;
 import com.sgp.backend.repository.ResponsableRepository;
 import com.sgp.backend.repository.UserRepository;
 import com.sgp.backend.repository.AsignacionHistorialRepository;
-import com.sgp.backend.repository.ResolutorConfigRepository;
+import com.sgp.backend.repository.TipoResolucionRepository;
 import com.sgp.backend.entity.AsignacionHistorial;
 import com.sgp.backend.entity.SolicitudResolutorAssignment;
 import com.sgp.backend.repository.SolicitudResolutorAssignmentRepository;
@@ -35,7 +35,7 @@ public class SolicitudService {
     private final ResponsableRepository responsableRepository;
     private final UserRepository userRepository;
     private final AsignacionHistorialRepository asignacionHistorialRepository;
-    private final ResolutorConfigRepository resolutorConfigRepository;
+    private final TipoResolucionRepository tipoResolucionRepository;
 
     public List<Solicitud> getAllSolicitudes(String status, String search) {
         org.springframework.data.jpa.domain.Specification<Solicitud> spec = org.springframework.data.jpa.domain.Specification
@@ -288,7 +288,7 @@ public class SolicitudService {
             existing.setResolutionApproved(false); // reset approval state on new derivation
             
             // Auto assign to the corresponding Resolutor
-            java.util.Optional<com.sgp.backend.entity.ResolutorConfig> configOpt = resolutorConfigRepository.findByTipoResolucionIgnoreCase(newSuggestedType);
+            java.util.Optional<com.sgp.backend.entity.TipoResolucion> configOpt = tipoResolucionRepository.findByTipoIgnoreCase(newSuggestedType);
             if (configOpt.isPresent() && configOpt.get().getResolutor() != null) {
                 existing.setResolutor(configOpt.get().getResolutor());
             }

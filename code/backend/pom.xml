@@ -32,11 +32,7 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
 		</dependency>
-		<dependency>
-			<groupId>org.postgresql</groupId>
-			<artifactId>postgresql</artifactId>
-			<scope>runtime</scope>
-		</dependency>
+
 		<!-- H2 Database (for local dev) -->
 		<dependency>
 			<groupId>com.h2database</groupId>
@@ -98,10 +94,10 @@
             <optional>true</optional>
         </dependency>
 		
-		<!-- PostgreSQL (Producción) -->
+		<!-- MySQL (Producción nativo outside docker) -->
 		<dependency>
-			<groupId>org.postgresql</groupId>
-			<artifactId>postgresql</artifactId>
+			<groupId>com.mysql</groupId>
+			<artifactId>mysql-connector-j</artifactId>
 			<scope>runtime</scope>
 		</dependency>
 		
