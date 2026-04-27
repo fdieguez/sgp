@@ -4,7 +4,9 @@ import {
     ClipboardList,
     Clock,
     CheckCircle2,
-    DollarSign
+    DollarSign,
+    RefreshCw,
+    Trash2
 } from 'lucide-react';
 
 export default function DashboardStats() {
@@ -52,6 +54,15 @@ export default function DashboardStats() {
             border: "border-yellow-800"
         },
         {
+            title: "En Resolución",
+            value: stats.inResolutionSolicitudes || 0,
+            subValue: `${calculatePct(stats.inResolutionSolicitudes)}%`,
+            icon: RefreshCw,
+            color: "text-purple-400",
+            bg: "bg-purple-900/20",
+            border: "border-purple-800"
+        },
+        {
             title: "Completados",
             value: stats.completedSolicitudes,
             subValue: `${calculatePct(stats.completedSolicitudes)}%`,
@@ -59,6 +70,15 @@ export default function DashboardStats() {
             color: "text-green-400",
             bg: "bg-green-900/20",
             border: "border-green-800"
+        },
+        {
+            title: "Rechazados",
+            value: stats.rejectedSolicitudes || 0,
+            subValue: `${calculatePct(stats.rejectedSolicitudes)}%`,
+            icon: Trash2,
+            color: "text-red-400",
+            bg: "bg-red-900/20",
+            border: "border-red-800"
         },
         {
             title: "Subsidios Entregados",
@@ -72,7 +92,7 @@ export default function DashboardStats() {
     ];
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
             {cards.map((card, index) => (
                 <div key={index} className={`bg-gray-800 rounded-xl border ${card.border} p-6 shadow-lg`}>
                     <div className="flex items-center justify-between mb-4">

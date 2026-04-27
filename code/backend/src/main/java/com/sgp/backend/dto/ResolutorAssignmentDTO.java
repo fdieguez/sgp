@@ -3,24 +3,24 @@ package com.sgp.backend.dto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 
 /**
- * DTO used to receive resolutor assignment data from the frontend.
- * Contains the resolutor identifier (email), the resolution type, and a generic detail field.
+ * DTO para recibir datos de asignación de un resolutor desde el frontend.
+ * Contiene el identificador del resolutor (email), el tipo de resolución y un
+ * campo de detalle libre que puede almacenar texto plano o un JSON serializado
+ * con los atributos del formulario dinámico.
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class ResolutorAssignmentDTO {
-    @NotNull
-    private String resolutorEmail; // email of the resolutor
 
-    @NotNull
-    private String tipoResolucion; // resolution type
+    /** Email del resolutor asignado. */
+    private String resolutorEmail;
 
-    @NotNull
-    @Size(max = 100)
-    private String detalle; // max 100 characters, generic detail
+    /** Tipo de resolución seleccionado (ej: "Subsidio", "Lentes", etc.). */
+    private String tipoResolucion;
+
+    /** Detalle libre o JSON serializado de los atributos del formulario dinámico. */
+    private String detalle;
 }

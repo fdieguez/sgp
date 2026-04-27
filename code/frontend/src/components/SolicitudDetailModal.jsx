@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Calendar, User, MapPin, Tag, Box, DollarSign, Clock, Hash, History, ArrowRight, FileText, UploadCloud, Download, Trash2 } from 'lucide-react';
+import { X, Calendar, User, MapPin, Tag, Box, DollarSign, Clock, Hash, History, ArrowRight, FileText, UploadCloud, Download, Trash2, Plus } from 'lucide-react';
 import api from '../config/axios';
 import TicketSeguimiento from './TicketSeguimiento';
 
@@ -100,10 +100,11 @@ export default function SolicitudDetailModal({ isOpen, onClose, solicitud }) {
 
     const getStatusStyle = (status) => {
         switch (status) {
-            case 'COMPLETED': return 'bg-green-900/30 text-green-400 border-green-800';
-            case 'PENDING': return 'bg-yellow-900/30 text-yellow-400 border-yellow-800';
-            case 'IN_PROGRESS': return 'bg-blue-900/30 text-blue-400 border-blue-800';
-            case 'REJECTED': return 'bg-red-900/30 text-red-400 border-red-800';
+            case 'completadas': return 'bg-green-900/30 text-green-400 border-green-800';
+            case 'pendiente': return 'bg-yellow-900/30 text-yellow-400 border-yellow-800';
+            case 'en proceso': return 'bg-blue-900/30 text-blue-400 border-blue-800';
+            case 'en resolucion': return 'bg-purple-900/30 text-purple-400 border-purple-800';
+            case 'rechazada': return 'bg-red-900/30 text-red-400 border-red-800';
             default: return 'bg-gray-700 text-gray-300 border-gray-600';
         }
     };
@@ -138,7 +139,7 @@ export default function SolicitudDetailModal({ isOpen, onClose, solicitud }) {
                         <div>
                             <div className="flex items-center gap-3 mb-2">
                                 <span className={`px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${getStatusStyle(solicitud.status)}`}>
-                                    {solicitud.status}
+                                    {solicitud.status === 'en resolucion' ? 'En Resolución' : solicitud.status}
                                 </span>
                                 <span className="text-gray-500 text-xs font-mono">#{solicitud.id}</span>
                             </div>
@@ -314,21 +315,27 @@ export default function SolicitudDetailModal({ isOpen, onClose, solicitud }) {
                                     <div key={record.id} className="bg-gray-900/40 p-4 rounded-2xl border border-gray-700/50 flex items-center justify-between">
                                         <div className="flex items-center gap-4">
                                             <div className={`p-2 rounded-lg ${
+                                                record.actionType === 'CREATED' ? 'bg-amber-500/10 text-amber-400' :
                                                 record.actionType === 'ASSIGNED' ? 'bg-emerald-500/10 text-emerald-400' :
                                                 record.actionType === 'REASSIGNED' ? 'bg-indigo-500/10 text-indigo-400' :
+                                                record.actionType.startsWith('RESOLUCIÓN') ? 'bg-blue-500/10 text-blue-400' :
                                                 'bg-red-500/10 text-red-400'
                                             }`}>
-                                                <ArrowRight className="h-5 w-5" />
+                                                {record.actionType === 'CREATED' ? <Plus className="h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}
                                             </div>
                                             <div>
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
+                                                        record.actionType === 'CREATED' ? 'bg-amber-900/30 text-amber-400 border-amber-800' :
                                                         record.actionType === 'ASSIGNED' ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' :
                                                         record.actionType === 'REASSIGNED' ? 'bg-indigo-900/30 text-indigo-400 border-indigo-800' :
+                                                        record.actionType.startsWith('RESOLUCIÓN') ? 'bg-blue-900/30 text-blue-400 border-blue-800' :
                                                         'bg-red-900/30 text-red-400 border-red-800'
                                                     }`}>
-                                                        {record.actionType === 'ASSIGNED' ? 'Asignado' :
-                                                         record.actionType === 'REASSIGNED' ? 'Re-asignado' : 'Desasignado'}
+                                                        {record.actionType === 'CREATED' ? 'Cargado/Creado' :
+                                                         record.actionType === 'ASSIGNED' ? 'Asignado' :
+                                                         record.actionType === 'REASSIGNED' ? 'Re-asignado' : 
+                                                         record.actionType.startsWith('RESOLUCIÓN') ? 'Resolución Aprobada' : 'Desasignado'}
                                                     </span>
                                                     <span className="text-xs text-gray-400">
                                                         {new Date(record.actionDate).toLocaleString()}

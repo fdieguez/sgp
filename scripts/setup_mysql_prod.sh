@@ -43,9 +43,19 @@ sudo mysql -u root -p"${ROOT_PASS}" -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO 
 sudo mysql -u root -p"${ROOT_PASS}" -e "FLUSH PRIVILEGES;"
 
 # 4. Permitir bind address para conectar a la red Docker (Host -> Docker0)
-echo "[4/5] Modificando bind-address para habilitar conexión transversal con Docker..."
+echo "[4/5] Modificando configuración de MySQL (bind-address, timezone, max_connections)..."
 sudo sed -i "s/^bind-address\s*=.*/bind-address = 0.0.0.0/" /etc/mysql/mysql.conf.d/mysqld.cnf
 sudo sed -i "s/^mysqlx-bind-address\s*=.*/mysqlx-bind-address = 0.0.0.0/" /etc/mysql/mysql.conf.d/mysqld.cnf || true
+
+# Añadir zona horaria y max_connections si no existen
+if ! grep -q "default-time-zone" /etc/mysql/mysql.conf.d/mysqld.cnf; then
+    echo "default-time-zone = '-03:00'" | sudo tee -a /etc/mysql/mysql.conf.d/mysqld.cnf
+fi
+if ! grep -q "max_connections" /etc/mysql/mysql.conf.d/mysqld.cnf; then
+    echo "max_connections = 300" | sudo tee -a /etc/mysql/mysql.conf.d/mysqld.cnf
+else
+    sudo sed -i "s/^max_connections\s*=.*/max_connections = 300/" /etc/mysql/mysql.conf.d/mysqld.cnf
+fi
 
 # 5. Reinicio de base y refuerzo UFW (Firewall)
 echo "[5/5] Reiniciando servicio de MySQL y validando Firewall (UFW)..."

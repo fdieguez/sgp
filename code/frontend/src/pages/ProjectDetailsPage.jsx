@@ -50,22 +50,25 @@ const parseLocalDate = (dateStr) => {
 
 // --- UI Components ---
 const STATUS_MAP = {
-    'PENDING': 'Pendiente',
-    'IN_PROGRESS': 'En Proceso',
-    'COMPLETED': 'Completado',
-    'REJECTED': 'Rechazado'
+    'pendiente': 'Pendiente',
+    'en proceso': 'En Proceso',
+    'en resolucion': 'En Resolución',
+    'completadas': 'Completado',
+    'rechazada': 'Rechazado'
 };
 
 const StatusBadge = ({ status }) => {
+    const s = status?.trim().toLowerCase();
     const styles = {
-        COMPLETED: 'bg-green-900/30 text-green-400 border-green-800',
-        PENDING: 'bg-yellow-900/30 text-yellow-400 border-yellow-800',
-        IN_PROGRESS: 'bg-blue-900/30 text-blue-400 border-blue-800',
-        REJECTED: 'bg-red-900/30 text-red-400 border-red-800'
+        completadas: 'bg-green-900/30 text-green-400 border-green-800',
+        pendiente: 'bg-yellow-900/30 text-yellow-400 border-yellow-800',
+        'en proceso': 'bg-blue-900/30 text-blue-400 border-blue-800',
+        'en resolucion': 'bg-purple-900/30 text-purple-400 border-purple-800',
+        rechazada: 'bg-red-900/30 text-red-400 border-red-800'
     };
     return (
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${styles[status] || 'bg-gray-700 text-gray-300 border-gray-600'}`}>
-            {STATUS_MAP[status] || status}
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${styles[s] || 'bg-gray-700 text-gray-300 border-gray-600'}`}>
+            {STATUS_MAP[s] || status}
         </span>
     );
 };
@@ -177,10 +180,9 @@ export default function ProjectDetailsPage() {
                     });
                 }
             } else if (key === 'status') {
-                result = result.filter(s => s.status === val);
+                result = result.filter(s => s.status?.trim().toLowerCase() === val.trim().toLowerCase());
             } else if (key === 'location') {
                 result = result.filter(s => s.location?.name === val);
-            } else if (key === 'responsable') {
             } else if (key === 'responsable') {
                 result = result.filter(s => s.responsable?.name === val);
             } else if (key === 'origin') {
@@ -236,7 +238,17 @@ export default function ProjectDetailsPage() {
             .sort((a, b) => b.value - a.value)
             .slice(0, 10);
 
-        return { rows: result, chartData, uniqueResponsables, uniqueOrigins, uniqueLocations };
+        // 5. Totals (always from base list for cards)
+        const stats = {
+            pendiente: solicitudes.filter(s => s.status?.trim().toLowerCase() === 'pendiente').length,
+            enProceso: solicitudes.filter(s => s.status?.trim().toLowerCase() === 'en proceso').length,
+            enResolucion: solicitudes.filter(s => s.status?.trim().toLowerCase() === 'en resolucion').length,
+            completadas: solicitudes.filter(s => s.status?.trim().toLowerCase() === 'completadas').length,
+            rechazada: solicitudes.filter(s => s.status?.trim().toLowerCase() === 'rechazada').length,
+            totalSubsidios: solicitudes.reduce((acc, s) => s.status?.trim().toLowerCase() === 'completadas' ? acc + (s.amount || 0) : acc, 0)
+        };
+
+        return { rows: result, chartData, uniqueResponsables, uniqueOrigins, uniqueLocations, stats };
     }, [solicitudes, searchTerm, filters, sortConfig, visColumn]);
 
     // Pagination
@@ -358,10 +370,11 @@ export default function ProjectDetailsPage() {
                                     onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
                                 >
                                     <option value="">Todos los Estados</option>
-                                    <option value="PENDING">Pendiente</option>
-                                    <option value="IN_PROGRESS">En Proceso</option>
-                                    <option value="COMPLETED">Completado</option>
-                                    <option value="REJECTED">Rechazado</option>
+                                    <option value="pendiente">Pendiente</option>
+                                    <option value="en proceso">En Proceso</option>
+                                    <option value="en resolucion">En Resolución</option>
+                                    <option value="completadas">Completado</option>
+                                    <option value="rechazada">Rechazado</option>
                                 </select>
                             </div>
                             <div>
@@ -414,43 +427,51 @@ export default function ProjectDetailsPage() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                        <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'PENDING' ? '' : 'PENDING' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'PENDING' ? 'bg-yellow-900/40 border-2 border-yellow-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                        <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'pendiente' ? '' : 'pendiente' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'pendiente' ? 'bg-yellow-900/40 border-2 border-yellow-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
                             <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]"></div> Pendientes
                             </div>
                             <div className="text-3xl font-black text-white">
-                                {processedData.rows.filter(s => s.status === 'PENDING').length}
+                                {processedData.stats.pendiente}
                             </div>
                         </button>
-                        <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'IN_PROGRESS' ? '' : 'IN_PROGRESS' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'IN_PROGRESS' ? 'bg-blue-900/40 border-2 border-blue-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
+                        <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'en proceso' ? '' : 'en proceso' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'en proceso' ? 'bg-blue-900/40 border-2 border-blue-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
                             <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></div> En Proceso
                             </div>
                             <div className="text-3xl font-black text-white">
-                                {processedData.rows.filter(s => s.status === 'IN_PROGRESS').length}
+                                {processedData.stats.enProceso}
                             </div>
                         </button>
-                        <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'COMPLETED' ? '' : 'COMPLETED' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'COMPLETED' ? 'bg-green-900/40 border-2 border-green-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
+                        <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'en resolucion' ? '' : 'en resolucion' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'en resolucion' ? 'bg-purple-900/40 border-2 border-purple-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
+                            <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.6)]"></div> En Resolución
+                            </div>
+                            <div className="text-3xl font-black text-white">
+                                {processedData.stats.enResolucion}
+                            </div>
+                        </button>
+                        <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'completadas' ? '' : 'completadas' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'completadas' ? 'bg-green-900/40 border-2 border-green-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
                             <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div> Completados
                             </div>
                             <div className="text-3xl font-black text-white">
-                                {processedData.rows.filter(s => s.status === 'COMPLETED').length}
+                                {processedData.stats.completadas}
                             </div>
                         </button>
-                        <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'REJECTED' ? '' : 'REJECTED' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'REJECTED' ? 'bg-red-900/40 border-2 border-red-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
+                        <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'rechazada' ? '' : 'rechazada' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'rechazada' ? 'bg-red-900/40 border-2 border-red-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
                             <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"></div> Rechazados
                             </div>
                             <div className="text-3xl font-black text-white">
-                                {processedData.rows.filter(s => s.status === 'REJECTED').length}
+                                {processedData.stats.rechazada}
                             </div>
                         </button>
                         <div className="bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border border-indigo-500/30 p-4 rounded-2xl flex flex-col justify-center shadow-lg lg:col-span-1 md:col-span-2 col-span-2">
                             <div className="text-[10px] uppercase font-black text-indigo-300 mb-1 tracking-wider">Subsidios Entregados</div>
                             <div className="text-2xl font-black text-white">
-                                ${processedData.rows.reduce((acc, s) => s.status === 'COMPLETED' ? acc + (s.amount || 0) : acc, 0).toLocaleString()} <span className="text-sm font-medium text-indigo-300/60">ARS</span>
+                                ${processedData.stats.totalSubsidies?.toLocaleString()} <span className="text-sm font-medium text-indigo-300/60">ARS</span>
                             </div>
                         </div>
                     </div>

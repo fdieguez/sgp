@@ -21,36 +21,58 @@ public class DataInitializer implements CommandLineRunner {
     private final UserRepository userRepository;
     private final com.sgp.backend.repository.SheetsConfigRepository sheetsConfigRepository;
     private final PasswordEncoder passwordEncoder;
-    private final com.sgp.backend.repository.ResponsableRepository responsableRepository;
     private final com.sgp.backend.repository.LocationRepository locationRepository;
     private final com.sgp.backend.repository.SolicitudRepository solicitudRepository;
     private final com.sgp.backend.repository.AsignacionHistorialRepository asignacionHistorialRepository;
 
     private final TipoResolucionRepository tipoResolucionRepository;
     private final AtributoResolucionRepository atributoRepository;
+    private final jakarta.persistence.EntityManager entityManager;
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public void run(String... args) throws Exception {
+        // Limpieza de esquemas antiguos (Remanentes de Stage 2)
+        // Hibernate 'update' no elimina constraints de tablas borradas manualmente del código
+        try {
+            entityManager.createNativeQuery("ALTER TABLE solicitudes DROP CONSTRAINT IF EXISTS FKEBLFBCPH338HYXL8QLN48EUOA").executeUpdate();
+            entityManager.createNativeQuery("DROP TABLE IF EXISTS responsables CASCADE").executeUpdate();
+            System.out.println("✅ Remanentes de esquema antiguo (Stage 2) eliminados exitosamente.");
+        } catch (Exception e) {
+            // Ignorar errores si las tablas o constraints ya no existen
+        }
+
         solicitudRepository.findAll().forEach(s -> {
             s.setResponsable(null);
             solicitudRepository.save(s);
         });
 
+        // Migración de Estados: Normalización a español
+        System.out.println("⏳ Ejecutando migración de estados...");
+        solicitudRepository.findAll().forEach(s -> {
+            boolean updated = false;
+            if ("PENDING".equals(s.getStatus())) { s.setStatus("pendiente"); updated = true; }
+            else if ("IN_PROGRESS".equals(s.getStatus())) { s.setStatus("en proceso"); updated = true; }
+            else if ("COMPLETED".equals(s.getStatus()) || "COMPLETADAS".equals(s.getStatus())) { s.setStatus("completadas"); updated = true; }
+            else if ("REJECTED".equals(s.getStatus())) { s.setStatus("rechazada"); updated = true; }
+            
+            if (updated) {
+                solicitudRepository.save(s);
+            }
+        });
+
         asignacionHistorialRepository.deleteAll();
-        responsableRepository.deleteAll();
+        // responsableRepository.deleteAll(); // Not needed anymore
 
         // 1. Seed Users (5 Roles Test Users)
-        createUserIfNotFound("admin@sgp.com", "SGP_StrongPass_2026!", "ADMINISTRADOR", "Admin", "Supremo", LocalDate.of(1990, 1, 1));
-        createUserIfNotFound("operador@sgp.com", "SGP_StrongPass_2026!", "OPERADOR", "Juan", "Operador", LocalDate.of(1990, 1, 1));
-        createUserIfNotFound("distribuidor@sgp.com", "SGP_StrongPass_2026!", "DISTRIBUIDOR", "Maria", "Distribuidora", LocalDate.of(1990, 1, 1));
+        createUserIfNotFound("admin@sgp.com", "SGP_StrongPass_2026!", "ADMINISTRADOR", "Admin", "Supremo", LocalDate.of(1990, 1, 1), null, null);
+        createUserIfNotFound("operador@sgp.com", "SGP_StrongPass_2026!", "OPERADOR", "Juan", "Operador", LocalDate.of(1990, 1, 1), null, null);
+        createUserIfNotFound("distribuidor@sgp.com", "SGP_StrongPass_2026!", "DISTRIBUIDOR", "Maria", "Distribuidora", LocalDate.of(1990, 1, 1), null, null);
         
-        User jperez = createUserIfNotFound("jperez@sgp.com", "1234.5", "RESPONSABLE", "Juan", "Perez", LocalDate.of(1990, 1, 1));
-        User pgrillo = createUserIfNotFound("pgrillo@sgp.com", "1234.5", "RESPONSABLE", "Pepe", "Grillo", LocalDate.of(1990, 1, 1));
+        createUserIfNotFound("jperez@sgp.com", "1234.5", "RESPONSABLE", "Juan", "Perez", LocalDate.of(1990, 1, 1), null, "Norte");
+        createUserIfNotFound("pgrillo@sgp.com", "1234.5", "RESPONSABLE", "Pepe", "Grillo", LocalDate.of(1990, 1, 1), null, "Sur");
         
-        User resolutor = createUserIfNotFound("resolutor@sgp.com", "SGP_StrongPass_2026!", "RESOLUTOR", "Ana", "Resolutora", LocalDate.of(1990, 1, 1));
-
-        createResponsableIfNotFound("Juan Perez", jperez, "Norte");
-        createResponsableIfNotFound("Pepe Grillo", pgrillo, "Sur");
+        User resolutor = createUserIfNotFound("resolutor@sgp.com", "SGP_StrongPass_2026!", "RESOLUTOR", "Ana", "Resolutora", LocalDate.of(1990, 1, 1), null, null);
 
         // 2. Initialize Locations from dataset
         initializeLocations();
@@ -110,7 +132,7 @@ public class DataInitializer implements CommandLineRunner {
         }
     }
 
-    private User createUserIfNotFound(String email, String password, String role, String firstName, String lastName, LocalDate birthDate) {
+    private User createUserIfNotFound(String email, String password, String role, String firstName, String lastName, LocalDate birthDate, String phone, String zone) {
         return userRepository.findByEmail(email).orElseGet(() -> {
             User user = new User();
             user.setEmail(email);
@@ -119,25 +141,24 @@ public class DataInitializer implements CommandLineRunner {
             user.setFirstName(firstName);
             user.setLastName(lastName);
             user.setBirthDate(birthDate);
+            user.setPhone(phone);
+            user.setZone(zone);
 
             User savedUser = userRepository.save(user);
-            System.out.println("✅ User created: " + email + " (" + role + ")");
+            System.out.println("✅ User created: " + email + " (" + role + ") " + (zone != null ? "Zone: " + zone : ""));
             return savedUser;
         });
     }
 
-    private void createResponsableIfNotFound(String name, User user, String zone) {
-        if (responsableRepository.findAll().stream().noneMatch(r -> r.getName().equals(name))) {
-            com.sgp.backend.entity.Responsable responsable = new com.sgp.backend.entity.Responsable();
-            responsable.setName(name);
-            responsable.setUser(user);
-            responsable.setZone(zone);
-            responsableRepository.save(responsable);
-            System.out.println("✅ Responsable created: " + name + " (Zone: " + zone + ")");
-        }
-    }
-
     private void seedTiposYAtributos(User resolutorDefault) {
+        // Limpieza de datos corruptos o vacíos (como la fila en blanco)
+        tipoResolucionRepository.findAll().forEach(t -> {
+            if (t.getTipo() == null || t.getTipo().trim().isEmpty()) {
+                tipoResolucionRepository.delete(t);
+                System.out.println("🗑️ Borrado Tipo de Resolución vacío.");
+            }
+        });
+
         if (tipoResolucionRepository.count() > 0) return;
 
         // Create Global Attributes

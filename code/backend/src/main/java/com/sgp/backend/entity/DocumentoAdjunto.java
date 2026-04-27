@@ -34,6 +34,7 @@ public class DocumentoAdjunto {
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "solicitud_id")
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private Solicitud solicitud;
 
     @ManyToOne

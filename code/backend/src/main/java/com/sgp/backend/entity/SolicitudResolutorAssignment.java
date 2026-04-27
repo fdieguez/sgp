@@ -24,6 +24,7 @@ public class SolicitudResolutorAssignment {
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "solicitud_id")
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private Solicitud solicitud;
 
     @ManyToOne(optional = false)
@@ -41,4 +42,16 @@ public class SolicitudResolutorAssignment {
      */
     @Column(columnDefinition = "TEXT")
     private String detalle;
+
+    /**
+     * Indica si el resolutor ha aprobado esta parte de la solicitud.
+     */
+    @Builder.Default
+    private Boolean approved = false;
+
+    /**
+     * Comentarios u observaciones del resolutor al momento de aprobar.
+     */
+    @Column(columnDefinition = "TEXT")
+    private String observaciones;
 }

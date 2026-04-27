@@ -33,7 +33,7 @@ public abstract class Solicitud {
     @Column(nullable = false)
     private LocalDate entryDate;
 
-    // "PENDING", "IN_PROGRESS", "COMPLETED", "REJECTED"
+    // Status: "pendiente", "en proceso", "en resolucion", "completadas", "rechazada", "cancelada"
     @Column(nullable = false)
     private String status;
 
@@ -99,9 +99,21 @@ public abstract class Solicitud {
 
     @ManyToOne
     @JoinColumn(name = "responsable_id")
-    private Responsable responsable;
+    private User responsable;
 
     @ManyToOne
     @JoinColumn(name = "sheets_config_id")
     private SheetsConfig sheetsConfig;
+
+    @OneToMany(mappedBy = "solicitud", cascade = CascadeType.ALL, orphanRemoval = true)
+    @lombok.Builder.Default
+    private java.util.List<AsignacionHistorial> historial = new java.util.ArrayList<>();
+
+    @OneToMany(mappedBy = "solicitud", cascade = CascadeType.ALL, orphanRemoval = true)
+    @lombok.Builder.Default
+    private java.util.List<DocumentoAdjunto> adjuntos = new java.util.ArrayList<>();
+
+    @OneToMany(mappedBy = "solicitud", cascade = CascadeType.ALL, orphanRemoval = true)
+    @lombok.Builder.Default
+    private java.util.List<TicketSeguimiento> tickets = new java.util.ArrayList<>();
 }

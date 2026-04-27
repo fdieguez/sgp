@@ -2,12 +2,14 @@ package com.sgp.backend.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.Builder;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
 @Entity
 @Table(name = "users")
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class User {
@@ -33,4 +35,17 @@ public class User {
 
     @Column(nullable = false)
     private String role; // e.g., "ADMIN", "USER"
+
+    @Column(nullable = true)
+    private String phone;
+
+    @Column(nullable = true)
+    private String zone;
+
+    /**
+     * Devuelve el nombre completo para el frontend.
+     */
+    public String getName() {
+        return (firstName != null ? firstName : "") + " " + (lastName != null ? lastName : "");
+    }
 }

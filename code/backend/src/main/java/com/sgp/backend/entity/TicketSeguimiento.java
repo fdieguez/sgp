@@ -22,6 +22,7 @@ public class TicketSeguimiento {
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "solicitud_id")
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private Solicitud solicitud;
 
     @Column(nullable = false)

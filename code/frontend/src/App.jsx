@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ProjectDetailsPage from './pages/ProjectDetailsPage';
@@ -24,7 +25,7 @@ function ProtectedRoute({ children, adminOnly = false }) {
     return <div className="p-4 text-red-600">Acceso denegado. Se requieren permisos de administrador.</div>;
   }
 
-  return children;
+  return <ErrorBoundary>{children}</ErrorBoundary>;
 }
 
 function App() {

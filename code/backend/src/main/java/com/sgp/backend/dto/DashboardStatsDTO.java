@@ -10,7 +10,10 @@ import java.util.Map;
 public class DashboardStatsDTO {
     private long totalSolicitudes;
     private long pendingSolicitudes;
-    private long completedSolicitudes; // "DELIVERED" or "COMPLETED" - let's verify Order status strings
+    private long inProgressSolicitudes;
+    private long inResolutionSolicitudes;
+    private long completedSolicitudes;
+    private long rejectedSolicitudes;
     private BigDecimal totalSubsidiesDelivered;
     private Map<String, Long> solicitudesByOrigin;
 }

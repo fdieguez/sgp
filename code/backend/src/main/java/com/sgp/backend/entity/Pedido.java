@@ -16,6 +16,5 @@ import lombok.experimental.SuperBuilder;
 @Entity
 @Table(name = "pedidos")
 public class Pedido extends Solicitud {
-    // Specific fields for Pedido can be added here
-    // e.g., String priority;d
+    // e.g., String priority;
 }

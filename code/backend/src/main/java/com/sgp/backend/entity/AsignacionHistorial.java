@@ -21,11 +21,12 @@ public class AsignacionHistorial {
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "solicitud_id")
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private Solicitud solicitud;
 
     @ManyToOne
-    @JoinColumn(name = "responsable_id")
-    private Responsable responsable; // The one being assigned/unassigned. Null if unassigned.
+    @JoinColumn(name = "responsable_user_id")
+    private User responsable; // The one being assigned/unassigned. Null if unassigned.
 
     @Column(nullable = false)
     private String actionType; // e.g., "ASSIGNED", "UNASSIGNED", "REASSIGNED"

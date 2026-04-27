@@ -11,7 +11,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const [formData, setFormData] = useState({
         type: 'PEDIDO',
         description: '',
-        status: 'PENDING',
+        status: 'pendiente',
         origin: 'MANUAL',
         entryDate: new Date().toISOString().split('T')[0],
         person: { name: '', phone: '' },
@@ -28,6 +28,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const [locations, setLocations] = useState([]);
     const [tiposResolucion, setTiposResolucion] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [showApproveConfirm, setShowApproveConfirm] = useState(false);
+    const [approveObservations, setApproveObservations] = useState('');
 
     useEffect(() => {
         if (isOpen) {
@@ -74,7 +76,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 setFormData({
                     type: 'PEDIDO',
                     description: '',
-                    status: 'PENDING',
+                    status: 'pendiente',
                     origin: 'MANUAL',
                     entryDate: new Date().toISOString().split('T')[0],
                     person: { name: '', phone: '' },
@@ -136,19 +138,52 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         e.preventDefault();
         setLoading(true);
         try {
-            const payload = {
-                ...formData,
-                responsable: formData.responsableId ? { id: formData.responsableId } : null,
-                assignments: formData.assignments.filter(a => a.resolutorEmail && a.tipoResolucion).map(a => ({
+            // Limpiar asignaciones: filtrar vacías y serializar el detalle
+            const assignments = formData.assignments
+                .filter(a => a.resolutorEmail && a.tipoResolucion)
+                .map(a => ({
                     ...a,
-                    detalle: typeof a.detalle === 'object' ? JSON.stringify(a.detalle) : a.detalle
-                }))
-            };
+                    detalle: typeof a.detalle === 'object' ? JSON.stringify(a.detalle) : (a.detalle || '')
+                }));
 
             if (formData.id) {
-                await api.put(`/api/solicitudes/${formData.id}`, payload);
+                // PUT usa un DTO plano (SolicitudUpdateDTO) para evitar el problema de
+                // deserialización polimórfica de Jackson con la jerarquía abstracta de Solicitud.
+                // Se envía responsableId (número) en lugar de responsable:{id} (objeto anidado).
+                const updatePayload = {
+                    type: formData.type,
+                    description: formData.description,
+                    status: formData.status,
+                    origin: formData.origin,
+                    entryDate: formData.entryDate || null,
+                    person: formData.person,
+                    locationName: formData.locationName,
+                    barrio: formData.barrio,
+                    zone: formData.zone,
+                    contactDate: formData.contactDate || null,
+                    resolutionDate: formData.resolutionDate || null,
+                    resolution: formData.resolution,
+                    detail: formData.detail,
+                    observation: formData.observation,
+                    firstContactControl: formData.firstContactControl,
+                    // Clave: se envía el ID directo, no un objeto anidado
+                    responsableId: formData.responsableId ? Number(formData.responsableId) : null,
+                    suggestedResolutionType: formData.suggestedResolutionType || null,
+                    resolutionApproved: formData.resolutionApproved,
+                    // Campos de Subsidio
+                    amount: formData.amount ? Number(formData.amount) : null,
+                    grantDate: formData.grantDate || null,
+                    assignments
+                };
+                await api.put(`/api/solicitudes/${formData.id}`, updatePayload);
             } else {
-                await api.post('/api/solicitudes', payload);
+                // POST mantiene el formato original con polimorfismo (entidad completa)
+                const createPayload = {
+                    ...formData,
+                    responsable: formData.responsableId ? { id: Number(formData.responsableId) } : null,
+                    assignments
+                };
+                await api.post('/api/solicitudes', createPayload);
             }
             onSuccess();
             onClose();
@@ -160,7 +195,26 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         }
     };
 
+    const handleAprobar = async () => {
+        setLoading(true);
+        try {
+            await api.post(`/api/solicitudes/${formData.id}/aprobar`, { observaciones: approveObservations });
+            onSuccess();
+            onClose();
+        } catch (err) {
+            console.error("Error approving assignment", err);
+            alert("Error al finalizar la resolución");
+        } finally {
+            setLoading(false);
+            setShowApproveConfirm(false);
+        }
+    };
+
     if (!isOpen) return null;
+
+    // Verificar si el usuario actual tiene una asignación pendiente en esta solicitud
+    const myAssignment = formData.assignments?.find(a => a.resolutorEmail === user?.email);
+    const isPendingResolutor = isResolutor && myAssignment && !myAssignment.approved;
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -197,10 +251,11 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 value={formData.status}
                                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                             >
-                                <option value="PENDING">Pendiente</option>
-                                <option value="IN_PROGRESS">En Proceso</option>
-                                <option value="COMPLETED">Completado</option>
-                                <option value="REJECTED">Rechazado</option>
+                                <option value="pendiente">Pendiente</option>
+                                <option value="en proceso">En Proceso</option>
+                                <option value="en resolucion">En Resolución</option>
+                                <option value="completadas">Completado</option>
+                                <option value="rechazada">Rechazado</option>
                             </select>
                         </div>
                     </div>
@@ -427,18 +482,12 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
 
 
 
-                        {isResolutor && (
-                            <div className="flex items-center gap-3 pt-3 pb-3 bg-green-900/20 p-4 rounded-xl border border-green-700/50">
-                                <input
-                                    type="checkbox"
-                                    id="resolutionApproved"
-                                    className="w-5 h-5 rounded border-green-600 bg-gray-800 text-green-500 focus:ring-green-500"
-                                    checked={formData.resolutionApproved}
-                                    onChange={(e) => setFormData({ ...formData, resolutionApproved: e.target.checked })}
-                                />
-                                <label htmlFor="resolutionApproved" className="text-sm font-bold text-green-400">
-                                    Aprobar Resolución (Devolver a Responsable originario)
-                                </label>
+                        {isResolutor && myAssignment?.approved && (
+                            <div className="bg-emerald-900/40 p-4 rounded-xl border border-emerald-700/50 flex flex-col gap-1">
+                                <span className="text-sm font-bold text-emerald-400">✅ Resolución Finalizada</span>
+                                {myAssignment.observaciones && (
+                                    <p className="text-xs text-emerald-200 italic">"{myAssignment.observaciones}"</p>
+                                )}
                             </div>
                         )}
 
@@ -511,11 +560,17 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                 }}
                                             >
                                                 <option value="">Seleccione Área...</option>
-                                                {tiposResolucion.map(c => (
-                                                    <option key={c.id} value={c.tipo}>
-                                                        {c.tipo} - {c.resolutor?.firstName ? `${c.resolutor.firstName} ${c.resolutor.lastName}` : c.resolutor?.email}
-                                                    </option>
-                                                ))}
+                                                {tiposResolucion.length === 0 && (
+                                                    <option value="" disabled>No hay tipos de resolución (configúrelos en Settings)</option>
+                                                )}
+                                                {tiposResolucion.map(c => {
+                                                    const resolutorName = c.resolutor ? (c.resolutor.firstName ? `${c.resolutor.firstName} ${c.resolutor.lastName}` : c.resolutor.email) : 'Área General (Sin usuario fijo)';
+                                                    return (
+                                                        <option key={c.id} value={c.tipo}>
+                                                            {c.tipo} - {resolutorName}
+                                                        </option>
+                                                    );
+                                                })}
                                             </select>
                                             <button 
                                                 type="button"
@@ -618,22 +673,76 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     )}
                 </form>
 
-                <div className="p-6 border-t border-gray-700 bg-gray-800/50 flex justify-end gap-3">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
-                    >
-                        Cancelar
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={loading}
-                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold transition-all shadow-lg flex items-center gap-2 disabled:opacity-50"
-                    >
-                        <Save className="h-4 w-4" />
-                        {loading ? 'Guardando...' : 'Guardar Solicitud'}
-                    </button>
+                <div className="p-6 border-t border-gray-700 bg-gray-800/50 flex justify-between items-center gap-3">
+                    <div>
+                        {isPendingResolutor && (
+                            <button
+                                type="button"
+                                onClick={() => setShowApproveConfirm(true)}
+                                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold transition-all shadow-lg flex items-center gap-2"
+                            >
+                                <Save className="h-4 w-4" />
+                                Aprobar Resolución
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex gap-3">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={handleSubmit}
+                            disabled={loading}
+                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold transition-all shadow-lg flex items-center gap-2 disabled:opacity-50"
+                        >
+                            <Save className="h-4 w-4" />
+                            {loading ? 'Guardando...' : 'Guardar Solicitud'}
+                        </button>
+                    </div>
                 </div>
+
+                {/* Sub-modal de confirmación de aprobación */}
+                {showApproveConfirm && (
+                    <div className="absolute inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+                        <div className="bg-gray-800 border border-emerald-500/50 rounded-2xl shadow-2xl p-6 w-full max-w-md space-y-4">
+                            <h3 className="text-lg font-bold text-emerald-400 flex items-center gap-2">
+                                <Save className="h-5 w-5" /> ¿Aprobar Resolución?
+                            </h3>
+                            <p className="text-sm text-gray-300">
+                                Esta acción marcará su parte como resuelta y la solicitud desaparecerá de su bandeja principal.
+                            </p>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-2">Mis Observaciones</label>
+                                <textarea
+                                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+                                    rows="4"
+                                    placeholder="Escriba aquí los detalles de la resolución..."
+                                    value={approveObservations}
+                                    onChange={(e) => setApproveObservations(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button
+                                    onClick={() => setShowApproveConfirm(false)}
+                                    className="px-4 py-2 text-gray-400 hover:text-white"
+                                >
+                                    Volver
+                                </button>
+                                <button
+                                    onClick={handleAprobar}
+                                    disabled={loading}
+                                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg"
+                                >
+                                    {loading ? 'Confirmando...' : 'Confirmar y Finalizar'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

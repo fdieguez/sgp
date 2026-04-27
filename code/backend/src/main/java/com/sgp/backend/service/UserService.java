@@ -24,7 +24,7 @@ public class UserService {
         return userRepository.findById(id);
     }
 
-    public User createUser(String email, String password, String role) {
+    public User createUser(String email, String password, String role, String firstName, String lastName, String phone, String zone) {
         if (userRepository.findByEmail(email).isPresent()) {
             throw new IllegalArgumentException("Email already exists");
         }
@@ -33,11 +33,15 @@ public class UserService {
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(password));
         user.setRole(role != null ? role.toUpperCase() : "OPERADOR");
+        user.setFirstName(firstName != null ? firstName : "");
+        user.setLastName(lastName != null ? lastName : "");
+        user.setPhone(phone);
+        user.setZone(zone);
 
         return userRepository.save(user);
     }
 
-    public User updateUser(Long id, String email, String password, String role) {
+    public User updateUser(Long id, String email, String password, String role, String firstName, String lastName, String phone, String zone) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
@@ -55,6 +59,11 @@ public class UserService {
         if (role != null) {
             user.setRole(role.toUpperCase());
         }
+
+        if (firstName != null) user.setFirstName(firstName);
+        if (lastName != null) user.setLastName(lastName);
+        if (phone != null) user.setPhone(phone);
+        if (zone != null) user.setZone(zone);
 
         return userRepository.save(user);
     }

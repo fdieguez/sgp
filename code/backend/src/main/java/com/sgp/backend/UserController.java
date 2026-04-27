@@ -4,7 +4,6 @@ import com.sgp.backend.entity.User;
 import com.sgp.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import com.sgp.backend.repository.ResponsableRepository;
 import com.sgp.backend.repository.UserRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,7 +19,6 @@ import java.util.Map;
 public class UserController {
     private final UserService userService;
     private final UserRepository userRepository;
-    private final ResponsableRepository responsableRepository;
 
     @GetMapping("/me")
     public ResponseEntity<?> getCurrentUser() {
@@ -34,11 +32,6 @@ public class UserController {
             user.setPassword(null);
             java.util.Map<String, Object> response = new java.util.HashMap<>();
             response.put("user", user);
-
-            // Fetch Responsable if exists
-            responsableRepository.findByUserId(user.getId()).ifPresent(resp -> {
-                response.put("responsable", resp);
-            });
 
             return ResponseEntity.ok((Object) response);
         }).orElse(ResponseEntity.notFound().build());
@@ -71,12 +64,16 @@ public class UserController {
             String email = request.get("email");
             String password = request.get("password");
             String role = request.get("role");
+            String firstName = request.get("firstName");
+            String lastName = request.get("lastName");
+            String phone = request.get("phone");
+            String zone = request.get("zone");
 
             if (email == null || password == null) {
                 return ResponseEntity.badRequest().body("Email and password are required");
             }
 
-            User user = userService.createUser(email, password, role);
+            User user = userService.createUser(email, password, role, firstName, lastName, phone, zone);
             user.setPassword(null); // Don't return password
             return ResponseEntity.ok(user);
         } catch (IllegalArgumentException e) {
@@ -91,8 +88,12 @@ public class UserController {
             String email = request.get("email");
             String password = request.get("password");
             String role = request.get("role");
+            String firstName = request.get("firstName");
+            String lastName = request.get("lastName");
+            String phone = request.get("phone");
+            String zone = request.get("zone");
 
-            User user = userService.updateUser(id, email, password, role);
+            User user = userService.updateUser(id, email, password, role, firstName, lastName, phone, zone);
             user.setPassword(null);
             return ResponseEntity.ok(user);
         } catch (IllegalArgumentException e) {

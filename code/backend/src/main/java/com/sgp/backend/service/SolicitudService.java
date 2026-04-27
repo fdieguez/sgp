@@ -3,12 +3,10 @@ package com.sgp.backend.service;
 import com.sgp.backend.entity.Solicitud;
 import com.sgp.backend.entity.Person;
 import com.sgp.backend.entity.Location;
-import com.sgp.backend.entity.Responsable;
 import com.sgp.backend.entity.User;
 import com.sgp.backend.repository.SolicitudRepository;
 import com.sgp.backend.repository.PersonRepository;
 import com.sgp.backend.repository.LocationRepository;
-import com.sgp.backend.repository.ResponsableRepository;
 import com.sgp.backend.repository.UserRepository;
 import com.sgp.backend.repository.AsignacionHistorialRepository;
 import com.sgp.backend.repository.TipoResolucionRepository;
@@ -16,6 +14,7 @@ import com.sgp.backend.entity.AsignacionHistorial;
 import com.sgp.backend.entity.SolicitudResolutorAssignment;
 import com.sgp.backend.repository.SolicitudResolutorAssignmentRepository;
 import com.sgp.backend.dto.ResolutorAssignmentDTO;
+import com.sgp.backend.dto.SolicitudUpdateDTO;
 import lombok.RequiredArgsConstructor;
 import java.time.LocalDateTime;
 import jakarta.persistence.criteria.Subquery;
@@ -32,10 +31,10 @@ public class SolicitudService {
     private final SolicitudRepository solicitudRepository;
     private final PersonRepository personRepository;
     private final LocationRepository locationRepository;
-    private final ResponsableRepository responsableRepository;
     private final UserRepository userRepository;
     private final AsignacionHistorialRepository asignacionHistorialRepository;
     private final TipoResolucionRepository tipoResolucionRepository;
+    private final SolicitudResolutorAssignmentRepository assignmentRepository;
 
     public List<Solicitud> getAllSolicitudes(String status, String search) {
         org.springframework.data.jpa.domain.Specification<Solicitud> spec = org.springframework.data.jpa.domain.Specification
@@ -61,22 +60,17 @@ public class SolicitudService {
                 if (user.getRole().equals("OPERADOR")) {
                     spec = spec.and((root, query, cb) -> cb.equal(root.get("createdBy"), user));
                 } else if (user.getRole().equals("RESPONSABLE")) {
-                    Responsable resp = responsableRepository.findByUserId(user.getId()).orElse(null);
-                    if (resp != null) {
-                        spec = spec.and((root, query, cb) -> cb.equal(root.get("responsable"), resp));
-                    } else {
-                        // Responsable profile not found, hide all
-                        spec = spec.and((root, query, cb) -> cb.disjunction());
-                    }
+                    spec = spec.and((root, query, cb) -> cb.equal(root.get("responsable"), user));
                 } else if (user.getRole().equals("RESOLUTOR")) {
                     spec = spec.and((root, query, cb) -> {
                         Subquery<Long> subquery = query.subquery(Long.class);
                         Root<SolicitudResolutorAssignment> assignmentRoot = subquery.from(SolicitudResolutorAssignment.class);
                         subquery.select(assignmentRoot.get("solicitud").get("id"))
-                                .where(cb.equal(assignmentRoot.get("resolutor"), user));
+                                .where(cb.equal(assignmentRoot.get("resolutor"), user),
+                                       cb.equal(assignmentRoot.get("approved"), false)); // Solo pendientes
                         
                         return cb.or(
-                            cb.equal(root.get("resolutor"), user),
+                            cb.and(cb.equal(root.get("resolutor"), user), cb.notEqual(root.get("status"), "completadas")),
                             cb.in(root.get("id")).value(subquery)
                         );
                     });
@@ -92,6 +86,7 @@ public class SolicitudService {
         return solicitudRepository.findBySheetsConfigId(configId);
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public Solicitud createSolicitud(Solicitud solicitud) {
         // 1. Handle Person
         if (solicitud.getPerson() != null) {
@@ -156,7 +151,7 @@ public class SolicitudService {
 
         // 3. Defaults
         if (solicitud.getStatus() == null) {
-            solicitud.setStatus("PENDING");
+            solicitud.setStatus("pendiente");
         }
         if (solicitud.getEntryDate() == null) {
             solicitud.setEntryDate(java.time.LocalDate.now());
@@ -173,6 +168,11 @@ public class SolicitudService {
         // Process assignments if present
         processAssignments(saved, solicitud.getAssignments());
 
+        // Registrar la creación en el historial
+        if (saved.getCreatedBy() != null) {
+            logAssignmentChange(saved, saved.getCreatedBy(), "CREATED");
+        }
+
         if (saved.getResponsable() != null) {
             logAssignmentChange(saved, saved.getResponsable(), "ASSIGNED");
         }
@@ -180,40 +180,43 @@ public class SolicitudService {
         return saved;
     }
 
-    public Solicitud updateSolicitud(Long id, Solicitud solicitudPayload) {
+    @org.springframework.transaction.annotation.Transactional
+    public Solicitud updateSolicitud(Long id, SolicitudUpdateDTO dto) {
         Solicitud existing = solicitudRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Solicitud not found"));
 
-        Responsable oldResponsable = existing.getResponsable();
+        User oldResponsable = existing.getResponsable();
 
-        // 1. Handle Person
-        if (solicitudPayload.getPerson() != null) {
-            Person p = solicitudPayload.getPerson();
-            if (p.getId() == null) {
-                final Person personToSave = p;
-                p = personRepository.findByName(p.getName())
-                        .orElseGet(() -> {
-                            if (personToSave.getType() == null) {
-                                personToSave.getType();
-                                personToSave.setType("INDIVIDUAL");
-                            }
-                            return personRepository.save(personToSave);
-                        });
-            } else {
-                p = personRepository.findById(p.getId()).orElse(p);
-                p.setName(solicitudPayload.getPerson().getName());
-                p.setPhone(solicitudPayload.getPerson().getPhone());
+        // 1. Actualizar beneficiario
+        if (dto.getPerson() != null) {
+            Person p;
+            if (dto.getPerson().getId() != null) {
+                // Persona existente: actualizar sus campos
+                p = personRepository.findById(dto.getPerson().getId()).orElse(new Person());
+                p.setName(dto.getPerson().getName());
+                p.setPhone(dto.getPerson().getPhone());
                 p = personRepository.save(p);
+            } else {
+                // Persona nueva: buscar por nombre o crear
+                final String nombre = dto.getPerson().getName();
+                final String telefono = dto.getPerson().getPhone();
+                p = personRepository.findByName(nombre).orElseGet(() -> {
+                    Person nueva = new Person();
+                    nueva.setName(nombre);
+                    nueva.setPhone(telefono);
+                    nueva.setType("INDIVIDUAL");
+                    return personRepository.save(nueva);
+                });
             }
             existing.setPerson(p);
         }
 
-        // 2. Handle Location (using location fields from frontend)
-        if (solicitudPayload.getLocationName() != null && !solicitudPayload.getLocationName().trim().isEmpty()) {
-            final String cityName = solicitudPayload.getLocationName().trim();
-            final String inputBarrio = (solicitudPayload.getBarrio() != null && !solicitudPayload.getBarrio().trim().isEmpty()) ? solicitudPayload.getBarrio().trim() : null;
+        // 2. Actualizar ubicación usando los campos planos del DTO
+        if (dto.getLocationName() != null && !dto.getLocationName().trim().isEmpty()) {
+            final String cityName = dto.getLocationName().trim();
+            final String inputBarrio = (dto.getBarrio() != null && !dto.getBarrio().trim().isEmpty())
+                    ? dto.getBarrio().trim() : null;
 
-            // Find or create City
             Location cityLocation = locationRepository.findFirstByNameAndType(cityName, "CITY")
                     .orElseGet(() -> locationRepository.findFirstByNameAndType(cityName, "LOCALITY")
                     .orElseGet(() -> locationRepository.findFirstByName(cityName)
@@ -225,107 +228,93 @@ public class SolicitudService {
                     })));
 
             if (inputBarrio != null) {
-                // Find or create Neighborhood
                 Location finalCityLocation = cityLocation;
                 Location neighborhood = locationRepository.findFirstByNameAndParentId(inputBarrio, cityLocation.getId())
                         .orElseGet(() -> {
-                            Location newNeighborhood = new Location();
-                            newNeighborhood.setName(inputBarrio);
-                            newNeighborhood.setType("NEIGHBORHOOD");
-                            newNeighborhood.setParent(finalCityLocation);
-                            return locationRepository.save(newNeighborhood);
+                            Location nuevo = new Location();
+                            nuevo.setName(inputBarrio);
+                            nuevo.setType("NEIGHBORHOOD");
+                            nuevo.setParent(finalCityLocation);
+                            return locationRepository.save(nuevo);
                         });
                 existing.setLocation(neighborhood);
             } else {
                 existing.setLocation(cityLocation);
             }
-        } else if (solicitudPayload.getLocation() != null) {
-            // Fallback for older approach
-            Location l = solicitudPayload.getLocation();
-            if (l.getId() == null && l.getName() != null) {
-                final Location locationToSave = l;
-                l = locationRepository.findFirstByName(l.getName())
-                        .orElseGet(() -> {
-                            locationToSave.setType("CITY"); // Default for manual
-                            return locationRepository.save(locationToSave);
-                        });
+        }
+
+        // 3. Actualizar campos primitivos
+        existing.setDescription(dto.getDescription());
+        existing.setStatus(dto.getStatus());
+        existing.setOrigin(dto.getOrigin());
+        existing.setZone(dto.getZone());
+        existing.setContactDate(dto.getContactDate());
+        existing.setResolutionDate(dto.getResolutionDate());
+        existing.setObservation(dto.getObservation());
+        existing.setResolution(dto.getResolution());
+        existing.setDetail(dto.getDetail());
+        existing.setFirstContactControl(dto.getFirstContactControl());
+
+        if (dto.getEntryDate() != null) {
+            existing.setEntryDate(dto.getEntryDate());
+        }
+
+        // 4. Campos específicos de Subsidio
+        if (existing instanceof com.sgp.backend.entity.Subsidio subsidioExistente) {
+            if (dto.getAmount() != null) {
+                subsidioExistente.setAmount(dto.getAmount());
             }
-            existing.setLocation(l);
+            if (dto.getGrantDate() != null) {
+                subsidioExistente.setGrantDate(dto.getGrantDate());
+            }
         }
 
-        // Update primitive fields
-        existing.setDescription(solicitudPayload.getDescription());
-        existing.setStatus(solicitudPayload.getStatus());
-        existing.setOrigin(solicitudPayload.getOrigin());
-        existing.setZone(solicitudPayload.getZone());
-        existing.setContactDate(solicitudPayload.getContactDate());
-        existing.setResolutionDate(solicitudPayload.getResolutionDate());
-        existing.setObservation(solicitudPayload.getObservation());
-        existing.setResolution(solicitudPayload.getResolution());
-        existing.setDetail(solicitudPayload.getDetail());
-        existing.setFirstContactControl(solicitudPayload.getFirstContactControl());
-
-        if (existing instanceof com.sgp.backend.entity.Subsidio
-                && solicitudPayload instanceof com.sgp.backend.entity.Subsidio) {
-            ((com.sgp.backend.entity.Subsidio) existing)
-                    .setAmount(((com.sgp.backend.entity.Subsidio) solicitudPayload).getAmount());
-            ((com.sgp.backend.entity.Subsidio) existing)
-                    .setGrantDate(((com.sgp.backend.entity.Subsidio) solicitudPayload).getGrantDate());
-        }
-
-        if (solicitudPayload.getEntryDate() != null) {
-            existing.setEntryDate(solicitudPayload.getEntryDate());
-        }
-
-        // Handle Resolutor Suggestion Workflow (It assigns the Solicitud to the Resolutor user seamlessly without removing the original Responsable)
-        String newSuggestedType = solicitudPayload.getSuggestedResolutionType();
-        
-        // If a new suggested resolution type is set
-        if (newSuggestedType != null && !newSuggestedType.trim().isEmpty() && 
-            !newSuggestedType.equals(existing.getSuggestedResolutionType())) {
-            
+        // 5. Flujo de sugerencia de resolución
+        String newSuggestedType = dto.getSuggestedResolutionType();
+        if (newSuggestedType != null && !newSuggestedType.trim().isEmpty()
+                && !newSuggestedType.equals(existing.getSuggestedResolutionType())) {
             existing.setSuggestedResolutionType(newSuggestedType);
-            existing.setResolutionApproved(false); // reset approval state on new derivation
-            
-            // Auto assign to the corresponding Resolutor
-            java.util.Optional<com.sgp.backend.entity.TipoResolucion> configOpt = tipoResolucionRepository.findByTipoIgnoreCase(newSuggestedType);
-            if (configOpt.isPresent() && configOpt.get().getResolutor() != null) {
-                existing.setResolutor(configOpt.get().getResolutor());
-            }
-        } else if (solicitudPayload.getResolutionApproved() != null) {
-            existing.setResolutionApproved(solicitudPayload.getResolutionApproved());
-            // Optionally, if approved by a resolutor, they could reset the derivacion or notify someone, but setting the flag is enough for the UI to represent the "devolution".
+            existing.setResolutionApproved(false);
+            tipoResolucionRepository.findByTipoIgnoreCase(newSuggestedType)
+                    .filter(c -> c.getResolutor() != null)
+                    .ifPresent(c -> existing.setResolutor(c.getResolutor()));
+        } else if (dto.getResolutionApproved() != null) {
+            existing.setResolutionApproved(dto.getResolutionApproved());
         }
 
-        // Resolutors cannot override the primary Responsable, so only perform responsible override logic normally if not AutoAssigned.
-        // Also frontend payload from a Resolutor might miss the responsable fields, so only apply updates if explicitly sent.
-        if (solicitudPayload.getResponsable() != null && solicitudPayload.getResponsable().getId() != null) {
-            responsableRepository.findById(solicitudPayload.getResponsable().getId())
+        // 6. Asignación de responsable
+        // Solo se actualiza si el DTO trae un responsableId explícito.
+        // Si viene null, se CONSERVA el responsable actual (no se borra accidentalmente).
+        if (dto.getResponsableId() != null) {
+            userRepository.findById(dto.getResponsableId())
                     .ifPresent(existing::setResponsable);
-        } else if (solicitudPayload.getResponsable() == null) {
-            // we only unassign if they explicitly send `{ responsable: null }`. 
-            // the frontend should be careful not to wipe out existing state if sending partial updates
-            existing.setResponsable(null);
         }
+        // Nota: para desasignar explícitamente usar responsableId = 0 (no soportado aún)
 
         Solicitud saved = solicitudRepository.save(existing);
 
-        // Process assignments if present (Sync the collection)
-        processAssignments(saved, solicitudPayload.getAssignments());
+        // 7. Sincronizar asignaciones de resolutores
+        processAssignments(saved, dto.getAssignments());
 
-        Responsable newResponsable = saved.getResponsable();
+        // 8. Recalcular estado automático
+        updateSolicitudStatus(saved);
+        solicitudRepository.save(saved);
+
+        // 9. Auditoría de cambio de responsable
+        User newResponsable = saved.getResponsable();
         if (oldResponsable == null && newResponsable != null) {
             logAssignmentChange(saved, newResponsable, "ASSIGNED");
         } else if (oldResponsable != null && newResponsable == null) {
             logAssignmentChange(saved, oldResponsable, "UNASSIGNED");
-        } else if (oldResponsable != null && newResponsable != null && !oldResponsable.getId().equals(newResponsable.getId())) {
+        } else if (oldResponsable != null && newResponsable != null
+                && !oldResponsable.getId().equals(newResponsable.getId())) {
             logAssignmentChange(saved, newResponsable, "REASSIGNED");
         }
 
         return saved;
     }
 
-    private void logAssignmentChange(Solicitud solicitud, Responsable responsable, String actionType) {
+    private void logAssignmentChange(Solicitud solicitud, User responsable, String actionType) {
         String username = "Sistema";
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated() && !auth.getName().equals("anonymousUser")) {
@@ -387,5 +376,54 @@ public class SolicitudService {
             throw new RuntimeException("Solicitud not found");
         }
         solicitudRepository.deleteById(id);
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void aprobarAsignacion(Long solicitudId, String emailResolutor, String observaciones) {
+        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
+
+        User resolutor = userRepository.findByEmail(emailResolutor)
+                .orElseThrow(() -> new RuntimeException("Resolutor no encontrado"));
+
+        // Buscar la asignación específica para este resolutor en esta solicitud
+        SolicitudResolutorAssignment assignment = solicitud.getResolutorAssignments().stream()
+                .filter(a -> a.getResolutor().getId().equals(resolutor.getId()) && !a.getApproved())
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Asignación pendiente no encontrada para este resolutor"));
+
+        assignment.setApproved(true);
+        assignment.setObservaciones(observaciones);
+        
+        // Registrar en historial
+        logAssignmentChange(solicitud, resolutor, "RESOLUCIÓN APROBADA: " + observaciones);
+
+        // Recalcular estado de la solicitud
+        updateSolicitudStatus(solicitud);
+        
+        solicitudRepository.save(solicitud);
+    }
+
+    private void updateSolicitudStatus(Solicitud solicitud) {
+        String currentStatus = solicitud.getStatus();
+        
+        // If already completed or rejected, we don't auto-move unless explicitly changed? 
+        // But the user wants auto-transition.
+        
+        if (solicitud.getResponsable() == null) {
+            solicitud.setStatus("pendiente");
+        } else {
+            List<SolicitudResolutorAssignment> assignments = solicitud.getResolutorAssignments();
+            if (assignments.isEmpty()) {
+                solicitud.setStatus("en proceso");
+            } else {
+                long approvedCount = assignments.stream().filter(SolicitudResolutorAssignment::getApproved).count();
+                if (approvedCount == assignments.size()) {
+                    solicitud.setStatus("completadas");
+                } else {
+                    solicitud.setStatus("en resolucion");
+                }
+            }
+        }
     }
 }

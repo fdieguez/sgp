@@ -46,13 +46,8 @@ export default function SettingsPage() {
 
                 <div className="animate-in fade-in duration-500">
                     {activeTab === 'USERS' && (
-                        <div className="bg-gray-800/40 p-6 rounded-3xl border border-gray-700/50 backdrop-blur-sm shadow-xl min-h-[500px] relative overflow-hidden">
-                           <div className="absolute inset-0 z-0 opacity-5 pointer-events-none overflow-hidden scale-[1.02]">
-                                <UsersPage isEmbedded={true} />
-                           </div>
-                           <div className="relative z-10 w-full h-full">
-                               <UsersPage />
-                           </div>
+                        <div className="bg-gray-800/40 p-6 rounded-3xl border border-gray-700/50 backdrop-blur-sm shadow-xl min-h-[500px]">
+                           <UsersPage isEmbedded={true} />
                         </div>
                     )}
                     {activeTab === 'TIPOS' && <TiposResolucionABM />}

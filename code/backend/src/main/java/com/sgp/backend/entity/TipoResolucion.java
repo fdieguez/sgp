@@ -33,7 +33,6 @@ public class TipoResolucion {
     private User resolutor;
 
     @OneToMany(mappedBy = "tipoResolucion", cascade = CascadeType.ALL, orphanRemoval = true)
-    @com.fasterxml.jackson.annotation.JsonManagedReference
     @Builder.Default
     private List<TipoResolucionAtributo> atributosConfig = new ArrayList<>();
 }

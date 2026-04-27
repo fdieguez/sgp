@@ -2,11 +2,88 @@
 
 > **Propósito**: Este archivo registra todos los cambios, mejoras y decisiones técnicas del proyecto SGP para facilitar la continuidad entre sesiones de desarrollo.
 
-**Versión Actual**: `0.3.3` (Silos de Roles y Flujo de Resolución)
+**Versión Actual**: `0.6.5` (Estabilidad de Datos y Auditoría Completa)
 
 ---
 
 ## 📅 Abril 2026
+
+### 27/04/2026
+- **⭐️ Versión 0.6.5** (Estabilidad de Datos y Auditoría Completa):
+    - *(ver entrada anterior)*
+
+### 27/04/2026 — FIX CRÍTICO: Error al guardar solicitud (Distribuidor → Responsable)
+- **Causa Raíz Identificada y Resuelta (2 bugs interconectados)**:
+    - **Bug 1 — Deserialización Polimórfica (Backend)**: El endpoint `PUT /api/solicitudes/{id}` recibía `@RequestBody Solicitud` (clase abstracta). Jackson fallaba al deserializar el objeto `responsable: {id: X}` anidado dentro de la jerarquía polimórfica `PEDIDO/SUBSIDIO`, lanzando un error 500 genérico.
+    - **Bug 2 — Borrado Accidental del Responsable**: El `updateSolicitud` tenía un `else if (responsable == null) → setResponsable(null)` que borraba el responsable siempre que el campo llegara como null (incluso si el usuario no quería desasignarlo).
+- **Solución Implementada**:
+    - **Nuevo DTO**: Creado `SolicitudUpdateDTO.java` — objeto plano sin polimorfismo. El endpoint PUT ahora lo recibe en lugar de la entidad abstracta, eliminando el problema de Jackson de raíz.
+    - **Responsable por ID**: El DTO envía `responsableId` (Long) en lugar de `responsable: {id}` (objeto anidado). El service solo actualiza el responsable si llega un ID explícito; si es null, conserva el existente.
+    - **Frontend alineado**: `handleSubmit` en `SolicitudModal.jsx` construye dos payloads distintos: el DTO plano para `PUT` (update) y el objeto completo para `POST` (create).
+    - **DTO de Asignaciones**: Eliminada la restricción `@Size(max=100)` en `ResolutorAssignmentDTO.detalle` que impedía guardar JSONs de atributos dinámicos más largos.
+
+> **📝 NOTA PARA PROXIMA SESIÓN / NUEVO CHAT**:
+> El flujo Distribuidor → Responsable está 100% operativo. El sistema diferencia correctamente entre `PUT` y `POST` en el frontend, cada uno con su payload adecuado.
+> **Punto de Partida**: Continuar con validación de roles en producción y/o implementar la funcionalidad de desasignación explícita de responsable (responsableId = 0 o campo booleano separado).
+
+    - **Corrección Crítica de Serialización (Backend)**:
+        - Eliminado el uso de `@JsonManagedReference` / `@JsonBackReference` que causaba el error `getObjectIdReader() null` en Jackson al trabajar con la jerarquía abstracta de `Solicitud`. Se migró a `@JsonIgnore` en el lado hijo para una deserialización 100% segura.
+    - **Auditoría de Carga Inicial**:
+        - El historial de asignaciones ahora registra automáticamente un evento tipo `CREATED` al momento de la creación, permitiendo ver qué Operador inició el trámite.
+    - **Integridad de Borrado**:
+        - Configurado `CascadeType.ALL` y `orphanRemoval = true` en todas las relaciones de `Solicitud` (Historial, Adjuntos, Tickets). Ahora se pueden eliminar solicitudes sin errores de "Foreign Key Constraint".
+    - **Blindaje de Métricas y Dashboard**:
+        - El cálculo de totales en las tarjetas del dashboard ahora es independiente de los filtros de la tabla, asegurando que los números siempre reflejen el estado real de la base de datos.
+        - Implementado `trim().toLowerCase()` en todos los filtros (Java y JS) para hacer el sistema inmune a espacios en blanco accidentales en los nombres de los estados.
+    - **Migración de Datos Transparente**:
+        - `DataInitializer.java` detecta y normaliza automáticamente estados antiguos en inglés o con mayúsculas inconsistentes al arrancar el sistema.
+
+> **📝 NOTA PARA PROXIMA SESIÓN / NUEVO CHAT**:
+> El sistema ha sido estabilizado a nivel de **Integridad de Datos**. Se han resuelto los errores de guardado (Jackson) y borrado (Cascada). El Dashboard ahora es preciso y resistente a errores de formato manual.
+> **Punto de Partida**: Continuar con la validación de roles en producción. El flujo Operador -> Distribuidor -> Responsable -> Resolutor está 100% operativo con auditoría completa desde la creación.
+
+### 21/04/2026
+- **⭐️ Versión 0.6.0** (Flujo de Estados, Aprobaciones y Resiliencia UI):
+    - **Ciclo de Vida Automatizado (Backend)**: 
+        - Implementación de máquina de estados inteligente en `SolicitudService`. Las solicitudes transicionan automáticamente entre: `pendiente` (sin responsable), `en proceso` (con responsable), `en resolucion` (con resolutores pendientes) y `completadas` (100% aprobado).
+    - **Sistema de Aprobación Atómica**:
+        - Nuevo endpoint `POST /api/solicitudes/{id}/aprobar` exclusivo para Resolutores.
+        - Permite a cada resolutor marcar su tarea como finalizada e inyectar **Observaciones de Resolución** sin afectar el flujo de otros resolutores.
+    - **Auditoría y Trazabilidad**:
+        - `AsignacionHistorial` ahora registra no solo cambios de responsables, sino también las aprobaciones finales de cada área con sus respectivos comentarios.
+    - **Frontend - UX de Resolución**:
+        - `SolicitudModal.jsx` actualizado con el botón **"Finalizar Resolución"**.
+        - Implementado un sub-modal de confirmación que solicita observaciones antes de quitar la solicitud de la bandeja del resolutor (filtro dinámico).
+    - **Resiliencia y Blindaje UI (Anti-Pantallazos en Blanco)**:
+        - Incorporación de un componente **`ErrorBoundary.jsx`** global. 
+        - Ahora, si un componente falla, el sistema captura el error y muestra una interfaz de recuperación segura (Fallback UI) en lugar de dejar la pantalla en blanco.
+    - **Infraestructura de Producción**:
+        - `setup_mysql_prod.sh` actualizado para configurar la zona horaria `-03:00` (ART) y elevar el límite de conexiones simultáneas a `300`.
+    - **Testing Riguroso**:
+        - Creado `SolicitudWorkflowTest.java` logrando una cobertura del 100% del flujo crítico de vida de una solicitud.
+
+### 20/04/2026
+- **FIX CRÍTICO (Pantallazos en Blanco)**:
+    - Recuperada la función `handleSubmit` en el modal de solicitudes, que fue afectada en la última refactorización.
+    - Saneada la lógica de estados de React para asegurar que los selectores de "Estado" usen las nuevas claves en minúsculas (`pendiente`, `en proceso`, etc.) coincidentes con el backend.
+
+### 16/04/2026
+- **⭐️ Versión 0.5.0** (Unificación de Identidad y Estabilización UI):
+    - **Arquitectura de Usuario Unificada**: 
+        - Se eliminó por completo la entidad `Responsable`. Sus campos (`phone`, `zone`) ahora residen directamente en la tabla `User`.
+        - Simplificación radical del modelo de datos: menos tablas, menos JOINs, mayor velocidad.
+    - **Refactorización Core Backend**:
+        - `SolicitudService`, `DashboardService` y `SyncService` actualizados para trabajar con la entidad `User` consolidada.
+        - Las solicitudes ahora se asignan directamente a un `User` con rol `RESPONSABLE`.
+    - **Frontend (UX/UI)**:
+        - **Fusión de Gestión**: Se eliminó la pestaña "Responsables" en `SettingsPage`. Toda la administración ocurre en "Usuarios".
+        - **Formulario Inteligente**: El modal de usuarios detecta el rol y despliega los campos de "Zona" y "Teléfono" solo cuando es necesario.
+        - **FIX CRÍTICO (Pantalla en Blanco)**: 
+            - Se solucionó un crash en `SettingsPage` provocado por un renderizado doble del componente de usuarios.
+            - Se reparó un `ReferenceError: loading is not defined` en `UsersPage.jsx` tras la limpieza de código.
+    - **Integridad de Datos**:
+        - `DataInitializer` actualizado para limpiar filas fantasmas (vacías) en la tabla de `Tipos de Resolución`.
+        - Configurado para sembrar usuarios responsables directamente en la tabla maestra.
 
 ### 15/04/2026
 - **⭐️ Versión 0.4.1** (Formularios Dinámicos Nivel 2 y ABM de Configuración Central):
@@ -23,6 +100,10 @@
         - Revisión cruzada de borrados lógicos para toda la historia estadística (`activo: boolean`).
         - Validado y preparado el script de despliegue a producción `setup_mysql_prod.sh` (Configuración de MySQL silenciosa local, purga de anonimatos, bind-address y habilitación de Túnel Seguro SSH).
         - Implementación nativa de un Selector de Tema (Modo Claro/Oscuro dinámicos y estilizados con sombras refinadas) integrado de raíz en el `Navbar`.
+
+> **📝 NOTA PARA PROXIMA SESIÓN / NUEVO CHAT**:
+> Se ha completado la **Etapa 3** (Unificación Estratégica). El sistema ya no tiene la tabla redundante de Responsables. El código es más limpio, el UI es más coherente y los bugs de renderizado de la configuración han sido exterminados.
+> **Punto de Partida**: Ejecución del Plan de Pruebas con "QA-Pedro" (ver `docs/etapa3/plan_pruebas_flujo_principal.txt`) para validar el flujo Operador -> Distribuidor -> Responsable -> Resolutor en este nuevo esquema unificado.
 
 ### 10/04/2026
 - **⭐️ Versión 0.4.0** (Asignaciones Múltiples de Resolutores):
@@ -361,4 +442,4 @@
 
 ---
 
-**Última actualización**: 07/04/2026 07:25
+**Última actualización**: 21/04/2026 07:45

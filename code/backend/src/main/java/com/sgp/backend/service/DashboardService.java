@@ -10,9 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.sgp.backend.entity.Responsable;
 import com.sgp.backend.entity.User;
-import com.sgp.backend.repository.ResponsableRepository;
 import com.sgp.backend.repository.UserRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -27,7 +25,6 @@ import jakarta.persistence.criteria.Root;
 public class DashboardService {
 
     private final SolicitudRepository solicitudRepository;
-    private final ResponsableRepository responsableRepository;
     private final UserRepository userRepository;
 
     public DashboardStatsDTO getStats() {
@@ -42,23 +39,18 @@ public class DashboardService {
                 if (user.getRole().equals("OPERADOR")) {
                     spec = spec.and((root, query, cb) -> cb.equal(root.get("createdBy"), user));
                 } else if (user.getRole().equals("RESPONSABLE")) {
-                    Responsable resp = responsableRepository.findByUserId(user.getId()).orElse(null);
-                    if (resp != null) {
-                        final String zoneStr = resp.getZone();
-                        final Responsable responsableCriteria = resp;
-                        spec = spec.and((root, query, cb) -> {
-                            jakarta.persistence.criteria.Predicate zonePredicate = cb.disjunction();
-                            if (zoneStr != null && !zoneStr.trim().isEmpty()) {
-                                zonePredicate = cb.equal(
-                                        cb.lower(cb.trim(root.get("zone"))),
-                                        zoneStr.trim().toLowerCase());
-                            }
-                            jakarta.persistence.criteria.Predicate respPredicate = cb.equal(root.get("responsable"), responsableCriteria);
-                            return cb.or(zonePredicate, respPredicate);
-                        });
-                    } else {
-                        spec = spec.and((root, query, cb) -> cb.disjunction());
-                    }
+                    final String zoneStr = user.getZone();
+                    final User responsableCriteria = user;
+                    spec = spec.and((root, query, cb) -> {
+                        jakarta.persistence.criteria.Predicate zonePredicate = cb.disjunction();
+                        if (zoneStr != null && !zoneStr.trim().isEmpty()) {
+                            zonePredicate = cb.equal(
+                                    cb.lower(cb.trim(root.get("zone"))),
+                                    zoneStr.trim().toLowerCase());
+                        }
+                        jakarta.persistence.criteria.Predicate respPredicate = cb.equal(root.get("responsable"), responsableCriteria);
+                        return cb.or(zonePredicate, respPredicate);
+                    });
                 } else if (user.getRole().equals("RESOLUTOR")) {
                     spec = spec.and((root, query, cb) -> {
                         Subquery<Long> subquery = query.subquery(Long.class);
@@ -78,11 +70,14 @@ public class DashboardService {
         List<Solicitud> filteredSolicitudes = solicitudRepository.findAll(spec);
 
         long totalSolicitudes = filteredSolicitudes.size();
-        long pendingSolicitudes = filteredSolicitudes.stream().filter(s -> "PENDING".equals(s.getStatus())).count();
-        long completedSolicitudes = filteredSolicitudes.stream().filter(s -> "COMPLETED".equals(s.getStatus())).count();
+        long pendingSolicitudes = filteredSolicitudes.stream().filter(s -> s.getStatus() != null && "pendiente".equalsIgnoreCase(s.getStatus().trim())).count();
+        long inProgressSolicitudes = filteredSolicitudes.stream().filter(s -> s.getStatus() != null && "en proceso".equalsIgnoreCase(s.getStatus().trim())).count();
+        long inResolutionSolicitudes = filteredSolicitudes.stream().filter(s -> s.getStatus() != null && "en resolucion".equalsIgnoreCase(s.getStatus().trim())).count();
+        long completedSolicitudes = filteredSolicitudes.stream().filter(s -> s.getStatus() != null && "completadas".equalsIgnoreCase(s.getStatus().trim())).count();
+        long rejectedSolicitudes = filteredSolicitudes.stream().filter(s -> s.getStatus() != null && "rechazada".equalsIgnoreCase(s.getStatus().trim())).count();
 
         BigDecimal totalDelivered = filteredSolicitudes.stream()
-                .filter(s -> "COMPLETED".equals(s.getStatus()) && s instanceof com.sgp.backend.entity.Subsidio)
+                .filter(s -> s instanceof com.sgp.backend.entity.Subsidio && s.getStatus() != null && "completadas".equalsIgnoreCase(s.getStatus().trim()))
                 .map(s -> ((com.sgp.backend.entity.Subsidio) s).getAmount())
                 .filter(amount -> amount != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -98,7 +93,10 @@ public class DashboardService {
         return DashboardStatsDTO.builder()
                 .totalSolicitudes(totalSolicitudes)
                 .pendingSolicitudes(pendingSolicitudes)
+                .inProgressSolicitudes(inProgressSolicitudes)
+                .inResolutionSolicitudes(inResolutionSolicitudes)
                 .completedSolicitudes(completedSolicitudes)
+                .rejectedSolicitudes(rejectedSolicitudes)
                 .totalSubsidiesDelivered(totalDelivered)
                 .solicitudesByOrigin(solicitudesByOrigin)
                 .build();

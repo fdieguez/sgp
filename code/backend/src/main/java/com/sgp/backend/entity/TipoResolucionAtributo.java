@@ -22,7 +22,7 @@ public class TipoResolucionAtributo {
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "tipo_resolucion_id")
-    @JsonBackReference
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @ToString.Exclude
     private TipoResolucion tipoResolucion;
 

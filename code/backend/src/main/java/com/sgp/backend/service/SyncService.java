@@ -5,14 +5,13 @@ import com.sgp.backend.entity.Project;
 import com.sgp.backend.entity.SheetsConfig;
 import com.sgp.backend.entity.Person;
 import com.sgp.backend.entity.Location;
-import com.sgp.backend.entity.Responsable;
 import com.sgp.backend.entity.Solicitud;
 import com.sgp.backend.entity.Pedido;
 import com.sgp.backend.entity.Subsidio;
 import com.sgp.backend.repository.ProjectRepository;
 import com.sgp.backend.repository.SheetsConfigRepository;
 import com.sgp.backend.repository.SolicitudRepository;
-import com.sgp.backend.repository.ResponsableRepository;
+import com.sgp.backend.repository.UserRepository;
 import com.sgp.backend.repository.PersonRepository;
 import com.sgp.backend.repository.LocationRepository;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +36,7 @@ public class SyncService {
 
     // New Repositories
     private final com.sgp.backend.repository.SolicitudRepository solicitudRepository;
-    private final com.sgp.backend.repository.ResponsableRepository responsableRepository;
+    private final com.sgp.backend.repository.UserRepository userRepository;
     private final com.sgp.backend.repository.PersonRepository personRepository;
     private final com.sgp.backend.repository.LocationRepository locationRepository;
 
@@ -191,7 +190,7 @@ public class SyncService {
                 com.sgp.backend.entity.Person person = findOrCreatePerson(personName, phone, barrio, cityLocation);
 
                 // 3. Find or Create Responsable
-                com.sgp.backend.entity.Responsable responsable = null;
+                com.sgp.backend.entity.User responsable = null;
                 if (!responsableName.isEmpty()) {
                     responsable = findOrCreateResponsable(responsableName);
                 }
@@ -217,18 +216,19 @@ public class SyncService {
 
                 if (!exists) {
                     // Determine status
-                    String status = "PENDING";
+                    String status = "pendiente";
                     if (!resolucion.isEmpty()) {
                         if (resolucion.equalsIgnoreCase("COMPLETADO") || resolucion.equalsIgnoreCase("RESUELTO")
                                 || resolucion.equalsIgnoreCase("FINALIZADO")
-                                || resolucion.equalsIgnoreCase("ENTREGADO")) {
-                            status = "COMPLETED";
+                                || resolucion.equalsIgnoreCase("ENTREGADO")
+                                || resolucion.equalsIgnoreCase("COMPLETADAS")) {
+                            status = "completadas";
                         } else if (resolucion.equalsIgnoreCase("EN PROCESO")
                                 || resolucion.equalsIgnoreCase("EN PROGRESO")) {
-                            status = "IN_PROGRESS";
+                            status = "en proceso";
                         } else if (resolucion.equalsIgnoreCase("RECHAZADO")
                                 || resolucion.equalsIgnoreCase("CANCELADO")) {
-                            status = "REJECTED";
+                            status = "rechazada";
                         }
                     }
 
@@ -295,14 +295,20 @@ public class SyncService {
         log.info("Hybrid Sync finished. Created Solicitudes: {}, Row Errors: {}", createdCount, errorCount);
     }
 
-    private com.sgp.backend.entity.Responsable findOrCreateResponsable(String name) {
+    private com.sgp.backend.entity.User findOrCreateResponsable(String name) {
         try {
-            return responsableRepository.findByName(name)
-                    .orElseGet(() -> responsableRepository.save(com.sgp.backend.entity.Responsable.builder()
-                            .name(name)
-                            .build()));
+            return userRepository.findByEmail(name.replaceAll("\\s+", "").toLowerCase() + "@sync.local")
+                    .orElseGet(() -> {
+                        com.sgp.backend.entity.User u = new com.sgp.backend.entity.User();
+                        u.setFirstName(name);
+                        u.setLastName("");
+                        u.setEmail(name.replaceAll("\\s+", "").toLowerCase() + "@sync.local");
+                        u.setPassword(new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode("1234.5"));
+                        u.setRole("RESPONSABLE");
+                        return userRepository.save(u);
+                    });
         } catch (Exception e) {
-            log.error("Failed to find/create responsable: {}", name);
+            log.error("Failed to find/create responsable user: {}", name);
             return null;
         }
     }

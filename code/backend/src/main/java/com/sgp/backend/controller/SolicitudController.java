@@ -5,6 +5,7 @@ import com.sgp.backend.service.SolicitudService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.sgp.backend.dto.SolicitudUpdateDTO;
 
 import java.util.List;
 
@@ -44,8 +45,8 @@ public class SolicitudController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Solicitud> updateSolicitud(@PathVariable Long id, @RequestBody Solicitud solicitud) {
-        return ResponseEntity.ok(solicitudService.updateSolicitud(id, solicitud));
+    public ResponseEntity<Solicitud> updateSolicitud(@PathVariable Long id, @RequestBody SolicitudUpdateDTO solicitudDTO) {
+        return ResponseEntity.ok(solicitudService.updateSolicitud(id, solicitudDTO));
     }
 
     @DeleteMapping("/{id}")
@@ -57,5 +58,13 @@ public class SolicitudController {
     @GetMapping("/{id}/historial")
     public ResponseEntity<List<com.sgp.backend.entity.AsignacionHistorial>> getHistorial(@PathVariable Long id) {
         return ResponseEntity.ok(asignacionHistorialRepository.findBySolicitudIdOrderByActionDateDesc(id));
+    }
+
+    @PostMapping("/{id}/aprobar")
+    public ResponseEntity<Void> aprobarSolicitud(@PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
+        String observaciones = body.getOrDefault("observaciones", "");
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        solicitudService.aprobarAsignacion(id, auth.getName(), observaciones);
+        return ResponseEntity.ok().build();
     }
 }
