@@ -42,11 +42,6 @@ public class DataInitializer implements CommandLineRunner {
             // Ignorar errores si las tablas o constraints ya no existen
         }
 
-        solicitudRepository.findAll().forEach(s -> {
-            s.setResponsable(null);
-            solicitudRepository.save(s);
-        });
-
         // Migración de Estados: Normalización a español
         System.out.println("⏳ Ejecutando migración de estados...");
         solicitudRepository.findAll().forEach(s -> {
@@ -61,7 +56,6 @@ public class DataInitializer implements CommandLineRunner {
             }
         });
 
-        asignacionHistorialRepository.deleteAll();
         // responsableRepository.deleteAll(); // Not needed anymore
 
         // 1. Seed Users (5 Roles Test Users)

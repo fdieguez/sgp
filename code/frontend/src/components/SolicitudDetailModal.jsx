@@ -342,11 +342,31 @@ export default function SolicitudDetailModal({ isOpen, onClose, solicitud }) {
                                                     </span>
                                                 </div>
                                                 <div className="text-sm">
-                                                    <span className="text-gray-400">Responsable: </span>
-                                                    <span className="font-bold text-white">{record.responsable ? record.responsable.name : 'Ninguno'}</span>
+                                                    {record.actionType === 'CREATED' ? (
+                                                        <span className="text-gray-300">
+                                                            Solicitud registrada inicialmente en el sistema.
+                                                        </span>
+                                                    ) : record.actionType === 'ASSIGNED' ? (
+                                                        <span className="text-gray-300">
+                                                            Asignado al responsable <span className="font-bold text-white">{record.responsable ? record.responsable.name : 'Ninguno'}</span>
+                                                        </span>
+                                                    ) : record.actionType === 'REASSIGNED' ? (
+                                                        <span className="text-gray-300">
+                                                            Re-asignado al responsable <span className="font-bold text-white">{record.responsable ? record.responsable.name : 'Ninguno'}</span>
+                                                        </span>
+                                                    ) : record.actionType === 'UNASSIGNED' ? (
+                                                        <span className="text-gray-300">
+                                                            Se retiró la asignación de responsable (anterior: {record.responsable ? record.responsable.name : 'Desconocido'})
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-300">
+                                                            <span className="font-bold text-white">{record.responsable ? record.responsable.name : 'Usuario'}</span> {record.actionType.toLowerCase().includes('aprobada') ? 'aprobó la resolución.' : ''}
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <div className="text-xs text-gray-500 mt-1">
-                                                    Modificado por <span className="font-medium text-gray-400">{record.assignedByUsername}</span>
+                                                    {record.actionType === 'CREATED' ? 'Operador: ' : 'Acción realizada por: '}
+                                                    <span className="font-medium text-gray-400">{record.assignedByUsername}</span>
                                                 </div>
                                             </div>
                                         </div>
