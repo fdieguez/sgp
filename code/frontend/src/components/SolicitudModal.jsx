@@ -137,7 +137,27 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+        const validateDates = () => {
+            const dateFields = ['entryDate', 'grantDate', 'contactDate', 'resolutionDate'];
+            for (const field of dateFields) {
+                if (formData[field]) {
+                    const year = new Date(formData[field]).getFullYear();
+                    if (year > 2100 || year < 1900) {
+                        alert(`El año en el campo ${field} es inválido (${year}). Por favor corríjalo.`);
+                        return false;
+                    }
+                }
+            }
+            return true;
+        };
+
+        if (!validateDates()) {
+            setLoading(false);
+            return;
+        }
+
         try {
+
             // Limpiar asignaciones: filtrar vacías y serializar el detalle
             const assignments = formData.assignments
                 .filter(a => a.resolutorEmail && a.tipoResolucion)
@@ -403,6 +423,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 </label>
                                 <input
                                     type="date"
+                                    max="2099-12-31"
                                     className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
                                     value={formData.grantDate}
                                     onChange={(e) => setFormData({ ...formData, grantDate: e.target.value })}
@@ -417,6 +438,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Ingreso</label>
                             <input
                                 type="date"
+                                max="2099-12-31"
                                 className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
                                 value={formData.entryDate}
                                 onChange={(e) => setFormData({ ...formData, entryDate: e.target.value })}
@@ -453,6 +475,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Contacto</label>
                                 <input
                                     type="date"
+                                    max="2099-12-31"
                                     className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
                                     value={formData.contactDate}
                                     onChange={(e) => setFormData({ ...formData, contactDate: e.target.value })}
@@ -462,6 +485,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Resolución</label>
                                 <input
                                     type="date"
+                                    max="2099-12-31"
                                     className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
                                     value={formData.resolutionDate}
                                     onChange={(e) => setFormData({ ...formData, resolutionDate: e.target.value })}
