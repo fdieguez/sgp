@@ -53,7 +53,7 @@ public class DataInitializer implements CommandLineRunner {
         // responsableRepository.deleteAll(); // Not needed anymore
 
         // 1. Seed Users (5 Roles Test Users)
-        createUserIfNotFound("admin@sgp.com", "SGP_Admin_#2026_Prod_Secure_!", "ADMINISTRADOR", "Admin", "Supremo", LocalDate.of(1990, 1, 1), null, null);
+        createUserIfNotFound("admin@sgp.com", "Admin2026!", "ADMINISTRADOR", "Admin", "Supremo", LocalDate.of(1990, 1, 1), null, null);
         createUserIfNotFound("operador@sgp.com", "SGP_StrongPass_2026!", "OPERADOR", "Juan", "Operador", LocalDate.of(1990, 1, 1), null, null);
         createUserIfNotFound("distribuidor@sgp.com", "SGP_StrongPass_2026!", "DISTRIBUIDOR", "Maria", "Distribuidora", LocalDate.of(1990, 1, 1), null, null);
         
