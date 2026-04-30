@@ -33,15 +33,8 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @org.springframework.transaction.annotation.Transactional
     public void run(String... args) throws Exception {
-        // Limpieza de esquemas antiguos (Remanentes de Stage 2)
-        // Hibernate 'update' no elimina constraints de tablas borradas manualmente del código
-        try {
-            entityManager.createNativeQuery("ALTER TABLE solicitudes DROP CONSTRAINT IF EXISTS FKEBLFBCPH338HYXL8QLN48EUOA").executeUpdate();
-            entityManager.createNativeQuery("DROP TABLE IF EXISTS responsables CASCADE").executeUpdate();
-            System.out.println("✅ Remanentes de esquema antiguo (Stage 2) eliminados exitosamente.");
-        } catch (Exception e) {
-            // Ignorar errores si las tablas o constraints ya no existen
-        }
+        // Limpieza de esquema antiguo ya no es necesaria en MySQL Prod
+
 
         // Migración de Estados: Normalización a español
         System.out.println("⏳ Ejecutando migración de estados...");
