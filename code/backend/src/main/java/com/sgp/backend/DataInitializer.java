@@ -13,6 +13,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -59,7 +60,7 @@ public class DataInitializer implements CommandLineRunner {
         // responsableRepository.deleteAll(); // Not needed anymore
 
         // 1. Seed Users (5 Roles Test Users)
-        createUserIfNotFound("admin@sgp.com", "SGP_StrongPass_2026!", "ADMINISTRADOR", "Admin", "Supremo", LocalDate.of(1990, 1, 1), null, null);
+        createUserIfNotFound("admin@sgp.com", "SGP_Admin_#2026_Prod_Secure_!", "ADMINISTRADOR", "Admin", "Supremo", LocalDate.of(1990, 1, 1), null, null);
         createUserIfNotFound("operador@sgp.com", "SGP_StrongPass_2026!", "OPERADOR", "Juan", "Operador", LocalDate.of(1990, 1, 1), null, null);
         createUserIfNotFound("distribuidor@sgp.com", "SGP_StrongPass_2026!", "DISTRIBUIDOR", "Maria", "Distribuidora", LocalDate.of(1990, 1, 1), null, null);
         
@@ -127,35 +128,30 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private User createUserIfNotFound(String email, String password, String role, String firstName, String lastName, LocalDate birthDate, String phone, String zone) {
-        return userRepository.findByEmail(email).orElseGet(() -> {
-            User user = new User();
-            user.setEmail(email);
-            user.setPassword(passwordEncoder.encode(password));
-            user.setRole(role);
-            user.setFirstName(firstName);
-            user.setLastName(lastName);
-            user.setBirthDate(birthDate);
-            user.setPhone(phone);
-            user.setZone(zone);
-
-            User savedUser = userRepository.save(user);
-            System.out.println("✅ User created: " + email + " (" + role + ") " + (zone != null ? "Zone: " + zone : ""));
-            return savedUser;
-        });
+        User user = userRepository.findByEmail(email).orElse(new User());
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(password));
+        user.setRole(role);
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        user.setBirthDate(birthDate);
+        user.setPhone(phone);
+        user.setZone(zone);
+        
+        User savedUser = userRepository.save(user);
+        System.out.println("✅ User upserted: " + email + " (" + role + ") " + (zone != null ? "Zone: " + zone : ""));
+        return savedUser;
     }
 
     private void seedTiposYAtributos(User resolutorDefault) {
-        // Limpieza de datos corruptos o vacíos (como la fila en blanco)
+        // Limpieza de tipos vacíos
         tipoResolucionRepository.findAll().forEach(t -> {
             if (t.getTipo() == null || t.getTipo().trim().isEmpty()) {
                 tipoResolucionRepository.delete(t);
-                System.out.println("🗑️ Borrado Tipo de Resolución vacío.");
             }
         });
 
-        if (tipoResolucionRepository.count() > 0) return;
-
-        // Create Global Attributes
+        // Seed Global Attributes
         AtributoResolucion attrDatoObs = obtenerOCrearAtributo("Detalle u observaciones", "TEXTAREA", null);
         AtributoResolucion attrFecha = obtenerOCrearAtributo("Fecha", "DATE", null);
         AtributoResolucion attrMonto = obtenerOCrearAtributo("Monto solicitado", "NUMBER", null);
@@ -163,36 +159,54 @@ public class DataInitializer implements CommandLineRunner {
         AtributoResolucion attrDecInteres = obtenerOCrearAtributo("Declaración Interés", "SELECT", "SI,NO");
         AtributoResolucion attrCBU = obtenerOCrearAtributo("Constancia de CBU (adjuntar pdf)", "FILE", null);
 
-        // CREATE: AGENDA
-        TipoResolucion agenda = new TipoResolucion();
-        agenda.setTipo("AGENDA");
-        agenda.setResolutor(resolutorDefault);
-        agenda = tipoResolucionRepository.save(agenda);
-        
-        agregarAtributo(agenda, attrFecha, true, 1);
-        agregarAtributo(agenda, attrDecInteres, true, 2);
-        agregarAtributo(agenda, attrDatoObs, true, 3);
-        tipoResolucionRepository.save(agenda);
+        // Definición de tipos básicos
+        upsertTipoResolucion("AGENDA", resolutorDefault, List.of(
+            new AtributoConfig(attrFecha, true, 1),
+            new AtributoConfig(attrDecInteres, true, 2),
+            new AtributoConfig(attrDatoObs, true, 3)
+        ));
 
-        // CREATE: SUBSIDIO
-        TipoResolucion subsidio = new TipoResolucion();
-        subsidio.setTipo("SUBSIDIO");
-        subsidio.setResolutor(resolutorDefault);
-        subsidio = tipoResolucionRepository.save(subsidio);
+        upsertTipoResolucion("SUBSIDIO", resolutorDefault, List.of(
+            new AtributoConfig(attrInstitucion, true, 1),
+            new AtributoConfig(attrMonto, false, 2),
+            new AtributoConfig(attrCBU, false, 3),
+            new AtributoConfig(attrDatoObs, false, 4)
+        ));
 
-        agregarAtributo(subsidio, attrInstitucion, true, 1);
-        agregarAtributo(subsidio, attrMonto, false, 2);
-        agregarAtributo(subsidio, attrCBU, false, 3);
-        agregarAtributo(subsidio, attrDatoObs, false, 4);
-        tipoResolucionRepository.save(subsidio);
-        
-        // ADD DUMMIES TO MATCH LIST
-        TipoResolucion dummy1 = new TipoResolucion(); dummy1.setTipo("MATERIALES"); dummy1.setResolutor(resolutorDefault); tipoResolucionRepository.save(dummy1);
-        TipoResolucion dummy2 = new TipoResolucion(); dummy2.setTipo("ASESORAMIENTO"); dummy2.setResolutor(resolutorDefault); tipoResolucionRepository.save(dummy2);
-        TipoResolucion dummy3 = new TipoResolucion(); dummy3.setTipo("DECLARACION DE INTERES"); dummy3.setResolutor(resolutorDefault); tipoResolucionRepository.save(dummy3);
+        upsertTipoResolucion("MATERIALES", resolutorDefault, List.of());
+        upsertTipoResolucion("ASESORAMIENTO", resolutorDefault, List.of());
+        upsertTipoResolucion("DECLARACION DE INTERES", resolutorDefault, List.of());
 
         System.out.println("✅ Seeding Formatos Dinámicos Nivel 2 Terminado.");
     }
+
+    private void upsertTipoResolucion(String tipo, User resolutor, List<AtributoConfig> atributos) {
+        TipoResolucion tr = tipoResolucionRepository.findByTipoIgnoreCase(tipo).orElse(new TipoResolucion());
+        tr.setTipo(tipo);
+        tr.setResolutor(resolutor);
+        
+        // Si es nuevo o queremos forzar atributos (simplificado: solo si es nuevo o no tiene)
+        if (tr.getId() == null || tr.getAtributosConfig().isEmpty()) {
+            if (tr.getAtributosConfig() == null) {
+                tr.setAtributosConfig(new java.util.ArrayList<>());
+            } else {
+                tr.getAtributosConfig().clear();
+            }
+            
+            for (AtributoConfig ac : atributos) {
+                agregarAtributo(tr, ac.attr, ac.requerido, ac.orden);
+            }
+        }
+        tipoResolucionRepository.save(tr);
+    }
+
+    @lombok.AllArgsConstructor
+    private static class AtributoConfig {
+        AtributoResolucion attr;
+        boolean requerido;
+        int orden;
+    }
+
 
     private AtributoResolucion obtenerOCrearAtributo(String nombre, String tipoDato, String opciones) {
         return atributoRepository.findAll().stream()

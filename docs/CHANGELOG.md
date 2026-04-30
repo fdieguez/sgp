@@ -8,6 +8,16 @@
 
 ## 📅 Abril 2026
 
+### 29/04/2026
+- **⭐️ Versión 0.7.0** (Migración a MySQL Nativo y Optimización DevOps):
+    - **Migración de Motor de BD**: El sistema ha migrado de PostgreSQL (Docker) a **MySQL 8.0 nativo** instalado en el host para mejor rendimiento y facilidad de backups.
+    - **Base de Datos Limpia**: Se inicializó una base de datos nueva (`sgp_db`) sin datos históricos, optimizada para el nuevo esquema de la etapa 4.
+    - **Administrador de Rescate**: Se configuró un usuario administrador por defecto (`admin@sgp.com`) con una contraseña segura generada para producción.
+    - **Estructura DevOps**: 
+        - Creada carpeta `/devops/scripts/` (ignorada por Git) para almacenar scripts de mantenimiento, despliegue y renovación de certificados.
+        - Centralización de logs de despliegue para auditoría interna del servidor.
+    - **Seguridad**: Reforzada la política de contraseñas en `DataInitializer.java` y saneado el archivo `.gitignore` para proteger la nueva carpeta de herramientas.
+
 ### 27/04/2026
 - **⭐️ Versión 0.6.5** (Estabilidad de Datos y Auditoría Completa):
     - *(ver entrada anterior)*
