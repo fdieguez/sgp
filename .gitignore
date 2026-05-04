@@ -47,3 +47,5 @@ docs/task*.md
 docs/implementation_plan*.md
 docs/PROMPT_*.md
 docs/Resumen_*.md
+
+temp/
