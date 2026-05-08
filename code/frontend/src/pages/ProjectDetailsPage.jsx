@@ -36,7 +36,6 @@ import {
     Cell
 } from 'recharts';
 
-import SolicitudDetailModal from '../components/SolicitudDetailModal';
 import SolicitudModal from '../components/SolicitudModal';
 import Navbar from '../components/Navbar';
 
@@ -83,7 +82,6 @@ export default function ProjectDetailsPage() {
 
     // Modal States
     const [isABMOpen, setIsABMOpen] = useState(false);
-    const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [selectedSolicitud, setSelectedSolicitud] = useState(null);
 
     // UI States
@@ -94,11 +92,36 @@ export default function ProjectDetailsPage() {
     const [filters, setFilters] = useState({});
     const [showFilters, setShowFilters] = useState(false);
     const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [responsablesList, setResponsablesList] = useState([]);
+    const [locationsList, setLocationsList] = useState([]);
+
+    useEffect(() => {
+        fetchResponsables();
+        fetchLocations();
+    }, []);
+
+    const fetchResponsables = async () => {
+        try {
+            const res = await api.get('/api/responsables');
+            setResponsablesList(res.data);
+        } catch (err) {
+            console.error("Error fetching responsables", err);
+        }
+    };
+
+    const fetchLocations = async () => {
+        try {
+            const res = await api.get('/api/locations');
+            setLocationsList(res.data.filter(l => l.type === 'CITY' || l.type === 'LOCALITY'));
+        } catch (err) {
+            console.error("Error fetching locations", err);
+        }
+    };
 
     useEffect(() => {
         fetchData();
-        if (configId && user?.role === 'ADMIN') fetchConfig();
-    }, [configId, user]);
+        if (configId && (user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN')) fetchConfig();
+    }, [configId, user?.id, user?.role, filters, searchTerm]);
 
     const fetchConfig = async () => {
         try {
@@ -112,8 +135,39 @@ export default function ProjectDetailsPage() {
     const fetchData = async () => {
         setLoading(true);
         try {
+            const params = {
+                status: filters.status || null,
+                search: searchTerm || null,
+                origin: filters.origin || null,
+                responsableId: filters.responsableId || null,
+                locationId: filters.locationId || null
+            };
+
+            // Date Range Logic for Server
+            if (filters.dateRange) {
+                const today = new Date();
+                let dateFrom = null;
+                let dateTo = null;
+
+                if (filters.dateRange === '1M') {
+                    dateFrom = new Date(); dateFrom.setMonth(today.getMonth() - 1);
+                } else if (filters.dateRange === '6M') {
+                    dateFrom = new Date(); dateFrom.setMonth(today.getMonth() - 6);
+                } else if (filters.dateRange === '1Y') {
+                    dateFrom = new Date(); dateFrom.setFullYear(today.getFullYear() - 1);
+                } else if (filters.dateRange === '2Y') {
+                    dateFrom = new Date(); dateFrom.setFullYear(today.getFullYear() - 2);
+                } else if (filters.dateRange === 'CUSTOM') {
+                    if (filters.customStartDate) dateFrom = new Date(filters.customStartDate);
+                    if (filters.customEndDate) dateTo = new Date(filters.customEndDate);
+                }
+
+                if (dateFrom) params.dateFrom = dateFrom.toISOString().split('T')[0];
+                if (dateTo) params.dateTo = dateTo.toISOString().split('T')[0];
+            }
+
             const endpoint = configId ? `/api/solicitudes/config/${configId}` : `/api/solicitudes`;
-            const response = await api.get(endpoint);
+            const response = await api.get(endpoint, { params });
             setSolicitudes(response.data);
         } catch (err) {
             console.error(err);
@@ -129,7 +183,19 @@ export default function ProjectDetailsPage() {
             await api.delete(`/api/solicitudes/${id}`);
             fetchData();
         } catch (err) {
-            alert("Error al eliminar");
+            console.error(err);
+            alert("Error al eliminar la solicitud.");
+        }
+    };
+
+    const handleAprobarRapido = async (solicitudId) => {
+        if (!window.confirm("¿Confirmas la aprobación de esta solicitud?")) return;
+        try {
+            await api.post(`/api/solicitudes/${solicitudId}/aprobar`, { observaciones: "Aprobación rápida desde grilla" });
+            fetchData();
+        } catch (err) {
+            console.error("Error approving assignment", err);
+            alert("Error al aprobar la solicitud");
         }
     };
 
@@ -148,47 +214,10 @@ export default function ProjectDetailsPage() {
             );
         }
 
-        // 2. Filters
-        Object.entries(filters).forEach(([key, val]) => {
-            if (!val) return;
-            if (key === 'dateRange') {
-                const today = new Date();
-                let minDate = new Date('1900-01-01');
-                let maxDate = new Date('2100-01-01');
-
-                if (val === '1M') {
-                    minDate = new Date(); minDate.setMonth(today.getMonth() - 1);
-                } else if (val === '6M') {
-                    minDate = new Date(); minDate.setMonth(today.getMonth() - 6);
-                } else if (val === '1Y') {
-                    minDate = new Date(); minDate.setFullYear(today.getFullYear() - 1);
-                } else if (val === '2Y') {
-                    minDate = new Date(); minDate.setFullYear(today.getFullYear() - 2);
-                } else if (val === 'CUSTOM') {
-                    if (filters.customStartDate) minDate = parseLocalDate(filters.customStartDate);
-                    if (filters.customEndDate) {
-                        maxDate = parseLocalDate(filters.customEndDate);
-                        maxDate.setHours(23, 59, 59, 999);
-                    }
-                }
-
-                if (val !== '') {
-                    result = result.filter(s => {
-                        if (!s.entryDate) return false;
-                        const d = parseLocalDate(s.entryDate);
-                        return d >= minDate && d <= maxDate;
-                    });
-                }
-            } else if (key === 'status') {
-                result = result.filter(s => s.status?.trim().toLowerCase() === val.trim().toLowerCase());
-            } else if (key === 'location') {
-                result = result.filter(s => s.location?.name === val);
-            } else if (key === 'responsable') {
-                result = result.filter(s => s.responsable?.name === val);
-            } else if (key === 'origin') {
-                result = result.filter(s => s.origin === val);
-            }
-        });
+        // 2. Filters (Solo filtros locales adicionales si los hubiera, 
+        // pero la mayoría ya vienen del servidor. Dejamos el search por si acaso 
+        // para filtrado instantáneo sobre lo ya cargado).
+        // NOTA: El grueso del filtrado ahora ocurre en fetchData (API).
 
         // Unique Values for Filters
         const uniqueResponsables = [...new Set(solicitudes.map(s => s.responsable?.name).filter(Boolean))].sort();
@@ -270,10 +299,6 @@ export default function ProjectDetailsPage() {
         setIsABMOpen(true);
     };
 
-    const handleOpenDetail = (solicitud) => {
-        setSelectedSolicitud(solicitud);
-        setIsDetailOpen(true);
-    };
 
     if (loading && !solicitudes.length) return (
         <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -308,7 +333,7 @@ export default function ProjectDetailsPage() {
                             <Plus className="h-5 w-5" />
                             Nueva Solicitud
                         </button>
-                        {configId && user?.role === 'ADMIN' && (
+                        {(configId && (user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN')) && (
                             <Link
                                 to={`/projects/config/${configId}/settings`}
                                 className="bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white p-2.5 rounded-xl border border-gray-700 transition-all"
@@ -334,7 +359,7 @@ export default function ProjectDetailsPage() {
                                 <FilterX className="h-3 w-3" /> Limpiar todo
                             </button>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Rango de Fecha</label>
                                 <select
@@ -365,8 +390,8 @@ export default function ProjectDetailsPage() {
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Estado</label>
                                 <select
-                                    className="bg-gray-800 text-sm border border-gray-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none w-full sm:w-auto"
-                                    value={filters.status}
+                                    className="bg-gray-900 text-sm border border-gray-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none w-full"
+                                    value={filters.status || ''}
                                     onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
                                 >
                                     <option value="">Todos los Estados</option>
@@ -375,6 +400,17 @@ export default function ProjectDetailsPage() {
                                     <option value="en resolucion">En Resolución</option>
                                     <option value="completadas">Completado</option>
                                     <option value="rechazada">Rechazado</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Localidad</label>
+                                <select
+                                    className="bg-gray-900 text-sm border border-gray-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none w-full"
+                                    value={filters.locationId || ''}
+                                    onChange={(e) => setFilters(prev => ({ ...prev, locationId: e.target.value }))}
+                                >
+                                    <option value="">Todas las Localidades</option>
+                                    {locationsList.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                                 </select>
                             </div>
                             <div>
@@ -392,11 +428,12 @@ export default function ProjectDetailsPage() {
                                 <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Responsable</label>
                                 <select
                                     className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                                    value={filters.responsable || ''}
-                                    onChange={(e) => setFilters(prev => ({ ...prev, responsable: e.target.value }))}
+                                    value={filters.responsableId || ''}
+                                    onChange={(e) => setFilters(prev => ({ ...prev, responsableId: e.target.value }))}
                                 >
                                     <option value="">Todos</option>
-                                    {processedData.uniqueResponsables.map(r => <option key={r} value={r}>{r}</option>)}
+                                    <option value="0">(Sin Asignar)</option>
+                                    {responsablesList.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                 </select>
                             </div>
                         </div>
@@ -427,7 +464,7 @@ export default function ProjectDetailsPage() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                         <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'pendiente' ? '' : 'pendiente' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'pendiente' ? 'bg-yellow-900/40 border-2 border-yellow-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
                             <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]"></div> Pendientes
@@ -468,18 +505,12 @@ export default function ProjectDetailsPage() {
                                 {processedData.stats.rechazada}
                             </div>
                         </button>
-                        <div className="bg-gradient-to-br from-indigo-900/40 to-purple-900/40 border border-indigo-500/30 p-4 rounded-2xl flex flex-col justify-center shadow-lg lg:col-span-1 md:col-span-2 col-span-2">
-                            <div className="text-[10px] uppercase font-black text-indigo-300 mb-1 tracking-wider">Subsidios Entregados</div>
-                            <div className="text-2xl font-black text-white">
-                                ${processedData.stats.totalSubsidies?.toLocaleString()} <span className="text-sm font-medium text-indigo-300/60">ARS</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
                 {/* Chart Section */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2 bg-gray-800/40 p-6 rounded-3xl border border-gray-700/50 backdrop-blur-sm shadow-xl">
+                <div className="grid grid-cols-1 gap-6">
+                    <div className="bg-gray-800/40 p-6 rounded-3xl border border-gray-700/50 backdrop-blur-sm shadow-xl">
                         <div className="flex items-center justify-between mb-8">
                             <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
                                 <BarChart3 className="h-4 w-4 text-indigo-500" /> Analítica de Distribución
@@ -491,7 +522,7 @@ export default function ProjectDetailsPage() {
                             >
                                 <option value="status">Por Estado</option>
                                 <option value="location">Por Localidad</option>
-                                {user?.role === 'ADMIN' && (
+                                {(user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN') && (
                                     <option value="responsable">Por Responsable</option>
                                 )}
                                 <option value="origin">Por Origen</option>
@@ -526,24 +557,6 @@ export default function ProjectDetailsPage() {
                             </ResponsiveContainer>
                         </div>
                     </div>
-
-                    {/* Activity Feed / Search */}
-                    <div className="bg-gray-800/40 p-6 rounded-3xl border border-gray-700/50 backdrop-blur-sm flex flex-col justify-between">
-                        <div className="space-y-4">
-                            <div className="bg-indigo-900/10 border border-indigo-500/20 p-4 rounded-2xl">
-                                <p className="text-[10px] font-black uppercase text-indigo-400 tracking-tighter mb-2">Monto Total Subsidios</p>
-                                <p className="text-2xl font-black text-white">
-                                    ${processedData.rows.reduce((acc, s) => acc + (s.amount || 0), 0).toLocaleString()}
-                                </p>
-                            </div>
-                            <div className="bg-gray-900/30 p-4 rounded-2xl border border-gray-700/30">
-                                <p className="text-[10px] font-black uppercase text-gray-500 tracking-tighter">Promedio por Solicitud</p>
-                                <p className="text-lg font-bold text-gray-300">
-                                    {(processedData.rows.length > 0 ? (processedData.rows.reduce((acc, s) => acc + (s.amount || 0), 0) / processedData.rows.length) : 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 {/* Main Table Section */}
@@ -554,32 +567,21 @@ export default function ProjectDetailsPage() {
                                 <tr className="bg-gray-900/80 text-[10px] font-black text-gray-400 uppercase tracking-widest">
                                     <th className="p-3">N° Orden</th>
                                     <th onClick={() => handleSort('entryDate')} className="p-3 cursor-pointer hover:text-white transition-colors">
-                                        Fecha Ingreso {sortConfig.key === 'entryDate' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        Fecha {sortConfig.key === 'entryDate' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
                                     </th>
-                                    <th className="p-3">Mes</th>
                                     <th onClick={() => handleSort('origin')} className="p-3 cursor-pointer hover:text-white transition-colors">
                                         Origen {sortConfig.key === 'origin' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
                                     </th>
                                     <th onClick={() => handleSort('person')} className="p-3 cursor-pointer hover:text-white transition-colors">
-                                        Nombre / Institución {sortConfig.key === 'person' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        Beneficiario {sortConfig.key === 'person' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
                                     </th>
-                                    <th onClick={() => handleSort('location')} className="p-3 cursor-pointer hover:text-white transition-colors">
-                                        Localidad {sortConfig.key === 'location' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
-                                    </th>
-                                    <th className="p-3">Barrio</th>
-                                    <th className="p-3">Teléfono</th>
+                                    <th className="p-3">Ubicación</th>
                                     <th className="p-3 min-w-[200px]">Solicitud</th>
-                                    <th className="p-3 text-center">ZONA / EJE</th>
                                     <th className="p-3">RESPONSABLE</th>
-                                    <th className="p-3">F. Contacto</th>
-                                    <th className="p-3">F. Resolución</th>
                                     <th onClick={() => handleSort('status')} className="p-3 cursor-pointer hover:text-white transition-colors min-w-[120px]">
                                         Estado {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
                                     </th>
-                                    <th className="p-3 min-w-[150px]">Detalle</th>
-                                    <th className="p-3 min-w-[150px]">Observación</th>
-                                    <th className="p-3 text-right">Monto</th>
-                                    <th className="p-3 text-center">CONTROL 1er C.</th>
+                                    <th className="p-3 min-w-[250px]">Detalles de Resolución</th>
                                     <th className="p-3 text-right sticky right-0 bg-gray-900/90 shadow-xl">Acciones</th>
                                 </tr>
                             </thead>
@@ -600,52 +602,76 @@ export default function ProjectDetailsPage() {
                                         }
                                     }
 
+                                    // Renderizar detalles de resolucion
+                                    let resolucionContent = '-';
+                                    let hasPendingApproval = false;
+
+                                    if (s.resolutorAssignments && s.resolutorAssignments.length > 0) {
+                                        resolucionContent = s.resolutorAssignments.map((assignment, index) => {
+                                            let text = `${assignment.tipoResolucion}: `;
+                                            try {
+                                                const parsed = JSON.parse(assignment.detalle);
+                                                text += Object.entries(parsed).map(([k, v]) => `${k}: ${v}`).join(' | ');
+                                            } catch (e) {
+                                                text += assignment.detalle;
+                                            }
+                                            
+                                            if (assignment.resolutor?.email === user?.email && !assignment.approved) {
+                                                hasPendingApproval = true;
+                                            }
+                                            
+                                            return (
+                                                <div key={index} className="mb-1 pb-1 border-b border-gray-700/50 last:border-0">
+                                                    <span className="font-bold text-indigo-300">{assignment.resolutor?.name || assignment.resolutorEmail}:</span> {text}
+                                                    {assignment.approved && <Check className="inline h-3 w-3 text-emerald-500 ml-1" title="Aprobado" />}
+                                                </div>
+                                            );
+                                        });
+                                    }
+
                                     return (
                                         <tr key={s.id} className="group hover:bg-gray-700/20 transition-all text-xs border-b border-gray-800">
                                             <td className="p-3 font-mono text-gray-500">#{s.id}</td>
                                             <td className="p-3 text-gray-300 whitespace-nowrap">
                                                 {entryDate ? entryDate.toLocaleDateString() : '-'}
                                             </td>
-                                            <td className="p-3 text-gray-400 capitalize">{monthName}</td>
                                             <td className="p-3 text-gray-400">{s.origin || '-'}</td>
-                                            <td className="p-3 font-bold text-white whitespace-nowrap">{s.person?.name || '-'}</td>
-                                            <td className="p-3 text-gray-400">{localidad}</td>
-                                            <td className="p-3 text-gray-400">{barrio}</td>
-                                            <td className="p-3 font-mono text-gray-500">{s.person?.phone || '-'}</td>
+                                            <td className="p-3 font-bold text-white whitespace-nowrap">
+                                                {s.person?.name || '-'}<br/>
+                                                <span className="font-mono text-gray-500 text-[10px]">{s.person?.phone || ''}</span>
+                                            </td>
+                                            <td className="p-3 text-gray-400">
+                                                {localidad}<br/>
+                                                <span className="text-gray-500 text-[10px]">{barrio}</span>
+                                            </td>
                                             <td className="p-3 text-gray-300 font-medium leading-snug">
                                                 <div className="line-clamp-2" title={s.description}>{s.description}</div>
                                             </td>
-                                            <td className="p-3 text-center font-mono text-indigo-400 font-bold">{s.zone || '-'}</td>
-                                            <td className="p-3 text-indigo-300 font-bold uppercase whitespace-nowrap">{s.responsable?.name || '-'}</td>
-                                            <td className="p-3 text-gray-400 whitespace-nowrap">
-                                                {s.contactDate ? parseLocalDate(s.contactDate).toLocaleDateString() : '-'}
-                                            </td>
-                                            <td className="p-3 text-gray-400 whitespace-nowrap">
-                                                {s.resolutionDate ? parseLocalDate(s.resolutionDate).toLocaleDateString() : '-'}
+                                            <td className="p-3 text-indigo-300 font-bold uppercase whitespace-nowrap">
+                                                {s.responsable?.name || '-'}<br/>
+                                                <span className="text-indigo-500/50 text-[10px]">{s.zone || ''}</span>
                                             </td>
                                             <td className="p-3 text-gray-300">
-                                                {s.resolution || <StatusBadge status={s.status} />}
+                                                <StatusBadge status={s.status} />
                                             </td>
-                                            <td className="p-3 text-gray-400 italic">
-                                                <div className="line-clamp-2" title={s.detail}>{s.detail || '-'}</div>
-                                            </td>
-                                            <td className="p-3 text-yellow-500/80 italic">
-                                                <div className="line-clamp-2" title={s.observation}>{s.observation || '-'}</div>
-                                            </td>
-                                            <td className="p-3 text-right font-mono text-emerald-400">
-                                                {s.amount ? `$${s.amount.toLocaleString()}` : '-'}
-                                            </td>
-                                            <td className="p-3 text-center">
-                                                {s.firstContactControl ?
-                                                    <Check className="inline h-4 w-4 text-emerald-500" /> :
-                                                    <span className="text-gray-700">-</span>
-                                                }
+                                            <td className="p-3 text-gray-300 text-[11px] leading-tight">
+                                                {resolucionContent}
                                             </td>
                                             <td className="p-3 sticky right-0 bg-gray-900/90 shadow-xl group-hover:bg-gray-800 transition-colors">
                                                 <div className="flex justify-end gap-1 opacity-60 group-hover:opacity-100">
-                                                    <button onClick={() => handleOpenDetail(s)} title="Ver Detalle" className="p-1.5 hover:bg-indigo-600 rounded text-gray-400 hover:text-white"><Eye className="h-3 w-3" /></button>
-                                                    <button onClick={() => handleOpenABM(s)} title="Editar" className="p-1.5 hover:bg-emerald-600 rounded text-gray-400 hover:text-white"><Edit3 className="h-3 w-3" /></button>
-                                                    <button onClick={() => handleDelete(s.id)} title="Eliminar" className="p-1.5 hover:bg-red-600 rounded text-gray-400 hover:text-white"><Trash2 className="h-3 w-3" /></button>
+                                                    {hasPendingApproval && (
+                                                        <button onClick={() => handleAprobarRapido(s.id)} title="Aprobar Rápidamente" className="p-1.5 hover:bg-emerald-600 bg-emerald-900/30 rounded text-emerald-400 hover:text-white transition-colors">
+                                                            <Check className="h-4 w-4" />
+                                                        </button>
+                                                    )}
+                                                    <button onClick={() => handleOpenABM(s)} title="Ver / Editar Detalles" className="p-1.5 hover:bg-indigo-600 bg-gray-800 rounded text-indigo-400 hover:text-white transition-colors">
+                                                        <Edit3 className="h-4 w-4" />
+                                                    </button>
+                                                    {user?.role === 'ADMINISTRADOR' && (
+                                                        <button onClick={() => handleDelete(s.id)} title="Eliminar" className="p-1.5 hover:bg-red-600 rounded text-gray-400 hover:text-white transition-colors">
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -685,11 +711,6 @@ export default function ProjectDetailsPage() {
                 onSuccess={fetchData}
                 initialData={selectedSolicitud}
                 configId={configId}
-            />
-            <SolicitudDetailModal
-                isOpen={isDetailOpen}
-                onClose={() => setIsDetailOpen(false)}
-                solicitud={selectedSolicitud}
             />
         </div>
     );

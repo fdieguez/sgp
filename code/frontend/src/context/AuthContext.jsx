@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import api from '../config/axios';
 
 const AuthContext = createContext();
@@ -75,12 +75,26 @@ export const AuthProvider = ({ children }) => {
 
     // Try to restore user profile fully on load if token exists but user lacks responsable details
     useEffect(() => {
-        if (token && user && (!user.id || (user.role === 'RESPONSABLE' && user.responsable === undefined))) {
+        const needsRefresh = token && user && (
+            !user.id || 
+            (user.role === 'RESPONSABLE' && user.responsable === undefined)
+        );
+
+        if (needsRefresh) {
             api.get('/api/users/me')
                 .then(res => {
-                    setUser({
-                        ...res.data.user,
-                        responsable: res.data.responsable
+                    const userData = res.data.user;
+                    const responsableData = res.data.responsable;
+                    
+                    // Solo actualizar si realmente hay datos nuevos o diferentes para evitar loops
+                    setUser(prev => {
+                        if (prev && prev.id === userData.id && prev.responsable === responsableData) {
+                            return prev;
+                        }
+                        return {
+                            ...userData,
+                            responsable: responsableData
+                        };
                     });
                 })
                 .catch(err => {
@@ -90,10 +104,19 @@ export const AuthProvider = ({ children }) => {
                     }
                 });
         }
-    }, [token]);
+    }, [token, user?.id, user?.role, user?.responsable]); // Dependencias más específicas
+
+    const contextValue = useMemo(() => ({
+        token,
+        isAuthenticated: !!token,
+        login,
+        logout,
+        user,
+        loading
+    }), [token, user, loading]);
 
     return (
-        <AuthContext.Provider value={{ token, isAuthenticated: !!token, login, logout, user, loading }}>
+        <AuthContext.Provider value={contextValue}>
             {children}
         </AuthContext.Provider>
     );

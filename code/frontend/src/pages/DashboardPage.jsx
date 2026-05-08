@@ -35,7 +35,7 @@ export default function DashboardPage() {
         } else {
             setLoading(false);
         }
-    }, [user]);
+    }, [user?.role]);
 
     const fetchConfigs = async () => {
         try {

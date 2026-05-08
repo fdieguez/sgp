@@ -20,13 +20,26 @@ public class SolicitudController {
     @GetMapping
     public List<Solicitud> getAllSolicitudes(
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String search) {
-        return solicitudService.getAllSolicitudes(status, search);
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long responsableId,
+            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) String origin,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate dateTo) {
+        return solicitudService.getAllSolicitudes(status, search, responsableId, locationId, origin, dateFrom, dateTo);
     }
 
     @GetMapping("/config/{configId}")
-    public List<Solicitud> getSolicitudesByConfig(@PathVariable Long configId) {
-        return solicitudService.getSolicitudesByConfig(configId);
+    public List<Solicitud> getSolicitudesByConfig(
+            @PathVariable Long configId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long responsableId,
+            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) String origin,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate dateTo) {
+        return solicitudService.getSolicitudesByConfig(configId, status, search, responsableId, locationId, origin, dateFrom, dateTo);
     }
 
     @GetMapping("/{id}")

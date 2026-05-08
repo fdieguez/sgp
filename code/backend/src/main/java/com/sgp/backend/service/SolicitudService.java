@@ -36,7 +36,7 @@ public class SolicitudService {
     private final TipoResolucionRepository tipoResolucionRepository;
     private final SolicitudResolutorAssignmentRepository assignmentRepository;
 
-    public List<Solicitud> getAllSolicitudes(String status, String search) {
+    public List<Solicitud> getAllSolicitudes(String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo) {
         org.springframework.data.jpa.domain.Specification<Solicitud> spec = org.springframework.data.jpa.domain.Specification
                 .where(null);
 
@@ -48,7 +48,32 @@ public class SolicitudService {
             String likePattern = "%" + search.toLowerCase() + "%";
             spec = spec.and((root, query, cb) -> cb.or(
                     cb.like(cb.lower(root.get("description")), likePattern),
-                    cb.like(cb.lower(root.get("person").get("name")), likePattern)));
+                    cb.like(cb.lower(root.get("person").get("name")), likePattern),
+                    cb.like(cb.lower(root.get("id").as(String.class)), likePattern)));
+        }
+
+        if (responsableId != null) {
+            if (responsableId == 0) {
+                spec = spec.and((root, query, cb) -> cb.isNull(root.get("responsable")));
+            } else {
+                spec = spec.and((root, query, cb) -> cb.equal(root.get("responsable").get("id"), responsableId));
+            }
+        }
+
+        if (locationId != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("location").get("id"), locationId));
+        }
+
+        if (origin != null && !origin.isEmpty()) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("origin"), origin));
+        }
+
+        if (dateFrom != null) {
+            spec = spec.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get("entryDate"), dateFrom));
+        }
+
+        if (dateTo != null) {
+            spec = spec.and((root, query, cb) -> cb.lessThanOrEqualTo(root.get("entryDate"), dateTo));
         }
 
         // Apply Role Based Filtering
@@ -63,27 +88,97 @@ public class SolicitudService {
                     spec = spec.and((root, query, cb) -> cb.equal(root.get("responsable"), user));
                 } else if (user.getRole().equals("RESOLUTOR")) {
                     spec = spec.and((root, query, cb) -> {
-                        Subquery<Long> subquery = query.subquery(Long.class);
-                        Root<SolicitudResolutorAssignment> assignmentRoot = subquery.from(SolicitudResolutorAssignment.class);
-                        subquery.select(assignmentRoot.get("solicitud").get("id"))
-                                .where(cb.equal(assignmentRoot.get("resolutor"), user),
-                                       cb.equal(assignmentRoot.get("approved"), false)); // Solo pendientes
+                        query.distinct(true);
+                        jakarta.persistence.criteria.Join<Solicitud, SolicitudResolutorAssignment> assignments = root.join("resolutorAssignments", jakarta.persistence.criteria.JoinType.LEFT);
                         
-                        return cb.or(
-                            cb.and(cb.equal(root.get("resolutor"), user), cb.notEqual(root.get("status"), "completadas")),
-                            cb.in(root.get("id")).value(subquery)
+                        jakarta.persistence.criteria.Predicate isLegacyResolutor = cb.and(
+                            cb.equal(root.get("resolutor").get("id"), user.getId()),
+                            cb.notEqual(root.get("status"), "completadas")
                         );
+                        
+                        jakarta.persistence.criteria.Predicate isAssignedResolutor = cb.equal(assignments.get("resolutor").get("id"), user.getId());
+                        
+                        return cb.or(isLegacyResolutor, isAssignedResolutor);
                     });
                 }
-                // DISTRIBUIDOR and ADMINISTRADOR see everything (no additional predicates).
             }
         }
 
         return solicitudRepository.findAll(spec);
     }
 
-    public List<Solicitud> getSolicitudesByConfig(Long configId) {
-        return solicitudRepository.findBySheetsConfigId(configId);
+    public List<Solicitud> getSolicitudesByConfig(Long configId, String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo) {
+        org.springframework.data.jpa.domain.Specification<Solicitud> spec = org.springframework.data.jpa.domain.Specification
+                .where((root, query, cb) -> cb.equal(root.get("sheetsConfig").get("id"), configId));
+        
+        return getSolicitudesWithSpec(spec, status, search, responsableId, locationId, origin, dateFrom, dateTo);
+    }
+
+    private List<Solicitud> getSolicitudesWithSpec(org.springframework.data.jpa.domain.Specification<Solicitud> baseSpec, String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo) {
+        org.springframework.data.jpa.domain.Specification<Solicitud> spec = baseSpec;
+
+        if (status != null && !status.isEmpty()) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), status));
+        }
+
+        if (search != null && !search.isEmpty()) {
+            String likePattern = "%" + search.toLowerCase() + "%";
+            spec = spec.and((root, query, cb) -> cb.or(
+                    cb.like(cb.lower(root.get("description")), likePattern),
+                    cb.like(cb.lower(root.get("person").get("name")), likePattern),
+                    cb.like(cb.lower(root.get("id").as(String.class)), likePattern)));
+        }
+
+        if (responsableId != null) {
+            if (responsableId == 0) {
+                spec = spec.and((root, query, cb) -> cb.isNull(root.get("responsable")));
+            } else {
+                spec = spec.and((root, query, cb) -> cb.equal(root.get("responsable").get("id"), responsableId));
+            }
+        }
+
+        if (locationId != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("location").get("id"), locationId));
+        }
+
+        if (origin != null && !origin.isEmpty()) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("origin"), origin));
+        }
+
+        if (dateFrom != null) {
+            spec = spec.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get("entryDate"), dateFrom));
+        }
+
+        if (dateTo != null) {
+            spec = spec.and((root, query, cb) -> cb.lessThanOrEqualTo(root.get("entryDate"), dateTo));
+        }
+
+        // Apply Role Based Filtering
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated()) {
+            String email = auth.getName();
+            User user = userRepository.findByEmail(email).orElse(null);
+            if (user != null) {
+                if (user.getRole().equals("OPERADOR")) {
+                    spec = spec.and((root, query, cb) -> cb.equal(root.get("createdBy"), user));
+                } else if (user.getRole().equals("RESPONSABLE")) {
+                    spec = spec.and((root, query, cb) -> cb.equal(root.get("responsable"), user));
+                } else if (user.getRole().equals("RESOLUTOR")) {
+                    spec = spec.and((root, query, cb) -> {
+                        query.distinct(true);
+                        jakarta.persistence.criteria.Join<Solicitud, SolicitudResolutorAssignment> assignments = root.join("resolutorAssignments", jakarta.persistence.criteria.JoinType.LEFT);
+                        jakarta.persistence.criteria.Predicate isLegacyResolutor = cb.and(
+                            cb.equal(root.get("resolutor").get("id"), user.getId()),
+                            cb.notEqual(root.get("status"), "completadas")
+                        );
+                        jakarta.persistence.criteria.Predicate isAssignedResolutor = cb.equal(assignments.get("resolutor").get("id"), user.getId());
+                        return cb.or(isLegacyResolutor, isAssignedResolutor);
+                    });
+                }
+            }
+        }
+
+        return solicitudRepository.findAll(spec);
     }
 
     @org.springframework.transaction.annotation.Transactional
@@ -286,10 +381,14 @@ public class SolicitudService {
         // Solo se actualiza si el DTO trae un responsableId explícito.
         // Si viene null, se CONSERVA el responsable actual (no se borra accidentalmente).
         if (dto.getResponsableId() != null) {
-            userRepository.findById(dto.getResponsableId())
-                    .ifPresent(existing::setResponsable);
+            if (dto.getResponsableId() <= 0) {
+                // Desasignación explícita (responsableId = 0)
+                existing.setResponsable(null);
+            } else {
+                userRepository.findById(dto.getResponsableId())
+                        .ifPresent(existing::setResponsable);
+            }
         }
-        // Nota: para desasignar explícitamente usar responsableId = 0 (no soportado aún)
 
         Solicitud saved = solicitudRepository.save(existing);
 

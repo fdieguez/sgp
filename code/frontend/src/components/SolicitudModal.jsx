@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar, Users, Plus, Trash2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar, Users, Plus, Trash2, History, FileText, UploadCloud, Download, ArrowRight, MessageSquare } from 'lucide-react';
 import api from '../config/axios';
 import { useAuth } from '../context/AuthContext';
+import TicketSeguimiento from './TicketSeguimiento';
 
 export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData, configId }) {
     const { user } = useAuth();
@@ -31,46 +32,178 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const [showApproveConfirm, setShowApproveConfirm] = useState(false);
     const [approveObservations, setApproveObservations] = useState('');
 
+    // Tabs & extra states
+    const [activeTab, setActiveTab] = useState('detalles');
+    const [historial, setHistorial] = useState([]);
+    const [adjuntos, setAdjuntos] = useState([]);
+    const [isDragging, setIsDragging] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+
+    const fetchAdjuntos = useCallback(async () => {
+        if (!formData.id) return;
+        try {
+            const res = await api.get(`/api/solicitudes/${formData.id}/adjuntos`);
+            setAdjuntos(res.data);
+        } catch (err) {
+            console.error("Error fetching adjuntos", err);
+        }
+    }, [formData.id]);
+
+    const fetchHistorial = useCallback(async () => {
+        if (!formData.id) return;
+        try {
+            const res = await api.get(`/api/solicitudes/${formData.id}/historial`);
+            setHistorial(res.data);
+        } catch (err) {
+            console.error("Error fetching history", err);
+        }
+    }, [formData.id]);
+
+    useEffect(() => {
+        if (isOpen && formData.id) {
+            if (activeTab === 'historial') {
+                fetchHistorial();
+            }
+            if (activeTab === 'adjuntos') {
+                fetchAdjuntos();
+            }
+        }
+    }, [isOpen, formData.id, activeTab, fetchHistorial, fetchAdjuntos]);
+
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+    const handleDragLeave = (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+    const handleDrop = async (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            await handleFileUpload(e.dataTransfer.files[0]);
+        }
+    };
+    const handleFileUpload = async (file) => {
+        if (!file) return;
+        setIsUploading(true);
+        const uploadData = new FormData();
+        uploadData.append('file', file);
+        try {
+            await api.post(`/api/solicitudes/${formData.id}/adjuntos`, uploadData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            fetchAdjuntos();
+        } catch (err) {
+            console.error("Upload failed", err);
+            alert("Error al subir archivo");
+        } finally {
+            setIsUploading(false);
+        }
+    };
+    const handleDownload = async (adjunto) => {
+        try {
+            const res = await api.get(`/api/solicitudes/adjuntos/${adjunto.id}/download`, { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([res.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', adjunto.originalFileName);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => window.URL.revokeObjectURL(url), 100);
+        } catch (err) {
+            console.error("Download fail", err);
+            alert("Error al descargar");
+        }
+    };
+    const handleDeleteAdjunto = async (id) => {
+        if(!window.confirm("¿Seguro que deseas eliminar este archivo?")) return;
+        try {
+            await api.delete(`/api/solicitudes/adjuntos/${id}`);
+            fetchAdjuntos();
+        } catch (err) {
+            console.error("Delete fail", err);
+            alert("Error al eliminar el archivo");
+        }
+    };
+
+    const fetchResponsables = useCallback(async () => {
+        try {
+            const res = await api.get('/api/responsables');
+            setResponsables(res.data);
+        } catch (err) {
+            console.error("Error fetching responsables", err);
+        }
+    }, []);
+
+    const fetchLocations = useCallback(async () => {
+        try {
+            const res = await api.get('/api/locations');
+            setLocations(res.data);
+        } catch (err) {
+            console.error("Error fetching locations", err);
+        }
+    }, []);
+
+    const fetchTiposResolucion = useCallback(async () => {
+        try {
+            const res = await api.get('/api/tipos-resolucion');
+            setTiposResolucion(res.data);
+        } catch (err) {
+            console.error("Error fetching tipos resolucion", err);
+        }
+    }, []);
+
     useEffect(() => {
         if (isOpen) {
             fetchResponsables();
             fetchLocations();
             fetchTiposResolucion();
+            
+            // Solo resetear el formulario si cambian los datos iniciales o si es una nueva apertura
             if (initialData) {
-                // Map entity to form
-                setFormData({
-                    ...initialData,
-                    type: initialData.amount !== undefined ? 'SUBSIDIO' : 'PEDIDO',
-                    person: initialData.person || { name: '', phone: '' },
-                    locationName: initialData.location?.type === 'NEIGHBORHOOD' ? (initialData.location?.parent?.name || '') : (initialData.location?.name || ''),
-                    barrio: initialData.location?.type === 'NEIGHBORHOOD' ? (initialData.location?.name || '') : '',
-                    responsableId: initialData.responsable?.id || '',
-                    amount: initialData.amount || '',
-                    grantDate: initialData.grantDate ? initialData.grantDate.split('T')[0] : '',
-                    zone: initialData.zone || '',
-                    contactDate: initialData.contactDate ? initialData.contactDate.split('T')[0] : '',
-                    resolutionDate: initialData.resolutionDate ? initialData.resolutionDate.split('T')[0] : '',
-                    entryDate: initialData.entryDate ? initialData.entryDate.split('T')[0] : '',
-                    observation: initialData.observation || '',
-                    resolution: initialData.resolution || '',
-                    suggestedResolutionType: initialData.suggestedResolutionType || '',
-                    resolutionApproved: initialData.resolutionApproved || false,
-                    detail: initialData.detail || '',
-                    firstContactControl: initialData.firstContactControl || false,
-                    origin: initialData.origin || 'MANUAL',
-                    assignments: initialData.resolutorAssignments?.map(a => {
-                        let parsedDetalle = a.detalle || '';
-                        try {
-                            if (a.detalle && typeof a.detalle === 'string' && a.detalle.startsWith('{')) {
-                                parsedDetalle = JSON.parse(a.detalle);
-                            }
-                        } catch (e) {}
-                        return {
-                            resolutorEmail: a.resolutor?.email || '',
-                            tipoResolucion: a.tipoResolucion || '',
-                            detalle: parsedDetalle
-                        };
-                    }) || []
+                // Evitar re-setear si el ID es el mismo para no romper la experiencia del usuario si el padre re-renderiza
+                setFormData(prev => {
+                    if (prev.id === initialData.id && prev.status === initialData.status) {
+                         return prev;
+                    }
+                    return {
+                        ...initialData,
+                        type: initialData.amount !== undefined ? 'SUBSIDIO' : 'PEDIDO',
+                        person: initialData.person || { name: '', phone: '' },
+                        locationName: initialData.location?.type === 'NEIGHBORHOOD' ? (initialData.location?.parent?.name || '') : (initialData.location?.name || ''),
+                        barrio: initialData.location?.type === 'NEIGHBORHOOD' ? (initialData.location?.name || '') : '',
+                        responsableId: initialData.responsable?.id || '',
+                        amount: initialData.amount || '',
+                        grantDate: initialData.grantDate ? initialData.grantDate.split('T')[0] : '',
+                        zone: initialData.zone || '',
+                        contactDate: initialData.contactDate ? initialData.contactDate.split('T')[0] : '',
+                        resolutionDate: initialData.resolutionDate ? initialData.resolutionDate.split('T')[0] : '',
+                        entryDate: initialData.entryDate ? initialData.entryDate.split('T')[0] : '',
+                        observation: initialData.observation || '',
+                        resolution: initialData.resolution || '',
+                        suggestedResolutionType: initialData.suggestedResolutionType || '',
+                        resolutionApproved: initialData.resolutionApproved || false,
+                        detail: initialData.detail || '',
+                        firstContactControl: initialData.firstContactControl || false,
+                        origin: initialData.origin || 'MANUAL',
+                        assignments: initialData.resolutorAssignments?.map(a => {
+                            let parsedDetalle = a.detalle || '';
+                            try {
+                                if (a.detalle && typeof a.detalle === 'string' && a.detalle.startsWith('{')) {
+                                    parsedDetalle = JSON.parse(a.detalle);
+                                }
+                            } catch (e) {}
+                            return {
+                                resolutorEmail: a.resolutor?.email || '',
+                                tipoResolucion: a.tipoResolucion || '',
+                                detalle: parsedDetalle
+                            };
+                        }) || []
+                    };
                 });
             } else {
                 setFormData({
@@ -96,36 +229,13 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     firstContactControl: false,
                     assignments: []
                 });
+                setActiveTab('detalles');
             }
+        } else {
+            // Cuando se cierra, podemos resetear el tab pero no es crítico
+            setActiveTab('detalles');
         }
-    }, [isOpen, initialData]);
-
-    const fetchResponsables = async () => {
-        try {
-            const res = await api.get('/api/responsables');
-            setResponsables(res.data);
-        } catch (err) {
-            console.error("Error fetching responsables", err);
-        }
-    };
-
-    const fetchLocations = async () => {
-        try {
-            const res = await api.get('/api/locations');
-            setLocations(res.data);
-        } catch (err) {
-            console.error("Error fetching locations", err);
-        }
-    };
-
-    const fetchTiposResolucion = async () => {
-        try {
-            const res = await api.get('/api/tipos-resolucion');
-            setTiposResolucion(res.data);
-        } catch (err) {
-            console.error("Error fetching tipos resolucion", err);
-        }
-    };
+    }, [isOpen, initialData?.id, fetchResponsables, fetchLocations, fetchTiposResolucion, isResponsable, user?.responsable?.id, user?.responsable?.zone]);
 
     // Computar listas dinámicas
     const availableCities = locations.filter(l => l.type === 'CITY' || l.type === 'LOCALITY');
@@ -166,8 +276,9 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     detail: formData.detail,
                     observation: formData.observation,
                     firstContactControl: formData.firstContactControl,
-                    // Clave: se envía el ID directo, no un objeto anidado
-                    responsableId: formData.responsableId ? Number(formData.responsableId) : null,
+                    // Clave: se envía el ID directo, no un objeto anidado. 
+                    // Se envía 0 para indicar desasignación explícita.
+                    responsableId: formData.responsableId ? Number(formData.responsableId) : 0,
                     suggestedResolutionType: formData.suggestedResolutionType || null,
                     resolutionApproved: formData.resolutionApproved,
                     // Campos de Subsidio
@@ -224,12 +335,45 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         <Clipboard className="text-indigo-500" />
                         {formData.id ? 'Editar Solicitud' : 'Nueva Solicitud'}
                     </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+                    <button onClick={onClose} title="Cerrar" className="text-gray-400 hover:text-white transition-colors">
                         <X className="h-6 w-6" />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                <div className="flex border-b border-gray-700 px-6 bg-gray-900/20">
+                    <button
+                        onClick={() => setActiveTab('detalles')}
+                        className={`px-4 py-3 font-bold text-sm tracking-wide ${activeTab === 'detalles' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'}`}
+                    >
+                        Formulario / Detalles
+                    </button>
+                    {formData.id && (
+                        <>
+                            <button
+                                onClick={() => setActiveTab('comentarios')}
+                                className={`px-4 py-3 font-bold text-sm tracking-wide flex items-center gap-2 ${activeTab === 'comentarios' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'}`}
+                            >
+                                <MessageSquare className="h-4 w-4" /> Notas Seguimiento
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('historial')}
+                                className={`px-4 py-3 font-bold text-sm tracking-wide flex items-center gap-2 ${activeTab === 'historial' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'}`}
+                            >
+                                <History className="h-4 w-4" /> Historial
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('adjuntos')}
+                                className={`px-4 py-3 font-bold text-sm tracking-wide flex items-center gap-2 ${activeTab === 'adjuntos' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'}`}
+                            >
+                                <FileText className="h-4 w-4" /> Adjuntos
+                            </button>
+                        </>
+                    )}
+                </div>
+
+                <div className="max-h-[70vh] overflow-y-auto custom-scrollbar">
+                    {activeTab === 'detalles' && (
+                        <form onSubmit={handleSubmit} className="p-6 space-y-6">
                     {/* Type and Status */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -517,24 +661,26 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     </div>
 
                     {/* Multi-Resolutor Assignments Section */}
-                    {user?.role === 'RESPONSABLE' && (
+                    {(user?.role === 'RESPONSABLE' || user?.role === 'ADMINISTRADOR' || formData.assignments.length > 0) && (
                     <div className="p-4 bg-indigo-900/10 rounded-xl border border-indigo-700/30 space-y-4">
                         <div className="flex items-center justify-between">
                             <h3 className="text-sm font-semibold text-indigo-300 flex items-center gap-2">
                                 <Users className="h-4 w-4" /> Asignaciones Múltiples (Resolutores)
                             </h3>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setFormData({
-                                        ...formData,
-                                        assignments: [...formData.assignments, { resolutorEmail: '', tipoResolucion: '', detalle: '' }]
-                                    });
-                                }}
-                                className="text-xs flex items-center gap-1 bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded transition-colors"
-                            >
-                                <Plus className="h-3 w-3" /> Agregar
-                            </button>
+                            {!isResolutor && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setFormData({
+                                            ...formData,
+                                            assignments: [...formData.assignments, { resolutorEmail: '', tipoResolucion: '', detalle: '' }]
+                                        });
+                                    }}
+                                    className="text-xs flex items-center gap-1 bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded transition-colors"
+                                >
+                                    <Plus className="h-3 w-3" /> Agregar
+                                </button>
+                            )}
                         </div>
 
                         {formData.assignments.length === 0 ? (
@@ -545,7 +691,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     <div key={index} className="flex flex-col gap-2 p-3 bg-gray-900/60 rounded-lg border border-gray-700 relative group">
                                         <div className="flex items-center gap-2">
                                             <select
-                                                className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"
+                                                className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white disabled:opacity-70"
+                                                disabled={isResolutor}
                                                 value={assignment.tipoResolucion}
                                                 onChange={(e) => {
                                                     const type = e.target.value;
@@ -572,22 +719,25 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                     );
                                                 })}
                                             </select>
-                                            <button 
-                                                type="button"
-                                                onClick={() => {
-                                                    const newAssignments = formData.assignments.filter((_, i) => i !== index);
-                                                    setFormData({ ...formData, assignments: newAssignments });
-                                                }}
-                                                className="text-red-400 hover:text-red-300 p-1"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
+                                            {!isResolutor && (
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newAssignments = formData.assignments.filter((_, i) => i !== index);
+                                                        setFormData({ ...formData, assignments: newAssignments });
+                                                    }}
+                                                    className="text-red-400 hover:text-red-300 p-1"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            )}
                                         </div>
                                         <div className="flex flex-col mt-2">
-                                            {(() => {
-                                                const config = tiposResolucion.find(c => c.tipo === assignment.tipoResolucion);
-                                                if (config && config.atributosConfig && config.atributosConfig.length > 0) {
-                                                    const sortedCampos = [...config.atributosConfig].sort((a,b) => a.orden - b.orden);
+                                                {(() => {
+                                                    const config = tiposResolucion.find(c => c.tipo === assignment.tipoResolucion);
+                                                    const canEditThis = !isResolutor || (assignment.resolutorEmail === user?.email);
+                                                    if (config && config.atributosConfig && config.atributosConfig.length > 0) {
+                                                        const sortedCampos = [...config.atributosConfig].sort((a,b) => a.orden - b.orden);
                                                     const currentData = typeof assignment.detalle === 'object' && assignment.detalle !== null ? assignment.detalle : {};
                                                     return (
                                                         <div className="space-y-4 p-4 bg-gray-800/80 border border-gray-600 rounded-lg shadow-inner">
@@ -606,7 +756,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                                 newAssignments[index].detalle = { ...currentData, [campo.nombre]: e.target.value };
                                                                                 setFormData({ ...formData, assignments: newAssignments });
                                                                             }}
-                                                                            className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                                            className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
+                                                                            disabled={!canEditThis}
                                                                         >
                                                                             <option value="">Seleccionar...</option>
                                                                             {campo.opciones && campo.opciones.split(',').map(opt => (
@@ -622,7 +773,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                                 setFormData({ ...formData, assignments: newAssignments });
                                                                             }}
                                                                             rows="2"
-                                                                            className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none block"
+                                                                            className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none block disabled:opacity-50"
+                                                                            disabled={!canEditThis}
                                                                         />
                                                                     ) : (
                                                                         <input
@@ -647,7 +799,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                         <input 
                                                             type="text"
                                                             placeholder="Detalle de la asignación..."
-                                                            className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-300"
+                                                            className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-300 disabled:opacity-50"
+                                                            disabled={!canEditThis}
                                                             value={typeof assignment.detalle === 'string' ? assignment.detalle : ''}
                                                             onChange={(e) => {
                                                                 const newAssignments = [...formData.assignments];
@@ -671,7 +824,142 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         )}
                     </div>
                     )}
-                </form>
+                        </form>
+                    )}
+
+                    {activeTab === 'comentarios' && formData.id && (
+                        <div className="p-6">
+                            <TicketSeguimiento solicitudId={formData.id} />
+                        </div>
+                    )}
+
+                    {activeTab === 'historial' && formData.id && (
+                        <div className="p-6 space-y-4">
+                            {historial.length === 0 ? (
+                                <div className="text-center py-10 bg-gray-900/30 rounded-2xl border border-gray-700/50">
+                                    <History className="h-10 w-10 text-gray-600 mx-auto mb-3" />
+                                    <p className="text-gray-400 text-sm">No hay registros de asignación para esta solicitud.</p>
+                                </div>
+                            ) : (
+                                historial.map((record) => (
+                                    <div key={record.id} className="bg-gray-900/40 p-4 rounded-2xl border border-gray-700/50 flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`p-2 rounded-lg ${
+                                                record.actionType === 'CREATED' ? 'bg-amber-500/10 text-amber-400' :
+                                                record.actionType === 'ASSIGNED' ? 'bg-emerald-500/10 text-emerald-400' :
+                                                record.actionType === 'REASSIGNED' ? 'bg-indigo-500/10 text-indigo-400' :
+                                                record.actionType.startsWith('RESOLUCIÓN') ? 'bg-blue-500/10 text-blue-400' :
+                                                'bg-red-500/10 text-red-400'
+                                            }`}>
+                                                {record.actionType === 'CREATED' ? <Plus className="h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
+                                                        record.actionType === 'CREATED' ? 'bg-amber-900/30 text-amber-400 border-amber-800' :
+                                                        record.actionType === 'ASSIGNED' ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' :
+                                                        record.actionType === 'REASSIGNED' ? 'bg-indigo-900/30 text-indigo-400 border-indigo-800' :
+                                                        record.actionType.startsWith('RESOLUCIÓN') ? 'bg-blue-900/30 text-blue-400 border-blue-800' :
+                                                        'bg-red-900/30 text-red-400 border-red-800'
+                                                    }`}>
+                                                        {record.actionType === 'CREATED' ? 'Cargado/Creado' :
+                                                         record.actionType === 'ASSIGNED' ? 'Asignado' :
+                                                         record.actionType === 'REASSIGNED' ? 'Re-asignado' : 
+                                                         record.actionType.startsWith('RESOLUCIÓN') ? 'Resolución Aprobada' : 'Desasignado'}
+                                                    </span>
+                                                    <span className="text-xs text-gray-400">
+                                                        {new Date(record.actionDate).toLocaleString()}
+                                                    </span>
+                                                </div>
+                                                <div className="text-sm">
+                                                    {record.actionType === 'CREATED' ? (
+                                                        <span className="text-gray-300">
+                                                            Solicitud registrada inicialmente en el sistema.
+                                                        </span>
+                                                    ) : record.actionType === 'ASSIGNED' ? (
+                                                        <span className="text-gray-300">
+                                                            Asignado al responsable <span className="font-bold text-white">{record.responsable ? record.responsable.name : 'Ninguno'}</span>
+                                                        </span>
+                                                    ) : record.actionType === 'REASSIGNED' ? (
+                                                        <span className="text-gray-300">
+                                                            Re-asignado al responsable <span className="font-bold text-white">{record.responsable ? record.responsable.name : 'Ninguno'}</span>
+                                                        </span>
+                                                    ) : record.actionType === 'UNASSIGNED' ? (
+                                                        <span className="text-gray-300">
+                                                            Se retiró la asignación de responsable (anterior: {record.responsable ? record.responsable.name : 'Desconocido'})
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-300">
+                                                            <span className="font-bold text-white">{record.responsable ? record.responsable.name : 'Usuario'}</span> {record.actionType.toLowerCase().includes('aprobada') ? 'aprobó la resolución.' : ''}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="text-xs text-gray-500 mt-1">
+                                                    {record.actionType === 'CREATED' ? 'Operador: ' : 'Acción realizada por: '}
+                                                    <span className="font-medium text-gray-400">{record.assignedByUsername}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
+                    
+                    {activeTab === 'adjuntos' && formData.id && (
+                        <div className="p-6 space-y-6">
+                            <div 
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                                className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all ${isDragging ? 'border-indigo-500 bg-indigo-500/10' : 'border-gray-600 bg-gray-900/30'}`}
+                            >
+                                <UploadCloud className={`h-12 w-12 mx-auto mb-4 ${isDragging ? 'text-indigo-400' : 'text-gray-500'}`} />
+                                <h3 className="text-lg font-bold text-white mb-2">Subir Documento</h3>
+                                <p className="text-gray-400 text-sm mb-4">Arrastra aquí tu archivo o haz clic para seleccionar</p>
+                                <label className={`bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold cursor-pointer transition-colors inline-block ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                                    {isUploading ? 'Subiendo...' : 'Seleccionar Archivo'}
+                                    <input type="file" className="hidden" disabled={isUploading} onChange={(e) => handleFileUpload(e.target.files[0])} />
+                                </label>
+                            </div>
+
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                    <FileText className="h-4 w-4" /> Archivos Adjuntos ({adjuntos.length})
+                                </h3>
+                                {adjuntos.length === 0 ? (
+                                    <div className="text-center py-8 bg-gray-900/30 rounded-xl border border-gray-700/50">
+                                        <p className="text-gray-500 text-sm">No hay documentos adjuntos aún.</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        {adjuntos.map(adj => (
+                                            <div key={adj.id} className="bg-gray-800 border border-gray-700 p-4 rounded-xl flex items-center justify-between group">
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400 shrink-0">
+                                                        <FileText className="h-6 w-6" />
+                                                    </div>
+                                                    <div className="truncate min-w-0 flex-1">
+                                                        <p className="text-sm font-bold text-white truncate" title={adj.originalFileName}>{adj.originalFileName}</p>
+                                                        <p className="text-xs text-gray-500">{(adj.size / 1024 / 1024).toFixed(2)} MB • {new Date(adj.uploadedAt).toLocaleDateString()}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
+                                                    <button type="button" onClick={() => handleDownload(adj)} className="p-2 text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors" title="Descargar">
+                                                        <Download className="h-4 w-4" />
+                                                    </button>
+                                                    <button type="button" onClick={() => handleDeleteAdjunto(adj.id)} className="p-2 text-red-400 hover:text-white bg-red-900/20 hover:bg-red-600 rounded-lg transition-colors" title="Eliminar">
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
 
                 <div className="p-6 border-t border-gray-700 bg-gray-800/50 flex justify-between items-center gap-3">
                     <div>

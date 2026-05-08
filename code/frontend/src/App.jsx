@@ -91,8 +91,7 @@ function App() {
         {/* Global Version Indicator */}
         <div className="fixed bottom-4 right-4 z-[9999] pointer-events-none opacity-50 px-3 py-1 bg-black/30 backdrop-blur-md rounded-full text-white text-[10px] font-mono tracking-widest flex items-center gap-2">
           <span>SGP</span>
-          <span className="w-1 h-1 rounded-full bg-emerald-500"></span>
-          <span>v0.3.0</span>
+          <span className="text-[10px] font-mono text-gray-500 bg-gray-900/50 px-2 py-1 rounded-full border border-gray-800">v0.8.0</span>
         </div>
       </div>
     </AuthProvider>
