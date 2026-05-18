@@ -36,86 +36,20 @@ public class SolicitudService {
     private final TipoResolucionRepository tipoResolucionRepository;
     private final SolicitudResolutorAssignmentRepository assignmentRepository;
 
-    public List<Solicitud> getAllSolicitudes(String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo) {
-        org.springframework.data.jpa.domain.Specification<Solicitud> spec = org.springframework.data.jpa.domain.Specification
-                .where(null);
-
-        if (status != null && !status.isEmpty()) {
-            spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), status));
-        }
-
-        if (search != null && !search.isEmpty()) {
-            String likePattern = "%" + search.toLowerCase() + "%";
-            spec = spec.and((root, query, cb) -> cb.or(
-                    cb.like(cb.lower(root.get("description")), likePattern),
-                    cb.like(cb.lower(root.get("person").get("name")), likePattern),
-                    cb.like(cb.lower(root.get("id").as(String.class)), likePattern)));
-        }
-
-        if (responsableId != null) {
-            if (responsableId == 0) {
-                spec = spec.and((root, query, cb) -> cb.isNull(root.get("responsable")));
-            } else {
-                spec = spec.and((root, query, cb) -> cb.equal(root.get("responsable").get("id"), responsableId));
-            }
-        }
-
-        if (locationId != null) {
-            spec = spec.and((root, query, cb) -> cb.equal(root.get("location").get("id"), locationId));
-        }
-
-        if (origin != null && !origin.isEmpty()) {
-            spec = spec.and((root, query, cb) -> cb.equal(root.get("origin"), origin));
-        }
-
-        if (dateFrom != null) {
-            spec = spec.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get("entryDate"), dateFrom));
-        }
-
-        if (dateTo != null) {
-            spec = spec.and((root, query, cb) -> cb.lessThanOrEqualTo(root.get("entryDate"), dateTo));
-        }
-
-        // Apply Role Based Filtering
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.isAuthenticated()) {
-            String email = auth.getName();
-            User user = userRepository.findByEmail(email).orElse(null);
-            if (user != null) {
-                if (user.getRole().equals("OPERADOR")) {
-                    spec = spec.and((root, query, cb) -> cb.equal(root.get("createdBy"), user));
-                } else if (user.getRole().equals("RESPONSABLE")) {
-                    spec = spec.and((root, query, cb) -> cb.equal(root.get("responsable"), user));
-                } else if (user.getRole().equals("RESOLUTOR")) {
-                    spec = spec.and((root, query, cb) -> {
-                        query.distinct(true);
-                        jakarta.persistence.criteria.Join<Solicitud, SolicitudResolutorAssignment> assignments = root.join("resolutorAssignments", jakarta.persistence.criteria.JoinType.LEFT);
-                        
-                        jakarta.persistence.criteria.Predicate isLegacyResolutor = cb.and(
-                            cb.equal(root.get("resolutor").get("id"), user.getId()),
-                            cb.notEqual(root.get("status"), "completadas")
-                        );
-                        
-                        jakarta.persistence.criteria.Predicate isAssignedResolutor = cb.equal(assignments.get("resolutor").get("id"), user.getId());
-                        
-                        return cb.or(isLegacyResolutor, isAssignedResolutor);
-                    });
-                }
-            }
-        }
-
-        return solicitudRepository.findAll(spec);
+    public org.springframework.data.domain.Page<Solicitud> getAllSolicitudes(String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, org.springframework.data.domain.Pageable pageable) {
+        org.springframework.data.jpa.domain.Specification<Solicitud> spec = buildSpecification(status, search, responsableId, locationId, origin, dateFrom, dateTo);
+        return solicitudRepository.findAll(spec, pageable);
     }
 
-    public List<Solicitud> getSolicitudesByConfig(Long configId, String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo) {
-        org.springframework.data.jpa.domain.Specification<Solicitud> spec = org.springframework.data.jpa.domain.Specification
+    public org.springframework.data.domain.Page<Solicitud> getSolicitudesByConfig(Long configId, String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, org.springframework.data.domain.Pageable pageable) {
+        org.springframework.data.jpa.domain.Specification<Solicitud> baseSpec = org.springframework.data.jpa.domain.Specification
                 .where((root, query, cb) -> cb.equal(root.get("sheetsConfig").get("id"), configId));
-        
-        return getSolicitudesWithSpec(spec, status, search, responsableId, locationId, origin, dateFrom, dateTo);
+        org.springframework.data.jpa.domain.Specification<Solicitud> spec = baseSpec.and(buildSpecification(status, search, responsableId, locationId, origin, dateFrom, dateTo));
+        return solicitudRepository.findAll(spec, pageable);
     }
 
-    private List<Solicitud> getSolicitudesWithSpec(org.springframework.data.jpa.domain.Specification<Solicitud> baseSpec, String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo) {
-        org.springframework.data.jpa.domain.Specification<Solicitud> spec = baseSpec;
+    private org.springframework.data.jpa.domain.Specification<Solicitud> buildSpecification(String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo) {
+        org.springframework.data.jpa.domain.Specification<Solicitud> spec = org.springframework.data.jpa.domain.Specification.where(null);
 
         if (status != null && !status.isEmpty()) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), status));
@@ -159,26 +93,82 @@ public class SolicitudService {
             String email = auth.getName();
             User user = userRepository.findByEmail(email).orElse(null);
             if (user != null) {
-                if (user.getRole().equals("OPERADOR")) {
-                    spec = spec.and((root, query, cb) -> cb.equal(root.get("createdBy"), user));
-                } else if (user.getRole().equals("RESPONSABLE")) {
-                    spec = spec.and((root, query, cb) -> cb.equal(root.get("responsable"), user));
-                } else if (user.getRole().equals("RESOLUTOR")) {
+                String userRole = user.getRole();
+                // Si es ADMIN, tiene acceso completo a todas las solicitudes sin filtrado
+                if (userRole != null && !userRole.contains("ADMIN")) {
                     spec = spec.and((root, query, cb) -> {
                         query.distinct(true);
                         jakarta.persistence.criteria.Join<Solicitud, SolicitudResolutorAssignment> assignments = root.join("resolutorAssignments", jakarta.persistence.criteria.JoinType.LEFT);
-                        jakarta.persistence.criteria.Predicate isLegacyResolutor = cb.and(
-                            cb.equal(root.get("resolutor").get("id"), user.getId()),
-                            cb.notEqual(root.get("status"), "completadas")
-                        );
-                        jakarta.persistence.criteria.Predicate isAssignedResolutor = cb.equal(assignments.get("resolutor").get("id"), user.getId());
-                        return cb.or(isLegacyResolutor, isAssignedResolutor);
+                        
+                        List<jakarta.persistence.criteria.Predicate> orPredicates = new java.util.ArrayList<>();
+                        
+                        if (userRole.contains("OPERADOR")) {
+                            orPredicates.add(cb.equal(root.get("createdBy"), user));
+                        }
+                        if (userRole.contains("DISTRIBUIDOR")) {
+                            // El distribuidor solo ve solicitudes sin responsable asignado
+                            orPredicates.add(cb.isNull(root.get("responsable")));
+                        }
+                        if (userRole.contains("RESPONSABLE")) {
+                            orPredicates.add(cb.equal(root.get("responsable"), user));
+                        }
+                        if (userRole.contains("RESOLUTOR")) {
+                            jakarta.persistence.criteria.Predicate isLegacyResolutor = cb.and(
+                                cb.equal(root.get("resolutor").get("id"), user.getId()),
+                                cb.notEqual(root.get("status"), "completadas")
+                            );
+                            jakarta.persistence.criteria.Predicate isAssignedResolutor = cb.equal(assignments.get("resolutor").get("id"), user.getId());
+                            
+                            orPredicates.add(cb.or(isLegacyResolutor, isAssignedResolutor));
+                        }
+                        
+                        if (orPredicates.isEmpty()) {
+                            return cb.disjunction();
+                        }
+                        
+                        return cb.or(orPredicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
                     });
                 }
             }
         }
 
-        return solicitudRepository.findAll(spec);
+        return spec;
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void bulkAssign(List<Long> ids, Long responsableId) {
+        User responsable = null;
+        if (responsableId != null && responsableId > 0) {
+            responsable = userRepository.findById(responsableId)
+                    .orElseThrow(() -> new RuntimeException("Responsable no encontrado"));
+        }
+        
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        User asignador = null;
+        if (auth != null && auth.isAuthenticated() && !auth.getName().equals("anonymousUser")) {
+            asignador = userRepository.findByEmail(auth.getName()).orElse(null);
+        }
+
+        for (Long id : ids) {
+            Solicitud solicitud = solicitudRepository.findById(id).orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
+            solicitud.setResponsable(responsable);
+            solicitudRepository.save(solicitud);
+
+            AsignacionHistorial historial = new AsignacionHistorial();
+            historial.setSolicitud(solicitud);
+            historial.setResponsable(responsable);
+            historial.setActionDate(java.time.LocalDateTime.now());
+            historial.setAssignedByUsername(asignador != null ? asignador.getEmail() : "Sistema");
+            historial.setActionType(responsable == null ? "UNASSIGNED" : "ASSIGNED");
+            asignacionHistorialRepository.save(historial);
+        }
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void bulkDelete(List<Long> ids) {
+        for (Long id : ids) {
+            solicitudRepository.deleteById(id);
+        }
     }
 
     @org.springframework.transaction.annotation.Transactional

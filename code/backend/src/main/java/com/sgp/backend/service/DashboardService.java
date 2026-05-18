@@ -36,34 +36,42 @@ public class DashboardService {
             String email = auth.getName();
             User user = userRepository.findByEmail(email).orElse(null);
             if (user != null) {
-                if (user.getRole().equals("OPERADOR")) {
-                    spec = spec.and((root, query, cb) -> cb.equal(root.get("createdBy"), user));
-                } else if (user.getRole().equals("RESPONSABLE")) {
-                    final String zoneStr = user.getZone();
-                    final User responsableCriteria = user;
-                    spec = spec.and((root, query, cb) -> {
+                spec = spec.and((root, query, cb) -> {
+                    List<jakarta.persistence.criteria.Predicate> orPredicates = new java.util.ArrayList<>();
+                    String userRole = user.getRole();
+                    
+                    if (userRole.contains("OPERADOR")) {
+                        orPredicates.add(cb.equal(root.get("createdBy"), user));
+                    }
+                    if (userRole.contains("RESPONSABLE")) {
+                        final String zoneStr = user.getZone();
                         jakarta.persistence.criteria.Predicate zonePredicate = cb.disjunction();
                         if (zoneStr != null && !zoneStr.trim().isEmpty()) {
                             zonePredicate = cb.equal(
                                     cb.lower(cb.trim(root.get("zone"))),
                                     zoneStr.trim().toLowerCase());
                         }
-                        jakarta.persistence.criteria.Predicate respPredicate = cb.equal(root.get("responsable"), responsableCriteria);
-                        return cb.or(zonePredicate, respPredicate);
-                    });
-                } else if (user.getRole().equals("RESOLUTOR")) {
-                    spec = spec.and((root, query, cb) -> {
+                        jakarta.persistence.criteria.Predicate respPredicate = cb.equal(root.get("responsable"), user);
+                        orPredicates.add(cb.or(zonePredicate, respPredicate));
+                    }
+                    if (userRole.contains("RESOLUTOR")) {
                         Subquery<Long> subquery = query.subquery(Long.class);
                         Root<SolicitudResolutorAssignment> assignmentRoot = subquery.from(SolicitudResolutorAssignment.class);
                         subquery.select(assignmentRoot.get("solicitud").get("id"))
                                 .where(cb.equal(assignmentRoot.get("resolutor"), user));
                         
-                        return cb.or(
+                        orPredicates.add(cb.or(
                             cb.equal(root.get("resolutor"), user),
                             cb.in(root.get("id")).value(subquery)
-                        );
-                    });
-                }
+                        ));
+                    }
+                    
+                    if (orPredicates.isEmpty()) {
+                        return cb.disjunction();
+                    }
+                    
+                    return cb.or(orPredicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+                });
             }
         }
 

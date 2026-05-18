@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.sgp.backend.dto.SolicitudUpdateDTO;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.util.List;
 
@@ -18,33 +19,70 @@ public class SolicitudController {
     private final com.sgp.backend.repository.AsignacionHistorialRepository asignacionHistorialRepository;
 
     @GetMapping
-    public List<Solicitud> getAllSolicitudes(
+    public ResponseEntity<org.springframework.data.domain.Page<Solicitud>> getAllSolicitudes(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long responsableId,
             @RequestParam(required = false) Long locationId,
             @RequestParam(required = false) String origin,
-            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
-            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate dateTo) {
-        return solicitudService.getAllSolicitudes(status, search, responsableId, locationId, origin, dateFrom, dateTo);
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateTo,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "id,desc") String sort) {
+        
+        String[] sortParams = sort.split(",");
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size, org.springframework.data.domain.Sort.by(
+                sortParams.length > 1 && sortParams[1].equalsIgnoreCase("asc") ? org.springframework.data.domain.Sort.Direction.ASC : org.springframework.data.domain.Sort.Direction.DESC,
+                sortParams[0]
+        ));
+        
+        return ResponseEntity.ok(solicitudService.getAllSolicitudes(status, search, responsableId, locationId, origin, dateFrom, dateTo, pageable));
     }
 
     @GetMapping("/config/{configId}")
-    public List<Solicitud> getSolicitudesByConfig(
+    public ResponseEntity<org.springframework.data.domain.Page<Solicitud>> getSolicitudesByConfig(
             @PathVariable Long configId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long responsableId,
             @RequestParam(required = false) Long locationId,
             @RequestParam(required = false) String origin,
-            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
-            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate dateTo) {
-        return solicitudService.getSolicitudesByConfig(configId, status, search, responsableId, locationId, origin, dateFrom, dateTo);
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateTo,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "id,desc") String sort) {
+        
+        String[] sortParams = sort.split(",");
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size, org.springframework.data.domain.Sort.by(
+                sortParams.length > 1 && sortParams[1].equalsIgnoreCase("asc") ? org.springframework.data.domain.Sort.Direction.ASC : org.springframework.data.domain.Sort.Direction.DESC,
+                sortParams[0]
+        ));
+        
+        return ResponseEntity.ok(solicitudService.getSolicitudesByConfig(configId, status, search, responsableId, locationId, origin, dateFrom, dateTo, pageable));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Solicitud> getSolicitudById(@PathVariable Long id) {
         return ResponseEntity.ok(solicitudService.getSolicitudById(id));
+    }
+
+    @PostMapping("/bulk-assign")
+    public ResponseEntity<Void> bulkAssign(@RequestBody java.util.Map<String, Object> payload) {
+        List<Number> idsParam = (List<Number>) payload.get("ids");
+        List<Long> ids = idsParam.stream().map(Number::longValue).collect(java.util.stream.Collectors.toList());
+        Long responsableId = ((Number) payload.get("responsableId")).longValue();
+        solicitudService.bulkAssign(ids, responsableId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/bulk-delete")
+    public ResponseEntity<Void> bulkDelete(@RequestBody java.util.Map<String, Object> payload) {
+        List<Number> idsParam = (List<Number>) payload.get("ids");
+        List<Long> ids = idsParam.stream().map(Number::longValue).collect(java.util.stream.Collectors.toList());
+        solicitudService.bulkDelete(ids);
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping

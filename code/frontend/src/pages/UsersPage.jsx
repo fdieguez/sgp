@@ -21,7 +21,7 @@ export default function UsersPage({ isEmbedded = false }) {
     const [editingUser, setEditingUser] = useState(null);
     const [userFormData, setUserFormData] = useState({ 
         email: '', password: '', role: 'OPERADOR', 
-        firstName: '', lastName: '', phone: '', zone: '' 
+        firstName: '', lastName: '', phone: '', zone: '', dni: '' 
     });
 
     useEffect(() => {
@@ -51,7 +51,7 @@ export default function UsersPage({ isEmbedded = false }) {
                 await api.post('/api/users', userFormData);
             }
             setShowUserModal(false);
-            setUserFormData({ email: '', password: '', role: 'OPERADOR', firstName: '', lastName: '', phone: '', zone: '' });
+            setUserFormData({ email: '', password: '', role: 'OPERADOR', firstName: '', lastName: '', phone: '', zone: '', dni: '' });
             setEditingUser(null);
             fetchAll();
         } catch (err) {
@@ -78,7 +78,8 @@ export default function UsersPage({ isEmbedded = false }) {
             firstName: user.firstName || '',
             lastName: user.lastName || '',
             phone: user.phone || '',
-            zone: user.zone || ''
+            zone: user.zone || '',
+            dni: user.dni || ''
         });
         setShowUserModal(true);
     };
@@ -208,26 +209,53 @@ export default function UsersPage({ isEmbedded = false }) {
                                 <input type="password" required={!editingUser} onChange={(e) => setUserFormData({ ...userFormData, password: e.target.value })} placeholder={editingUser ? 'Dejar vacío para no cambiar' : ''} className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Rol del Sistema</label>
-                                <select value={userFormData.role} onChange={(e) => setUserFormData({ ...userFormData, role: e.target.value })} className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                                    <option value="OPERADOR">Operador (Mesa de Entrada)</option>
-                                    <option value="DISTRIBUIDOR">Distribuidor</option>
-                                    <option value="RESPONSABLE">Responsable Territorial</option>
-                                    <option value="RESOLUTOR">Resolutor (Especialista)</option>
-                                    <option value="ADMINISTRADOR">Administrador Maestro</option>
-                                </select>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Roles del Sistema</label>
+                                <div className="grid grid-cols-2 gap-2 bg-gray-900 p-3 rounded-xl border border-gray-600">
+                                    {[
+                                        { val: 'OPERADOR', lbl: 'Operador' },
+                                        { val: 'DISTRIBUIDOR', lbl: 'Distribuidor' },
+                                        { val: 'RESPONSABLE', lbl: 'Responsable' },
+                                        { val: 'RESOLUTOR', lbl: 'Resolutor' },
+                                        { val: 'ADMINISTRADOR', lbl: 'Administrador' }
+                                    ].map(r => (
+                                        <label key={r.val} className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={userFormData.role.includes(r.val)}
+                                                onChange={(e) => {
+                                                    const checked = e.target.checked;
+                                                    const currentRoles = userFormData.role.split(',').filter(Boolean);
+                                                    let newRoles;
+                                                    if (checked) {
+                                                        newRoles = [...currentRoles, r.val];
+                                                    } else {
+                                                        newRoles = currentRoles.filter(x => x !== r.val);
+                                                    }
+                                                    setUserFormData({ ...userFormData, role: newRoles.join(',') });
+                                                }}
+                                                className="rounded border-gray-600 text-indigo-600 focus:ring-indigo-500 bg-gray-800"
+                                            />
+                                            <span className="text-sm text-gray-300">{r.lbl}</span>
+                                        </label>
+                                    ))}
+                                </div>
                             </div>
 
-                            {userFormData.role === 'RESPONSABLE' && (
-                                <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
-                                    <div>
-                                        <label className="block text-xs font-bold text-emerald-500 uppercase mb-1">Zona Territorial</label>
-                                        <input type="text" placeholder="Ej: Norte, Sur..." required value={userFormData.zone} onChange={(e) => setUserFormData({ ...userFormData, zone: e.target.value })} className="w-full px-4 py-2 bg-gray-900 border border-emerald-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-emerald-500 uppercase mb-1">Teléfono</label>
-                                        <input type="tel" placeholder="+54 342..." value={userFormData.phone} onChange={(e) => setUserFormData({ ...userFormData, phone: e.target.value })} className="w-full px-4 py-2 bg-gray-900 border border-emerald-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                                    </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">DNI (Opcional)</label>
+                                    <input type="text" value={userFormData.dni || ''} onChange={(e) => setUserFormData({ ...userFormData, dni: e.target.value })} className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Teléfono (Obligatorio)</label>
+                                    <input type="tel" required value={userFormData.phone} onChange={(e) => setUserFormData({ ...userFormData, phone: e.target.value })} className="w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                                </div>
+                            </div>
+
+                            {userFormData.role.includes('RESPONSABLE') && (
+                                <div className="animate-in fade-in slide-in-from-top-2">
+                                    <label className="block text-xs font-bold text-emerald-500 uppercase mb-1">Zona Territorial</label>
+                                    <input type="text" placeholder="Ej: Norte, Sur..." required value={userFormData.zone} onChange={(e) => setUserFormData({ ...userFormData, zone: e.target.value })} className="w-full px-4 py-2 bg-gray-900 border border-emerald-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                                 </div>
                             )}
 

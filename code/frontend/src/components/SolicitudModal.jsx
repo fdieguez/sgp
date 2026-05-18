@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar, Users, Plus, Trash2, History, FileText, UploadCloud, Download, ArrowRight, MessageSquare } from 'lucide-react';
 import api from '../config/axios';
 import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 import TicketSeguimiento from './TicketSeguimiento';
 
 export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData, configId }) {
@@ -96,9 +97,10 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             fetchAdjuntos();
+            toast.success("Archivo subido con éxito");
         } catch (err) {
-            console.error("Upload failed", err);
-            alert("Error al subir archivo");
+            console.error("Error subiendo archivo", err);
+            toast.error("Error al subir archivo");
         } finally {
             setIsUploading(false);
         }
@@ -115,18 +117,19 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             link.remove();
             setTimeout(() => window.URL.revokeObjectURL(url), 100);
         } catch (err) {
-            console.error("Download fail", err);
-            alert("Error al descargar");
+            console.error("Error descargando archivo", err);
+            toast.error("Error al descargar");
         }
     };
-    const handleDeleteAdjunto = async (id) => {
+    const handleDeleteAdjunto = async (adjuntoId) => {
         if(!window.confirm("¿Seguro que deseas eliminar este archivo?")) return;
         try {
-            await api.delete(`/api/solicitudes/adjuntos/${id}`);
+            await api.delete(`/api/solicitudes/${formData.id}/adjuntos/${adjuntoId}`);
+            toast.success("Archivo eliminado");
             fetchAdjuntos();
         } catch (err) {
-            console.error("Delete fail", err);
-            alert("Error al eliminar el archivo");
+            console.error("Error eliminando archivo", err);
+            toast.error("Error al eliminar el archivo");
         }
     };
 
@@ -284,9 +287,11 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     // Campos de Subsidio
                     amount: formData.amount ? Number(formData.amount) : null,
                     grantDate: formData.grantDate || null,
-                    assignments
+                    assignments,
+                    status: formData.status
                 };
                 await api.put(`/api/solicitudes/${formData.id}`, updatePayload);
+                await api.put(`/api/solicitudes/${formData.id}/status`, formData.status, { headers: { 'Content-Type': 'text/plain' } });
             } else {
                 // POST mantiene el formato original con polimorfismo (entidad completa)
                 const createPayload = {
@@ -296,11 +301,12 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 };
                 await api.post('/api/solicitudes', createPayload);
             }
+            toast.success(formData.id ? "Solicitud actualizada" : "Solicitud creada");
             onSuccess();
             onClose();
         } catch (err) {
             console.error("Error saving solicitud", err);
-            alert("Error al guardar la solicitud");
+            toast.error("Error al guardar la solicitud");
         } finally {
             setLoading(false);
         }
@@ -310,11 +316,12 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         setLoading(true);
         try {
             await api.post(`/api/solicitudes/${formData.id}/aprobar`, { observaciones: approveObservations });
+            toast.success("Resolución aprobada");
             onSuccess();
             onClose();
         } catch (err) {
             console.error("Error approving assignment", err);
-            alert("Error al finalizar la resolución");
+            toast.error("Error al finalizar la resolución");
         } finally {
             setLoading(false);
             setShowApproveConfirm(false);

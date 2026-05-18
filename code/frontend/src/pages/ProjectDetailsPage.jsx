@@ -23,7 +23,8 @@ import {
     Trash2,
     Eye,
     Check,
-    Settings
+    Settings,
+    Download
 } from 'lucide-react';
 import {
     BarChart,
@@ -38,6 +39,7 @@ import {
 
 import SolicitudModal from '../components/SolicitudModal';
 import Navbar from '../components/Navbar';
+import toast from 'react-hot-toast';
 
 // --- Helpers ---
 const parseLocalDate = (dateStr) => {
@@ -83,11 +85,13 @@ export default function ProjectDetailsPage() {
     // Modal States
     const [isABMOpen, setIsABMOpen] = useState(false);
     const [selectedSolicitud, setSelectedSolicitud] = useState(null);
+    const [selectedRows, setSelectedRows] = useState([]);
 
     // UI States
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const [sortConfig, setSortConfig] = useState({ key: 'entryDate', direction: 'desc' });
+    const [totalPages, setTotalPages] = useState(1);
+    const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
     const [visColumn, setVisColumn] = useState('status'); // Default chart by status
     const [filters, setFilters] = useState({});
     const [showFilters, setShowFilters] = useState(false);
@@ -121,7 +125,7 @@ export default function ProjectDetailsPage() {
     useEffect(() => {
         fetchData();
         if (configId && (user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN')) fetchConfig();
-    }, [configId, user?.id, user?.role, filters, searchTerm]);
+    }, [configId, user?.id, user?.role, filters, searchTerm, currentPage, sortConfig, rowsPerPage]);
 
     const fetchConfig = async () => {
         try {
@@ -140,7 +144,10 @@ export default function ProjectDetailsPage() {
                 search: searchTerm || null,
                 origin: filters.origin || null,
                 responsableId: filters.responsableId || null,
-                locationId: filters.locationId || null
+                locationId: filters.locationId || null,
+                page: currentPage - 1, // API es 0-indexed
+                size: rowsPerPage,
+                sort: `${sortConfig.key},${sortConfig.direction}`
             };
 
             // Date Range Logic for Server
@@ -168,7 +175,8 @@ export default function ProjectDetailsPage() {
 
             const endpoint = configId ? `/api/solicitudes/config/${configId}` : `/api/solicitudes`;
             const response = await api.get(endpoint, { params });
-            setSolicitudes(response.data);
+            setSolicitudes(response.data.content);
+            setTotalPages(response.data.totalPages);
         } catch (err) {
             console.error(err);
             setError("Error cargando las solicitudes.");
@@ -181,10 +189,11 @@ export default function ProjectDetailsPage() {
         if (!window.confirm("¿Seguro que deseas eliminar esta solicitud?")) return;
         try {
             await api.delete(`/api/solicitudes/${id}`);
+            toast.success("Solicitud eliminada con éxito");
             fetchData();
         } catch (err) {
             console.error(err);
-            alert("Error al eliminar la solicitud.");
+            toast.error("Error al eliminar la solicitud.");
         }
     };
 
@@ -192,10 +201,107 @@ export default function ProjectDetailsPage() {
         if (!window.confirm("¿Confirmas la aprobación de esta solicitud?")) return;
         try {
             await api.post(`/api/solicitudes/${solicitudId}/aprobar`, { observaciones: "Aprobación rápida desde grilla" });
+            toast.success("Solicitud aprobada");
             fetchData();
         } catch (err) {
             console.error("Error approving assignment", err);
-            alert("Error al aprobar la solicitud");
+            toast.error("Error al aprobar la solicitud");
+        }
+    };
+
+    const handleSelectAll = (e) => {
+        if (e.target.checked) {
+            setSelectedRows(processedData.rows.map(s => s.id));
+        } else {
+            setSelectedRows([]);
+        }
+    };
+
+    const handleSelectRow = (id) => {
+        setSelectedRows(prev => prev.includes(id) ? prev.filter(r => r !== id) : [...prev, id]);
+    };
+
+    const handleBulkAssign = async (responsableId) => {
+        if (!window.confirm(`¿Asignar ${selectedRows.length} solicitudes al responsable seleccionado?`)) return;
+        try {
+            await api.post(`/api/solicitudes/bulk-assign`, { ids: selectedRows, responsableId: Number(responsableId) });
+            toast.success("Asignación masiva exitosa");
+            setSelectedRows([]);
+            fetchData();
+        } catch (err) {
+            console.error(err);
+            toast.error("Error en asignación masiva");
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (!window.confirm(`¿Seguro que deseas eliminar ${selectedRows.length} solicitudes? Esta acción no se puede deshacer.`)) return;
+        try {
+            await api.post(`/api/solicitudes/bulk-delete`, { ids: selectedRows });
+            toast.success("Eliminación masiva exitosa");
+            setSelectedRows([]);
+            fetchData();
+        } catch (err) {
+            console.error(err);
+            toast.error("Error al eliminar solicitudes");
+        }
+    };
+
+    const handleExportCSV = async () => {
+        try {
+            const params = {
+                status: filters.status || null,
+                search: searchTerm || null,
+                origin: filters.origin || null,
+                responsableId: filters.responsableId || null,
+                locationId: filters.locationId || null,
+                page: 0,
+                size: 10000,
+                sort: `${sortConfig.key},${sortConfig.direction}`
+            };
+
+            const endpoint = configId ? `/api/solicitudes/config/${configId}` : `/api/solicitudes`;
+            const response = await api.get(endpoint, { params });
+            const dataToExport = response.data.content;
+            
+            if (!dataToExport.length) {
+                toast.error("No hay datos para exportar");
+                return;
+            }
+
+            const headers = ["ID", "Fecha", "Origen", "Beneficiario", "Localidad", "Barrio", "Estado", "Responsable", "Monto"];
+            const csvRows = [headers.join(",")];
+
+            dataToExport.forEach(s => {
+                const localidad = s.location?.type === 'NEIGHBORHOOD' ? (s.location?.parent?.name || '') : (s.location?.name || '');
+                const barrio = s.location?.type === 'NEIGHBORHOOD' ? s.location?.name : '';
+                const row = [
+                    s.id,
+                    s.entryDate,
+                    s.origin,
+                    `"${s.person?.name || ''}"`,
+                    `"${localidad}"`,
+                    `"${barrio}"`,
+                    s.status,
+                    `"${s.responsable?.name || ''}"`,
+                    s.amount || 0
+                ];
+                csvRows.push(row.join(","));
+            });
+
+            const csvString = csvRows.join("\n");
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.setAttribute("download", `exportacion_solicitudes_${new Date().getTime()}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast.success("Exportación exitosa");
+        } catch (err) {
+            console.error("Error exporting", err);
+            toast.error("Error al exportar los datos");
         }
     };
 
@@ -203,48 +309,9 @@ export default function ProjectDetailsPage() {
     const processedData = useMemo(() => {
         let result = [...solicitudes];
 
-        // 1. Search
-        if (searchTerm) {
-            const term = searchTerm.toLowerCase();
-            result = result.filter(s =>
-                s.id?.toString().includes(term) ||
-                s.description?.toLowerCase().includes(term) ||
-                s.person?.name?.toLowerCase().includes(term) ||
-                s.location?.name?.toLowerCase().includes(term)
-            );
-        }
-
-        // 2. Filters (Solo filtros locales adicionales si los hubiera, 
-        // pero la mayoría ya vienen del servidor. Dejamos el search por si acaso 
-        // para filtrado instantáneo sobre lo ya cargado).
-        // NOTA: El grueso del filtrado ahora ocurre en fetchData (API).
-
-        // Unique Values for Filters
-        const uniqueResponsables = [...new Set(solicitudes.map(s => s.responsable?.name).filter(Boolean))].sort();
-        const uniqueOrigins = [...new Set(solicitudes.map(s => s.origin).filter(Boolean))].sort();
-        const uniqueLocations = [...new Set(solicitudes.map(s => s.location?.name).filter(Boolean))].sort();
-
-        // 3. Sort
-        if (sortConfig.key) {
-            result.sort((a, b) => {
-                let valA = a[sortConfig.key];
-                let valB = b[sortConfig.key];
-
-                // Nested fields
-                if (sortConfig.key === 'person') valA = a.person?.name;
-                if (sortConfig.key === 'person') valB = b.person?.name;
-                if (sortConfig.key === 'location') valA = a.location?.name;
-                if (sortConfig.key === 'location') valB = b.location?.name;
-
-                if (!valA) return 1;
-                if (!valB) return -1;
-
-                if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-                if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-                return 0;
-            });
-        }
-
+        // 1. Ya no se filtra por search local si se hace por servidor, pero lo dejamos por si acaso
+        // 2. Sort ya no se hace localmente
+        
         // 4. Chart Data with Percentages
         const total = result.length;
         const counts = {};
@@ -277,21 +344,19 @@ export default function ProjectDetailsPage() {
             totalSubsidios: solicitudes.reduce((acc, s) => s.status?.trim().toLowerCase() === 'completadas' ? acc + (s.amount || 0) : acc, 0)
         };
 
-        return { rows: result, chartData, uniqueResponsables, uniqueOrigins, uniqueLocations, stats };
-    }, [solicitudes, searchTerm, filters, sortConfig, visColumn]);
+        return { rows: result, chartData, uniqueResponsables: [], uniqueOrigins: [], uniqueLocations: [], stats };
+    }, [solicitudes, visColumn]);
 
-    // Pagination
-    const totalPages = Math.ceil(processedData.rows.length / rowsPerPage);
-    const currentRows = processedData.rows.slice(
-        (currentPage - 1) * rowsPerPage,
-        currentPage * rowsPerPage
-    );
+    // Pagination is handled by server now
+    const currentRows = processedData.rows;
 
     const handleSort = (key) => {
         setSortConfig(prev => ({
             key,
             direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
         }));
+        // Reiniciar página a 1 cuando se ordena
+        setCurrentPage(1);
     };
 
     const handleOpenABM = (solicitud = null) => {
@@ -320,8 +385,14 @@ export default function ProjectDetailsPage() {
                         Inicio
                     </Link>
                     <div className="flex gap-3">
-                        <button
-                            onClick={() => setShowFilters(!showFilters)}
+                            <button
+                                onClick={handleExportCSV}
+                                className="px-4 py-2 bg-green-600 hover:bg-green-500 border border-green-500 rounded-xl text-white font-bold flex items-center gap-2 transition-all text-sm shadow-lg shadow-green-900/20"
+                            >
+                                <Download className="h-4 w-4" /> Exportar CSV
+                            </button>
+                            <button
+                                onClick={() => setShowFilters(!showFilters)}
                             className={`p-2 rounded-xl border transition-all ${showFilters ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'}`}
                         >
                             <Filter className="h-5 w-5" />
@@ -421,7 +492,9 @@ export default function ProjectDetailsPage() {
                                     onChange={(e) => setFilters(prev => ({ ...prev, origin: e.target.value }))}
                                 >
                                     <option value="">Todos</option>
-                                    {processedData.uniqueOrigins.map(o => <option key={o} value={o}>{o}</option>)}
+                                    <option value="MANUAL">MANUAL</option>
+                                    <option value="SINCRO">SINCRO</option>
+                                    <option value="WEB">WEB</option>
                                 </select>
                             </div>
                             <div>
@@ -560,11 +633,43 @@ export default function ProjectDetailsPage() {
                 </div>
 
                 {/* Main Table Section */}
-                <div className="bg-gray-800/50 rounded-[2rem] border border-gray-700/50 overflow-hidden shadow-2xl backdrop-blur-xl">
+                <div className="bg-gray-800/50 rounded-[2rem] border border-gray-700/50 overflow-hidden shadow-2xl backdrop-blur-xl relative">
+                    {/* Floating Action Bar */}
+                    {selectedRows.length > 0 && (
+                        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-indigo-600 border border-indigo-500 p-2 px-4 rounded-full shadow-2xl z-[50] flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300">
+                            <span className="text-white font-bold text-xs">{selectedRows.length} seleccionadas</span>
+                            <div className="h-4 w-px bg-indigo-400"></div>
+                            <select 
+                                className="bg-indigo-700 border-none text-xs rounded-full px-3 py-1 text-white outline-none cursor-pointer hover:bg-indigo-800 transition-colors"
+                                onChange={(e) => {
+                                    handleBulkAssign(e.target.value);
+                                    e.target.value = "";
+                                }}
+                                defaultValue=""
+                            >
+                                <option value="" disabled>Asignar Responsable...</option>
+                                <option value="0">(Quitar Asignación)</option>
+                                {responsablesList.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                            </select>
+                            {user?.role === 'ADMINISTRADOR' && (
+                                <button onClick={handleBulkDelete} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold transition-colors shadow-sm">
+                                    Eliminar
+                                </button>
+                            )}
+                        </div>
+                    )}
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="bg-gray-900/80 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                    <th className="p-3 w-10 text-center">
+                                        <input 
+                                            type="checkbox" 
+                                            className="rounded border-gray-600 text-indigo-500 focus:ring-indigo-500 bg-gray-800"
+                                            onChange={handleSelectAll}
+                                            checked={currentRows.length > 0 && selectedRows.length === currentRows.length}
+                                        />
+                                    </th>
                                     <th className="p-3">N° Orden</th>
                                     <th onClick={() => handleSort('entryDate')} className="p-3 cursor-pointer hover:text-white transition-colors">
                                         Fecha {sortConfig.key === 'entryDate' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
@@ -630,7 +735,15 @@ export default function ProjectDetailsPage() {
                                     }
 
                                     return (
-                                        <tr key={s.id} className="group hover:bg-gray-700/20 transition-all text-xs border-b border-gray-800">
+                                        <tr key={s.id} className={`group transition-all text-xs border-b border-gray-800 ${selectedRows.includes(s.id) ? 'bg-indigo-900/20' : 'hover:bg-gray-700/20'}`}>
+                                            <td className="p-3 text-center">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="rounded border-gray-600 text-indigo-500 focus:ring-indigo-500 bg-gray-800"
+                                                    checked={selectedRows.includes(s.id)}
+                                                    onChange={() => handleSelectRow(s.id)}
+                                                />
+                                            </td>
                                             <td className="p-3 font-mono text-gray-500">#{s.id}</td>
                                             <td className="p-3 text-gray-300 whitespace-nowrap">
                                                 {entryDate ? entryDate.toLocaleDateString() : '-'}

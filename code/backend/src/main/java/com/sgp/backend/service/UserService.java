@@ -24,9 +24,13 @@ public class UserService {
         return userRepository.findById(id);
     }
 
-    public User createUser(String email, String password, String role, String firstName, String lastName, String phone, String zone) {
+    public User createUser(String email, String password, String role, String firstName, String lastName, String phone, String zone, String dni) {
         if (userRepository.findByEmail(email).isPresent()) {
             throw new IllegalArgumentException("Email already exists");
+        }
+
+        if (phone == null || phone.trim().isEmpty()) {
+            throw new IllegalArgumentException("El teléfono es obligatorio");
         }
 
         User user = new User();
@@ -37,11 +41,12 @@ public class UserService {
         user.setLastName(lastName != null ? lastName : "");
         user.setPhone(phone);
         user.setZone(zone);
+        user.setDni(dni);
 
         return userRepository.save(user);
     }
 
-    public User updateUser(Long id, String email, String password, String role, String firstName, String lastName, String phone, String zone) {
+    public User updateUser(Long id, String email, String password, String role, String firstName, String lastName, String phone, String zone, String dni) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
@@ -62,8 +67,14 @@ public class UserService {
 
         if (firstName != null) user.setFirstName(firstName);
         if (lastName != null) user.setLastName(lastName);
-        if (phone != null) user.setPhone(phone);
+        if (phone != null) {
+            if (phone.trim().isEmpty()) {
+                throw new IllegalArgumentException("El teléfono es obligatorio");
+            }
+            user.setPhone(phone);
+        }
         if (zone != null) user.setZone(zone);
+        if (dni != null) user.setDni(dni);
 
         return userRepository.save(user);
     }

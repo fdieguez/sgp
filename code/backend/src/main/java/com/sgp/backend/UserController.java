@@ -68,12 +68,13 @@ public class UserController {
             String lastName = request.get("lastName");
             String phone = request.get("phone");
             String zone = request.get("zone");
+            String dni = request.get("dni");
 
             if (email == null || password == null) {
                 return ResponseEntity.badRequest().body("Email and password are required");
             }
 
-            User user = userService.createUser(email, password, role, firstName, lastName, phone, zone);
+            User user = userService.createUser(email, password, role, firstName, lastName, phone, zone, dni);
             user.setPassword(null); // Don't return password
             return ResponseEntity.ok(user);
         } catch (IllegalArgumentException e) {
@@ -92,8 +93,9 @@ public class UserController {
             String lastName = request.get("lastName");
             String phone = request.get("phone");
             String zone = request.get("zone");
+            String dni = request.get("dni");
 
-            User user = userService.updateUser(id, email, password, role, firstName, lastName, phone, zone);
+            User user = userService.updateUser(id, email, password, role, firstName, lastName, phone, zone, dni);
             user.setPassword(null);
             return ResponseEntity.ok(user);
         } catch (IllegalArgumentException e) {

@@ -109,7 +109,7 @@ test.describe('Validación E2E SGP: Flujo Maestro Consolidado', () => {
 
     const fila = page.locator('tr').filter({ hasText: solicitudDesc }).first();
     await expect(fila).toBeVisible({ timeout: 10000 });
-    await fila.locator('button[title="Editar"]').click();
+    await fila.locator('button[title="Ver / Editar Detalles"]').click();
 
     // Asignar Responsable (el que creamos)
     await page.locator('label:has-text("Responsable") + select').selectOption({ label: userResponsable.fullName });
@@ -130,7 +130,7 @@ test.describe('Validación E2E SGP: Flujo Maestro Consolidado', () => {
     await page.waitForTimeout(2000);
 
     // Verificación de persistencia (Cerrar y abrir de nuevo)
-    await fila.locator('button[title="Editar"]').click();
+    await fila.locator('button[title="Ver / Editar Detalles"]').click();
     await expect(page.locator('div.p-4.bg-indigo-900\\/10 select').first()).toHaveValue(resolutionTypeName);
     await page.click('button[title="Cerrar"]');
 
@@ -149,7 +149,7 @@ test.describe('Validación E2E SGP: Flujo Maestro Consolidado', () => {
     
     const filaResolutor = page.locator('tr').filter({ hasText: solicitudDesc }).first();
     await expect(filaResolutor).toBeVisible({ timeout: 15000 });
-    await filaResolutor.locator('button[title="Ver Detalle"]').click();
+    await filaResolutor.locator('button[title="Ver / Editar Detalles"]').click();
 
     // 3.3 APROBAR RESOLUCIÓN
     // Verificar que ve su asignación (el select debe tener el valor correcto aunque esté deshabilitado)
@@ -163,8 +163,6 @@ test.describe('Validación E2E SGP: Flujo Maestro Consolidado', () => {
     await page.click('button:has-text("Aprobar Resolución")');
     await page.locator('textarea[placeholder*="detalles de la resolución"]').fill('Aprobado vía E2E Automático');
     await page.click('button:has-text("Confirmar y Finalizar")');
-
-    await page.click('button:has-text("Guardar Solicitud")');
     
     // Verificación Final
     await page.reload();

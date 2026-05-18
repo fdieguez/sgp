@@ -16,10 +16,23 @@ test.describe('Suite de Validación: Unificación de Vistas (Etapa 05)', () => {
   test('Flujo Completo de Unificación de Vistas', async ({ page }) => {
     test.setTimeout(60000);
     // 1. LOGIN
-    await page.goto('/');
-    await page.fill('input[type="email"]', 'admin@sgp.com');
-    await page.fill('input[type="password"]', 'SGP_Admin_#2026_Prod_Secure_!');
+    await page.goto('/login');
+    // Limpiar campos explícitamente por si hay autocompletado
+    const emailInput = page.locator('input[type="email"]');
+    const passInput = page.locator('input[type="password"]');
+    
+    await emailInput.click({ clickCount: 3 });
+    await page.keyboard.press('Control+A');
+    await page.keyboard.press('Backspace');
+    await emailInput.fill('admin@sgp.com');
+
+    await passInput.click({ clickCount: 3 });
+    await page.keyboard.press('Control+A');
+    await page.keyboard.press('Backspace');
+    await passInput.fill('SGP_Admin_#2026_Prod_Secure_!');
+
     await page.click('button:has-text("Ingresar")');
+    await page.waitForURL('**/dashboard', { timeout: 15000 });
     await expect(page.locator('text=Panel SGP')).toBeVisible();
 
     // 2. DASHBOARD - Verificar eliminación de métricas económicas
@@ -56,7 +69,7 @@ test.describe('Suite de Validación: Unificación de Vistas (Etapa 05)', () => {
     await expect(fila).toContainText(descripcionTest);
 
     // 5. EDITAR / VER - Probar pestañas y funcionalidad
-    await fila.locator('button[title="Ver Detalle"]').click();
+    await fila.locator('button[title="Ver / Editar Detalles"]').click();
     await expect(page.locator('h2:has-text("Editar Solicitud")')).toBeVisible();
     
     // Probar pestañas
@@ -81,14 +94,16 @@ test.describe('Suite de Validación: Unificación de Vistas (Etapa 05)', () => {
     
     // Cambiar estado
     const statusSelect = page.locator('label:has-text("Estado") + select');
-    await statusSelect.selectOption('en proceso');
+    await statusSelect.selectOption({ label: 'En Proceso' });
     await page.waitForTimeout(1000); // Dar tiempo a React para actualizar el estado del formulario
     
     await page.click('button:has-text("Guardar Solicitud")');
+    await expect(page.locator('text=Solicitud actualizada')).toBeVisible();
     await expect(page.locator('h2:has-text("Editar Solicitud")')).toBeHidden();
 
-    // Recargar o esperar actualización
-    await page.waitForTimeout(2000); 
+    // Recargar para asegurar que traiga el estado actualizado del servidor
+    await page.reload();
+    await page.fill('input[placeholder*="Buscar por N° Orden"]', idUnico);
     
     // Validar en tabla - Usamos un selector fresco que busque por el ID único
     const filaFinal = page.locator('tr').filter({ hasText: idUnico });
