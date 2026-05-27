@@ -52,9 +52,9 @@ const parseLocalDate = (dateStr) => {
 // --- UI Components ---
 const STATUS_MAP = {
     'pendiente': 'Pendiente',
-    'en proceso': 'En Proceso',
+    'en proceso': 'Asignadas',
     'en resolucion': 'En Resolución',
-    'completadas': 'Completado',
+    'completadas': 'Resueltas',
     'rechazada': 'Rechazado'
 };
 
@@ -467,9 +467,9 @@ export default function ProjectDetailsPage() {
                                 >
                                     <option value="">Todos los Estados</option>
                                     <option value="pendiente">Pendiente</option>
-                                    <option value="en proceso">En Proceso</option>
+                                    <option value="en proceso">Asignadas</option>
                                     <option value="en resolucion">En Resolución</option>
-                                    <option value="completadas">Completado</option>
+                                    <option value="completadas">Resueltas</option>
                                     <option value="rechazada">Rechazado</option>
                                 </select>
                             </div>
@@ -548,7 +548,7 @@ export default function ProjectDetailsPage() {
                         </button>
                         <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'en proceso' ? '' : 'en proceso' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'en proceso' ? 'bg-blue-900/40 border-2 border-blue-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
                             <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></div> En Proceso
+                                <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></div> Asignadas
                             </div>
                             <div className="text-3xl font-black text-white">
                                 {processedData.stats.enProceso}
@@ -564,7 +564,7 @@ export default function ProjectDetailsPage() {
                         </button>
                         <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'completadas' ? '' : 'completadas' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'completadas' ? 'bg-green-900/40 border-2 border-green-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
                             <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div> Completados
+                                <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div> Resueltas
                             </div>
                             <div className="text-3xl font-black text-white">
                                 {processedData.stats.completadas}

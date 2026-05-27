@@ -47,8 +47,10 @@ test.describe('Validación E2E SGP: Flujo Maestro Consolidado', () => {
       await passInput.fill(password);
 
       await page.click('button:has-text("Ingresar")');
-      await page.waitForURL('**/dashboard', { timeout: 15000 });
-      await expect(page.locator('text=Panel SGP')).toBeVisible();
+      await page.waitForURL(/.*(dashboard|mis-solicitudes).*/, { timeout: 15000 });
+      if (page.url().includes('dashboard')) {
+        await expect(page.locator('text=Panel SGP')).toBeVisible();
+      }
     };
 
     // --- PASO 1: CONFIGURACIÓN (ADMIN) ---
@@ -204,8 +206,8 @@ test.describe('Validación E2E SGP: Flujo Maestro Consolidado', () => {
     // Verificación Final
     await page.reload();
     await page.fill('input[placeholder*="Buscar"]', idSuffix);
-    // El estado cambia a "Completado" en la UI (StatusBadge lo capitaliza)
-    await expect(page.locator('tr').filter({ hasText: solicitudDesc }).locator('text=Completado')).toBeVisible();
+    // El estado cambia a "Resueltas" en la UI (StatusBadge o statusConfig lo capitaliza)
+    await expect(page.locator('tr').filter({ hasText: solicitudDesc }).locator('text=Resueltas')).toBeVisible();
   });
 
 });

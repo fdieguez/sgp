@@ -94,7 +94,7 @@ test.describe('Suite de Validación: Unificación de Vistas (Etapa 05)', () => {
     
     // Cambiar estado
     const statusSelect = page.locator('label:has-text("Estado") + select');
-    await statusSelect.selectOption({ label: 'En Proceso' });
+    await statusSelect.selectOption({ label: 'Asignadas' });
     await page.waitForTimeout(1000); // Dar tiempo a React para actualizar el estado del formulario
     
     await page.click('button:has-text("Guardar Solicitud")');
@@ -107,7 +107,7 @@ test.describe('Suite de Validación: Unificación de Vistas (Etapa 05)', () => {
     
     // Validar en tabla - Usamos un selector fresco que busque por el ID único
     const filaFinal = page.locator('tr').filter({ hasText: idUnico });
-    await expect(filaFinal.locator('text=En Proceso')).toBeVisible({ timeout: 15000 });
+    await expect(filaFinal.locator('text=Asignadas')).toBeVisible({ timeout: 15000 });
   });
 
 });

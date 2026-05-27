@@ -139,7 +139,10 @@ export default function SolicitudDetailModal({ isOpen, onClose, solicitud }) {
                         <div>
                             <div className="flex items-center gap-3 mb-2">
                                 <span className={`px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${getStatusStyle(solicitud.status)}`}>
-                                    {solicitud.status === 'en resolucion' ? 'En Resolución' : solicitud.status}
+                                    {solicitud.status === 'en resolucion' ? 'En Resolución' : 
+                                     solicitud.status === 'en proceso' ? 'Asignadas' :
+                                     solicitud.status === 'completadas' ? 'Resueltas' : 
+                                     solicitud.status}
                                 </span>
                                 <span className="text-gray-500 text-xs font-mono">#{solicitud.id}</span>
                             </div>

@@ -39,6 +39,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const [adjuntos, setAdjuntos] = useState([]);
     const [isDragging, setIsDragging] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [uploadingFields, setUploadingFields] = useState({});
 
     const fetchAdjuntos = useCallback(async () => {
         if (!formData.id) return;
@@ -129,6 +130,72 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             fetchAdjuntos();
         } catch (err) {
             console.error("Error eliminando archivo", err);
+            toast.error("Error al eliminar el archivo");
+        }
+    };
+    const handleDynamicFileUpload = async (assignmentIndex, campoNombre, file) => {
+        if (!file) return;
+        if (!formData.id) {
+            toast.error("Guarde la solicitud antes de subir archivos en la resolución");
+            return;
+        }
+        const key = `${assignmentIndex}_${campoNombre}`;
+        setUploadingFields(prev => ({ ...prev, [key]: true }));
+
+        const uploadData = new FormData();
+        uploadData.append('file', file);
+
+        try {
+            const res = await api.post(`/api/solicitudes/${formData.id}/adjuntos`, uploadData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            
+            const newAssignments = [...formData.assignments];
+            const currentData = typeof newAssignments[assignmentIndex].detalle === 'object' && newAssignments[assignmentIndex].detalle !== null
+                ? newAssignments[assignmentIndex].detalle
+                : {};
+
+            const downloadUrl = `/api/solicitudes/adjuntos/${res.data.id}/download`;
+            newAssignments[assignmentIndex].detalle = {
+                ...currentData,
+                [campoNombre]: downloadUrl,
+                [`${campoNombre}_filename`]: res.data.originalFileName,
+                [`${campoNombre}_id`]: res.data.id
+            };
+
+            setFormData({ ...formData, assignments: newAssignments });
+            toast.success("Archivo subido correctamente");
+        } catch (err) {
+            console.error("Error subiendo archivo dinámico", err);
+            toast.error("Error al subir el archivo");
+        } finally {
+            setUploadingFields(prev => ({ ...prev, [key]: false }));
+        }
+    };
+
+    const handleDynamicFileDelete = async (assignmentIndex, campoNombre, adjuntoId) => {
+        if (!window.confirm("¿Seguro que deseas eliminar este archivo?")) return;
+        
+        try {
+            if (adjuntoId) {
+                await api.delete(`/api/solicitudes/adjuntos/${adjuntoId}`);
+            }
+            
+            const newAssignments = [...formData.assignments];
+            const currentData = typeof newAssignments[assignmentIndex].detalle === 'object' && newAssignments[assignmentIndex].detalle !== null
+                ? newAssignments[assignmentIndex].detalle
+                : {};
+                
+            const updatedData = { ...currentData };
+            delete updatedData[campoNombre];
+            delete updatedData[`${campoNombre}_filename`];
+            delete updatedData[`${campoNombre}_id`];
+            
+            newAssignments[assignmentIndex].detalle = updatedData;
+            setFormData({ ...formData, assignments: newAssignments });
+            toast.success("Archivo eliminado");
+        } catch (err) {
+            console.error("Error al eliminar archivo dinámico", err);
             toast.error("Error al eliminar el archivo");
         }
     };
@@ -407,9 +474,9 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                                 >
                                     <option value="pendiente">Pendiente</option>
-                                    <option value="en proceso">En Proceso</option>
+                                    <option value="en proceso">Asignadas</option>
                                     <option value="en resolucion">En Resolución</option>
-                                    <option value="completadas">Completado</option>
+                                    <option value="completadas">Resueltas</option>
                                     <option value="rechazada">Rechazado</option>
                                 </select>
                             </div>
@@ -797,6 +864,29 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                         <div className="space-y-4 p-4 bg-gray-800/80 border border-gray-600 rounded-lg shadow-inner">
                                                             {sortedCampos.map(ac => {
                                                                 const campo = ac.atributo;
+
+                                                                // Lógica condicional específica para SUBSIDIO
+                                                                if (assignment.tipoResolucion === 'SUBSIDIO') {
+                                                                    const tipoPedido = currentData['Tipo de pedido'] || '';
+                                                                    const camposPersonal = [
+                                                                        'Apellido y nombre', 'DNI', 'Dirección del DNI',
+                                                                        'Adjuntar DNI frente', 'Adjuntar DNI atras', 'Adjuntar Constancia de CBU'
+                                                                    ];
+                                                                    const camposInstitucional = [
+                                                                        'Nombre de la Institución', 'Dirección de la Institución', 'Localidad de la Institución',
+                                                                        'responsable1: Nombre', 'responsable1: DNI', 'responsable1: Cargo',
+                                                                        'responsable2: Nombre', 'responsable2: DNI', 'responsable2: Cargo',
+                                                                        'Adjuntar nota de pedido (jpg/pdf)'
+                                                                    ];
+
+                                                                    if (camposPersonal.includes(campo.nombre) && tipoPedido !== 'Personal') {
+                                                                        return null;
+                                                                    }
+                                                                    if (camposInstitucional.includes(campo.nombre) && !tipoPedido.startsWith('Institucional')) {
+                                                                        return null;
+                                                                    }
+                                                                }
+
                                                                 return (
                                                                 <div key={campo.id}>
                                                                     <label className="block text-[11px] text-gray-400 mb-1 uppercase tracking-wider font-semibold">
@@ -830,17 +920,86 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                             className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none block disabled:opacity-50"
                                                                             disabled={!canEditThis}
                                                                         />
+                                                                    ) : campo.tipoDato === 'FILE' ? (
+                                                                        <div className="mt-1 flex flex-col gap-2 p-3 bg-gray-900/40 border border-gray-700/50 rounded-lg">
+                                                                            {currentData[campo.nombre] ? (
+                                                                                <div className="flex items-center justify-between text-xs text-indigo-300">
+                                                                                    <a 
+                                                                                        href={`${api.defaults.baseURL || ''}${currentData[campo.nombre]}`} 
+                                                                                        target="_blank" 
+                                                                                        rel="noopener noreferrer" 
+                                                                                        className="font-bold underline flex items-center gap-1 hover:text-indigo-200"
+                                                                                        title="Descargar/Ver archivo"
+                                                                                        onClick={async (e) => {
+                                                                                            // Usar el manejador de descargas para consistencia si no tiene baseURL absoluto
+                                                                                            e.preventDefault();
+                                                                                            try {
+                                                                                                const res = await api.get(currentData[campo.nombre], { responseType: 'blob' });
+                                                                                                const url = window.URL.createObjectURL(new Blob([res.data]));
+                                                                                                const link = document.createElement('a');
+                                                                                                link.href = url;
+                                                                                                link.setAttribute('download', currentData[`${campo.nombre}_filename`] || 'archivo');
+                                                                                                document.body.appendChild(link);
+                                                                                                link.click();
+                                                                                                link.remove();
+                                                                                                setTimeout(() => window.URL.revokeObjectURL(url), 100);
+                                                                                            } catch (err) {
+                                                                                                console.error("Error al descargar archivo dinámico", err);
+                                                                                                toast.error("Error al descargar archivo");
+                                                                                            }
+                                                                                        }}
+                                                                                    >
+                                                                                        📎 {currentData[`${campo.nombre}_filename`] || 'Ver archivo'}
+                                                                                    </a>
+                                                                                    {canEditThis && (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => handleDynamicFileDelete(index, campo.nombre, currentData[`${campo.nombre}_id`])}
+                                                                                            className="text-red-400 hover:text-red-300 font-semibold"
+                                                                                        >
+                                                                                            Eliminar
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div>
+                                                                                    {uploadingFields[`${index}_${campo.nombre}`] ? (
+                                                                                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                                                                                            <span className="animate-spin text-indigo-500">⏳</span> Subiendo archivo...
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <div className="flex items-center justify-between gap-2">
+                                                                                            <input
+                                                                                                type="file"
+                                                                                                disabled={!canEditThis || !formData.id}
+                                                                                                onChange={async (e) => {
+                                                                                                    if (e.target.files && e.target.files.length > 0) {
+                                                                                                        await handleDynamicFileUpload(index, campo.nombre, e.target.files[0]);
+                                                                                                    }
+                                                                                                }}
+                                                                                                className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-600/30 file:text-indigo-300 hover:file:bg-indigo-600/40 disabled:opacity-50"
+                                                                                            />
+                                                                                            {!formData.id && (
+                                                                                                <span className="text-[10px] text-yellow-500 font-semibold leading-tight">
+                                                                                                    Guarde la solicitud antes de subir archivos.
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
                                                                     ) : (
                                                                         <input
-                                                                            type={campo.tipoDato === 'DATE' ? 'date' : 'text'}
-                                                                            placeholder={campo.tipoDato === 'FILE' ? 'Suba en Adjuntos y pegue el link / ref aquí...' : ''}
+                                                                            type={campo.tipoDato === 'DATE' ? 'date' : campo.tipoDato === 'NUMBER' ? 'number' : 'text'}
                                                                             value={currentData[campo.nombre] || ''}
                                                                             onChange={e => {
                                                                                 const newAssignments = [...formData.assignments];
                                                                                 newAssignments[index].detalle = { ...currentData, [campo.nombre]: e.target.value };
                                                                                 setFormData({ ...formData, assignments: newAssignments });
                                                                             }}
-                                                                            className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none block"
+                                                                            className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none block disabled:opacity-50"
+                                                                            disabled={!canEditThis}
                                                                         />
                                                                     )}
                                                                 </div>

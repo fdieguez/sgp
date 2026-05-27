@@ -4,16 +4,16 @@ import personService from '../services/personService';
 
 const statusConfig = {
     'pendiente': { label: 'Pendiente', style: 'bg-yellow-900/30 text-yellow-500 border-yellow-800' },
-    'en proceso': { label: 'En Proceso', style: 'bg-blue-900/30 text-blue-400 border-blue-800' },
+    'en proceso': { label: 'Asignadas', style: 'bg-blue-900/30 text-blue-400 border-blue-800' },
     'en resolucion': { label: 'En Resolución', style: 'bg-purple-900/30 text-purple-400 border-purple-800' },
-    'completadas': { label: 'Completada', style: 'bg-green-900/30 text-green-500 border-green-800' },
+    'completadas': { label: 'Resueltas', style: 'bg-green-900/30 text-green-500 border-green-800' },
     'rechazada': { label: 'Rechazada', style: 'bg-red-900/30 text-red-500 border-red-800' },
     'cancelada': { label: 'Cancelada', style: 'bg-gray-800 text-gray-400 border-gray-600' },
     
     // Soporte de compatibilidad para estados antiguos en mayúsculas
     'PENDING': { label: 'Pendiente', style: 'bg-yellow-900/30 text-yellow-500 border-yellow-800' },
-    'IN_PROGRESS': { label: 'En Proceso', style: 'bg-blue-900/30 text-blue-400 border-blue-800' },
-    'COMPLETED': { label: 'Completada', style: 'bg-green-900/30 text-green-500 border-green-800' },
+    'IN_PROGRESS': { label: 'Asignadas', style: 'bg-blue-900/30 text-blue-400 border-blue-800' },
+    'COMPLETED': { label: 'Resueltas', style: 'bg-green-900/30 text-green-500 border-green-800' },
     'REJECTED': { label: 'Rechazada', style: 'bg-red-900/30 text-red-500 border-red-800' }
 };
 
@@ -125,7 +125,8 @@ const OrdersPage = () => {
                     >
                         <option value="">Todos</option>
                         <option value="PENDING">Pendiente</option>
-                        <option value="COMPLETED">Completado</option>
+                        <option value="IN_PROGRESS">Asignadas</option>
+                        <option value="COMPLETED">Resueltas</option>
                         <option value="REJECTED">Rechazado</option>
                     </select>
                 </div>

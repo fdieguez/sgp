@@ -14,7 +14,7 @@ test.describe.serial('Suite de Validación: Etapa 6.1 (Migraciones y Roles)', ()
         await page.keyboard.press('Backspace');
         await passInput.fill(pass);
         await page.click('button:has-text("Ingresar")');
-        await page.waitForURL('**/dashboard', { timeout: 15000 });
+        await page.waitForURL(/.*(dashboard|mis-solicitudes).*/, { timeout: 15000 });
     };
 
     test('Caso de Prueba 2: Visibilidad Limitada por Rol (Operadores)', async ({ page }) => {
@@ -56,7 +56,7 @@ test.describe.serial('Suite de Validación: Etapa 6.1 (Migraciones y Roles)', ()
         await page.locator('label:has-text("Nombre Completo") + input').fill('Solicitante Etapa 6.1');
         await page.locator('label:has-text("Descripción / Pedido") + textarea').fill(desc);
         await page.click('button:has-text("Guardar Solicitud")');
-        await expect(page.locator('text=Solicitud creada')).toBeVisible();
+        await expect(page.locator('text=creada con éxito')).toBeVisible();
 
         // Volver a abrir para probar adjuntos rápidos (simulado viendo que exista el botón)
         const filaFinal = page.locator('tr').filter({ hasText: desc }).first();

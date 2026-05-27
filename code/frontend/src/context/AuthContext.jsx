@@ -45,19 +45,22 @@ export const AuthProvider = ({ children }) => {
                 const profileRes = await api.get('/api/users/me', {
                     headers: { Authorization: `Bearer ${newToken}` }
                 });
-                setUser({
+                const finalUser = {
                     ...profileRes.data.user,
                     responsable: profileRes.data.responsable
-                });
+                };
+                setUser(finalUser);
+                return finalUser;
             } catch (err) {
                 console.error("Failed to fetch full profile", err);
                 // Fallback to basic info from login
-                setUser({
+                const fallbackUser = {
                     email: response.data.email,
                     role: response.data.role
-                });
+                };
+                setUser(fallbackUser);
+                return fallbackUser;
             }
-            return true;
         } catch (error) {
             console.error("Login failed", error);
             throw error;
