@@ -123,7 +123,11 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void initializeLocations() {
-        if (locationRepository.count() > 0) return;
+        if (locationRepository.count() > 0) {
+            // Si ya hay localidades en la base de datos, aseguramos que las requeridas estén marcadas como visibles
+            actualizarLocalidadesVisibles();
+            return;
+        }
 
         System.out.println("⏳ Cargando dataset de localidades de Santa Fe...");
         try (java.io.InputStream is = getClass().getResourceAsStream("/dataset/santa_fe_locations_dataset.txt");
@@ -167,9 +171,40 @@ public class DataInitializer implements CommandLineRunner {
                 }
             }
             System.out.println("✅ Se inicializaron " + count + " registros de ubicación exitosamente.");
+
+            // Aseguramos las localidades visibles para la interfaz en la base de datos recién creada
+            actualizarLocalidadesVisibles();
         } catch (Exception e) {
             System.err.println("❌ Error al cargar las localidades: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    private void actualizarLocalidadesVisibles() {
+        // Lista de localidades que deben estar visibles en la UI para la Etapa 6.1
+        List<String> visibleNames = List.of(
+            "Santa Fe", "Laguna Paiva", "Recreo", "San José del Rincón", "Santo Tomé",
+            "Arroyo Aguiar", "Arroyo Leyes", "Cabal", "Campo Andino", "Candioti",
+            "Emilia", "Llambi Campbell", "Monte Vera", "Nelson", "Sauce Viejo", "Otra"
+        );
+        for (String name : visibleNames) {
+            com.sgp.backend.entity.Location loc = locationRepository.findFirstByNameAndType(name, "CITY")
+                .orElseGet(() -> {
+                    com.sgp.backend.entity.Location newLoc = new com.sgp.backend.entity.Location();
+                    newLoc.setName(name);
+                    newLoc.setType("CITY");
+                    // Buscar la provincia de Santa Fe para asociarla como padre
+                    locationRepository.findFirstByNameAndType("Santa Fe", "PROVINCE")
+                        .ifPresent(newLoc::setParent);
+                    System.out.println("➕ Localidad faltante creada en BD: " + name);
+                    return newLoc;
+                });
+
+            if (!Boolean.TRUE.equals(loc.getShowInUi())) {
+                loc.setShowInUi(true);
+                locationRepository.save(loc);
+                System.out.println("✅ Localidad marcada como visible en UI (DataInitializer): " + name);
+            }
         }
     }
 

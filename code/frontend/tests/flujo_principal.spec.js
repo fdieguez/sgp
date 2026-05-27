@@ -52,7 +52,7 @@ test.describe.serial('Flujo Principal de Solicitud (Etapa 3)', () => {
 
     // Encontrar la solicitud y hacer clic en Editar
     const fila = page.locator('tr').filter({ hasText: descripcionSolicitud }).first();
-    await fila.locator('button[title="Editar"]').click();
+    await fila.locator('button[title="Ver / Editar Detalles"]').click();
 
     // Modal de edición
     await expect(page.locator('h2:has-text("Editar Solicitud")')).toBeVisible();
@@ -83,7 +83,7 @@ test.describe.serial('Flujo Principal de Solicitud (Etapa 3)', () => {
 
     // Editar
     const fila = page.locator('tr').filter({ hasText: descripcionSolicitud }).first();
-    await fila.locator('button[title="Editar"]').click();
+    await fila.locator('button[title="Ver / Editar Detalles"]').click();
 
     // Modal
     await expect(page.locator('h2:has-text("Editar Solicitud")')).toBeVisible();
@@ -116,7 +116,7 @@ test.describe.serial('Flujo Principal de Solicitud (Etapa 3)', () => {
 
     // Editar
     const fila = page.locator('tr').filter({ hasText: descripcionSolicitud }).first();
-    await fila.locator('button[title="Editar"]').click();
+    await fila.locator('button[title="Ver / Editar Detalles"]').click();
 
     // Marcar resuelto
     // Como resolutor, puede aparecer "Aprobar Resolución"

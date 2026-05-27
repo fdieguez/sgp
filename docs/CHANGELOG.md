@@ -8,6 +8,17 @@
 
 ## 📅 Mayo 2026
 
+### 18/05/2026
+- **⭐️ Cierre de la Etapa 5** (Optimizaciones y UX):
+    - **Paginación en Servidor:** Migración de endpoints de solicitudes (`SolicitudController` y `SolicitudService`) a `Pageable` de Spring Data JPA. El frontend ahora carga de a 20 registros, optimizando la memoria y velocidad al conectar con la base productiva MySQL.
+    - **Operaciones Masivas (Bulk Actions):** Implementación de checkboxes en la grilla y barra flotante "sticky" inferior para asignación masiva de responsables y eliminación masiva (solo Admin).
+    - **Aprobación Ágil para Resolutores:** Agregado el botón de "Aprobación Rápida" directamente en la fila de la grilla principal, junto con la exhibición compactada de detalles de resolución.
+    - **Unificación de Vistas (Fix Final):** Las acciones "Ver" y "Editar" se han fusionado en un modal único, limpio de módulos legacy (subsidios) y adaptado condicionalmente al rol del usuario logueado.
+    - **Exportación de Datos:** Añadido el botón de descarga CSV respetando los filtros activos de la grilla.
+    - **Sistema de Notificaciones Moderno:** Reemplazo de todos los `alert()` nativos por `react-hot-toast`, con estética oscura alineada al diseño del sistema.
+    - **Filtro del Distribuidor:** Corrección crítica en `SolicitudService`. El Distribuidor ahora actúa como "despachador", visualizando *únicamente* aquellas solicitudes que no tienen responsable asignado (al asignar, la solicitud sale de su bandeja automáticamente). Se preservó el acceso completo del Administrador.
+    - **Limpieza del Repositorio:** Exclusión definitiva de archivos temporales de Playwright (`playwright-report/`, `test-results/`) y de la carpeta de subidas del backend (`uploads/`) del seguimiento de Git mediante `--cached`.
+
 ### 06/05/2026
 - **⭐️ Versión 0.8.5** (Refinamiento de Flujos y Filtros Avanzados):
     - **Optimización de Filtros (Server-side)**:

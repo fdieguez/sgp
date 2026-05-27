@@ -2,6 +2,27 @@ import React, { useState, useEffect } from 'react';
 import orderService from '../services/orderService';
 import personService from '../services/personService';
 
+const statusConfig = {
+    'pendiente': { label: 'Pendiente', style: 'bg-yellow-900/30 text-yellow-500 border-yellow-800' },
+    'en proceso': { label: 'En Proceso', style: 'bg-blue-900/30 text-blue-400 border-blue-800' },
+    'en resolucion': { label: 'En Resolución', style: 'bg-purple-900/30 text-purple-400 border-purple-800' },
+    'completadas': { label: 'Completada', style: 'bg-green-900/30 text-green-500 border-green-800' },
+    'rechazada': { label: 'Rechazada', style: 'bg-red-900/30 text-red-500 border-red-800' },
+    'cancelada': { label: 'Cancelada', style: 'bg-gray-800 text-gray-400 border-gray-600' },
+    
+    // Soporte de compatibilidad para estados antiguos en mayúsculas
+    'PENDING': { label: 'Pendiente', style: 'bg-yellow-900/30 text-yellow-500 border-yellow-800' },
+    'IN_PROGRESS': { label: 'En Proceso', style: 'bg-blue-900/30 text-blue-400 border-blue-800' },
+    'COMPLETED': { label: 'Completada', style: 'bg-green-900/30 text-green-500 border-green-800' },
+    'REJECTED': { label: 'Rechazada', style: 'bg-red-900/30 text-red-500 border-red-800' }
+};
+
+const getStatusConfig = (status) => {
+    if (!status) return { label: 'Desconocido', style: 'bg-gray-800 text-gray-400 border-gray-600' };
+    const normalized = status.trim().toLowerCase();
+    return statusConfig[normalized] || statusConfig[status] || { label: status, style: 'bg-gray-800 text-gray-400 border-gray-600' };
+};
+
 const OrdersPage = () => {
     const [orders, setOrders] = useState([]);
     const [persons, setPersons] = useState([]);
@@ -205,14 +226,14 @@ const OrdersPage = () => {
                                         <td className="px-6 py-4 whitespace-nowrap text-white font-medium">{order.person ? order.person.name : '-'}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-gray-400 text-sm">{order.origin}</td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${order.status === 'PENDING'
-                                                ? 'bg-yellow-900/30 text-yellow-500 border-yellow-800'
-                                                : order.status === 'COMPLETED'
-                                                    ? 'bg-green-900/30 text-green-500 border-green-800'
-                                                    : 'bg-gray-800 text-gray-400 border-gray-600'
-                                                }`}>
-                                                {order.status}
-                                            </span>
+                                            {(() => {
+                                                const conf = getStatusConfig(order.status);
+                                                return (
+                                                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${conf.style}`}>
+                                                        {conf.label}
+                                                    </span>
+                                                );
+                                            })()}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-indigo-400 hover:text-indigo-300 cursor-pointer">
                                             Detalles

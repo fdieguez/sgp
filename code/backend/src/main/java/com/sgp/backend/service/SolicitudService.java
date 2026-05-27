@@ -271,6 +271,7 @@ public class SolicitudService {
                 .orElseThrow(() -> new RuntimeException("Solicitud not found"));
 
         User oldResponsable = existing.getResponsable();
+        String oldStatus = existing.getStatus();
 
         // 1. Actualizar beneficiario
         if (dto.getPerson() != null) {
@@ -280,6 +281,8 @@ public class SolicitudService {
                 p = personRepository.findById(dto.getPerson().getId()).orElse(new Person());
                 p.setName(dto.getPerson().getName());
                 p.setPhone(dto.getPerson().getPhone());
+                p.setType(dto.getPerson().getType() != null ? dto.getPerson().getType() : p.getType());
+                p.setSubType(dto.getPerson().getSubType());
                 p = personRepository.save(p);
             } else {
                 // Persona nueva: buscar por nombre o crear
@@ -289,7 +292,8 @@ public class SolicitudService {
                     Person nueva = new Person();
                     nueva.setName(nombre);
                     nueva.setPhone(telefono);
-                    nueva.setType("INDIVIDUAL");
+                    nueva.setType(dto.getPerson().getType() != null ? dto.getPerson().getType() : "INDIVIDUAL");
+                    nueva.setSubType(dto.getPerson().getSubType());
                     return personRepository.save(nueva);
                 });
             }
@@ -385,8 +389,11 @@ public class SolicitudService {
         // 7. Sincronizar asignaciones de resolutores
         processAssignments(saved, dto.getAssignments());
 
-        // 8. Recalcular estado automático
-        updateSolicitudStatus(saved);
+        // 8. Recalcular estado automático (solo si no se cambió de forma manual en el DTO)
+        boolean statusChangedManually = dto.getStatus() != null && !dto.getStatus().equalsIgnoreCase(oldStatus);
+        if (!statusChangedManually) {
+            updateSolicitudStatus(saved);
+        }
         solicitudRepository.save(saved);
 
         // 9. Auditoría de cambio de responsable

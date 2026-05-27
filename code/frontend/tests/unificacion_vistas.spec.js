@@ -49,9 +49,9 @@ test.describe('Suite de Validación: Unificación de Vistas (Etapa 05)', () => {
     await expect(page.locator('h2:has-text("Nueva Solicitud")')).toBeVisible();
     
     // Probar campos dinámicos (Tipo -> Monto)
-    await page.locator('label:has-text("Tipo") + select').selectOption('SUBSIDIO');
+    await page.locator('label:text-is("Tipo") + select').selectOption('SUBSIDIO');
     await expect(page.locator('label:has-text("Monto")')).toBeVisible();
-    await page.locator('label:has-text("Tipo") + select').selectOption('PEDIDO');
+    await page.locator('label:text-is("Tipo") + select').selectOption('PEDIDO');
     await expect(page.locator('label:has-text("Monto")')).toBeHidden();
 
     // Pestañas deben estar ocultas en nueva solicitud

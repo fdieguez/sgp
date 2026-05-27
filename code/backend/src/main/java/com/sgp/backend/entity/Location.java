@@ -1,5 +1,6 @@
 package com.sgp.backend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -8,12 +9,16 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
 @Table(name = "locations")
+@JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class, property = "id")
 public class Location {
 
     @Id
@@ -33,6 +38,9 @@ public class Location {
     private Location parent;
 
     @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
-    @JsonIgnoreProperties("parent")
+    @JsonIgnore
     private List<Location> children;
+
+    @Column(name = "show_in_ui", columnDefinition = "boolean default false")
+    private Boolean showInUi;
 }

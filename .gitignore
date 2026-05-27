@@ -47,6 +47,7 @@ docs/task*.md
 docs/implementation_plan*.md
 docs/PROMPT_*.md
 docs/Resumen_*.md
+docs/CHANGELOG*.md
 
 temp/
 

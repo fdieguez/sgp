@@ -18,4 +18,6 @@ public interface LocationRepository extends JpaRepository<Location, Long> {
     List<Location> findByParent(Location parent);
 
     List<Location> findByType(String type);
+
+    List<Location> findByShowInUiTrueOrType(String type);
 }

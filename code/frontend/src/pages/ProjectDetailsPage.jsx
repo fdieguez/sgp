@@ -540,7 +540,7 @@ export default function ProjectDetailsPage() {
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                         <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'pendiente' ? '' : 'pendiente' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'pendiente' ? 'bg-yellow-900/40 border-2 border-yellow-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
                             <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]"></div> Pendientes
+                                <div className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]"></div> Pendiente
                             </div>
                             <div className="text-3xl font-black text-white">
                                 {processedData.stats.pendiente}

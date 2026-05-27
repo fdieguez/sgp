@@ -45,7 +45,7 @@ export default function DashboardStats() {
             border: "border-blue-800"
         },
         {
-            title: "Pendientes",
+            title: "Pendiente",
             value: stats.pendingSolicitudes,
             subValue: `${calculatePct(stats.pendingSolicitudes)}%`,
             icon: Clock,

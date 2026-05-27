@@ -259,6 +259,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     detalle: typeof a.detalle === 'object' ? JSON.stringify(a.detalle) : (a.detalle || '')
                 }));
 
+            let newId = null;
             if (formData.id) {
                 // PUT usa un DTO plano (SolicitudUpdateDTO) para evitar el problema de
                 // deserialización polimórfica de Jackson con la jerarquía abstracta de Solicitud.
@@ -291,7 +292,6 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     status: formData.status
                 };
                 await api.put(`/api/solicitudes/${formData.id}`, updatePayload);
-                await api.put(`/api/solicitudes/${formData.id}/status`, formData.status, { headers: { 'Content-Type': 'text/plain' } });
             } else {
                 // POST mantiene el formato original con polimorfismo (entidad completa)
                 const createPayload = {
@@ -299,9 +299,10 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     responsable: formData.responsableId ? { id: Number(formData.responsableId) } : null,
                     assignments
                 };
-                await api.post('/api/solicitudes', createPayload);
+                const response = await api.post('/api/solicitudes', createPayload);
+                newId = response.data?.id;
             }
-            toast.success(formData.id ? "Solicitud actualizada" : "Solicitud creada");
+            toast.success(formData.id ? "Solicitud actualizada con éxito" : `Solicitud #${newId} creada con éxito`);
             onSuccess();
             onClose();
         } catch (err) {
@@ -340,7 +341,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 <div className="flex items-center justify-between p-6 border-b border-gray-700 bg-gray-800/50">
                     <h2 className="text-xl font-bold flex items-center gap-2">
                         <Clipboard className="text-indigo-500" />
-                        {formData.id ? 'Editar Solicitud' : 'Nueva Solicitud'}
+                        {formData.id ? `Editar Solicitud #${formData.id}` : 'Nueva Solicitud'}
                     </h2>
                     <button onClick={onClose} title="Cerrar" className="text-gray-400 hover:text-white transition-colors">
                         <X className="h-6 w-6" />
@@ -383,42 +384,46 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         <form onSubmit={handleSubmit} className="p-6 space-y-6">
                     {/* Type and Status */}
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Tipo</label>
-                            <select
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
-                                value={formData.type}
-                                disabled={!!formData.id}
-                                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                            >
-                                <option value="PEDIDO">Pedido</option>
-                                <option value="SUBSIDIO">Subsidio</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Estado</label>
-                            <select
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                                value={formData.status}
-                                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                            >
-                                <option value="pendiente">Pendiente</option>
-                                <option value="en proceso">En Proceso</option>
-                                <option value="en resolucion">En Resolución</option>
-                                <option value="completadas">Completado</option>
-                                <option value="rechazada">Rechazado</option>
-                            </select>
-                        </div>
+                        {user?.role !== 'OPERADOR' && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Tipo</label>
+                                <select
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
+                                    value={formData.type}
+                                    disabled={!!formData.id}
+                                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                                >
+                                    <option value="PEDIDO">Pedido</option>
+                                    <option value="SUBSIDIO">Subsidio</option>
+                                </select>
+                            </div>
+                        )}
+                        {!!formData.id && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Estado</label>
+                                <select
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    value={formData.status}
+                                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                >
+                                    <option value="pendiente">Pendiente</option>
+                                    <option value="en proceso">En Proceso</option>
+                                    <option value="en resolucion">En Resolución</option>
+                                    <option value="completadas">Completado</option>
+                                    <option value="rechazada">Rechazado</option>
+                                </select>
+                            </div>
+                        )}
                     </div>
 
                     {/* Person Data */}
                     <div className="space-y-4 p-4 bg-gray-900/40 rounded-xl border border-gray-700">
                         <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                            <UserIcon className="h-4 w-4 text-indigo-400" /> Beneficiario
+                            <UserIcon className="h-4 w-4 text-indigo-400" /> Solicitante
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm text-gray-500 mb-1">Nombre Completo</label>
+                                <label className="block text-sm text-gray-500 mb-1">Nombre Completo / Institución</label>
                                 <input
                                     type="text"
                                     required
@@ -436,6 +441,40 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     onChange={(e) => setFormData({ ...formData, person: { ...formData.person, phone: e.target.value } })}
                                 />
                             </div>
+                            <div>
+                                <label className="block text-sm text-gray-500 mb-1">Tipo Solicitante</label>
+                                <select
+                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                    value={formData.person.type || ''}
+                                    onChange={(e) => setFormData({ ...formData, person: { ...formData.person, type: e.target.value, subType: '' } })}
+                                >
+                                    <option value="">Seleccionar...</option>
+                                    <option value="Club">Club</option>
+                                    <option value="Iglesia">Iglesia</option>
+                                    <option value="Escuela">Escuela</option>
+                                    <option value="Gobierno Local">Gobierno Local</option>
+                                    <option value="ONGs">ONGs</option>
+                                    <option value="Grupo social">Grupo social</option>
+                                    <option value="Comedor/Merendero">Comedor/Merendero</option>
+                                    <option value="Personal">Personal</option>
+                                </select>
+                            </div>
+                            {formData.person.type === 'Personal' && (
+                                <div>
+                                    <label className="block text-sm text-gray-500 mb-1">Subtipo</label>
+                                    <select
+                                        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        value={formData.person.subType || ''}
+                                        onChange={(e) => setFormData({ ...formData, person: { ...formData.person, subType: e.target.value } })}
+                                    >
+                                        <option value="">Seleccionar...</option>
+                                        <option value="joven">Joven</option>
+                                        <option value="emprendedor">Emprendedor</option>
+                                        <option value="referente">Referente</option>
+                                        <option value="otro">Otro</option>
+                                    </select>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -480,17 +519,19 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     ))}
                                 </datalist>
                             </div>
-                            <div>
-                                <label className="block text-sm text-gray-500 mb-1">Zona / Eje</label>
-                                <input
-                                    type="text"
-                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-                                    value={formData.zone || ''}
-                                    disabled={isResponsable}
-                                    onChange={(e) => setFormData({ ...formData, zone: e.target.value })}
-                                    placeholder="Auto-asignada, o escriba aquí..."
-                                />
-                            </div>
+                            {user?.role !== 'OPERADOR' && (
+                                <div>
+                                    <label className="block text-sm text-gray-500 mb-1">Zona / Eje</label>
+                                    <input
+                                        type="text"
+                                        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                                        value={formData.zone || ''}
+                                        disabled={isResponsable}
+                                        onChange={(e) => setFormData({ ...formData, zone: e.target.value })}
+                                        placeholder="Auto-asignada, o escriba aquí..."
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -527,7 +568,9 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             <option value="MANUAL">Manual / Personal</option>
                             <option value="WHATSAPP">WhatsApp</option>
                             <option value="NOTE">Nota / Expediente</option>
-                            <option value="SOCIAL_MEDIA">Redes Sociales</option>
+                            <option value="INSTAGRAM">Instagram</option>
+                            <option value="FACEBOOK">Facebook</option>
+                            <option value="OTRO">Otro</option>
                             <option value="PHONE">Teléfono</option>
                             <option value="EMAIL">Email</option>
                         </select>
@@ -573,99 +616,103 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 onChange={(e) => setFormData({ ...formData, entryDate: e.target.value })}
                             />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Responsable</label>
-                            <select
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-                                value={formData.responsableId}
-                                disabled={isResponsable}
-                                onChange={(e) => {
-                                    const respId = e.target.value;
-                                    const selectedResp = responsables.find(r => r.id.toString() === respId.toString());
-                                    setFormData({ 
-                                        ...formData, 
-                                        responsableId: respId,
-                                        zone: selectedResp ? (selectedResp.zone || '') : ''
-                                    });
-                                }}
-                            >
-                                <option value="">Seleccionar...</option>
-                                {responsables.map(r => (
-                                    <option key={r.id} value={r.id}>{r.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="p-4 bg-gray-900/40 rounded-xl border border-gray-700 space-y-4">
-                        <h3 className="text-sm font-semibold text-gray-300">Seguimiento</h3>
-                        <div className="grid grid-cols-2 gap-4">
+                        {user?.role !== 'OPERADOR' && (
                             <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Contacto</label>
-                                <input
-                                    type="date"
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                                    value={formData.contactDate}
-                                    onChange={(e) => setFormData({ ...formData, contactDate: e.target.value })}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Resolución</label>
-                                <input
-                                    type="date"
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                                    value={formData.resolutionDate}
-                                    onChange={(e) => setFormData({ ...formData, resolutionDate: e.target.value })}
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Resolución</label>
-                            <input
-                                type="text"
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                                value={formData.resolution}
-                                onChange={(e) => setFormData({ ...formData, resolution: e.target.value })}
-                                placeholder="Resultado breve..."
-                            />
-                        </div>
-
-
-
-                        {isResolutor && myAssignment?.approved && (
-                            <div className="bg-emerald-900/40 p-4 rounded-xl border border-emerald-700/50 flex flex-col gap-1">
-                                <span className="text-sm font-bold text-emerald-400">✅ Resolución Finalizada</span>
-                                {myAssignment.observaciones && (
-                                    <p className="text-xs text-emerald-200 italic">"{myAssignment.observaciones}"</p>
-                                )}
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Responsable</label>
+                                <select
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                                    value={formData.responsableId}
+                                    disabled={isResponsable}
+                                    onChange={(e) => {
+                                        const respId = e.target.value;
+                                        const selectedResp = responsables.find(r => r.id.toString() === respId.toString());
+                                        setFormData({ 
+                                            ...formData, 
+                                            responsableId: respId,
+                                            zone: selectedResp ? (selectedResp.zone || '') : ''
+                                        });
+                                    }}
+                                >
+                                    <option value="">Seleccionar...</option>
+                                    {responsables.map(r => (
+                                        <option key={r.id} value={r.id}>{r.name}</option>
+                                    ))}
+                                </select>
                             </div>
                         )}
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Detalle</label>
-                            <textarea
-                                rows="2"
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                value={formData.detail}
-                                onChange={(e) => setFormData({ ...formData, detail: e.target.value })}
-                                placeholder="Detalle extendido del seguimiento..."
-                            />
-                        </div>
-
-                        <div className="flex items-center gap-2 pt-2">
-                            <input
-                                type="checkbox"
-                                id="firstContactControl"
-                                className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500"
-                                checked={formData.firstContactControl}
-                                onChange={(e) => setFormData({ ...formData, firstContactControl: e.target.checked })}
-                            />
-                            <label htmlFor="firstContactControl" className="text-sm font-medium text-gray-300">
-                                Control 1er Contacto Realizado
-                            </label>
-                        </div>
                     </div>
+
+                    {user?.role !== 'OPERADOR' && (
+                        <div className="p-4 bg-gray-900/40 rounded-xl border border-gray-700 space-y-4">
+                            <h3 className="text-sm font-semibold text-gray-300">Seguimiento</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Contacto</label>
+                                    <input
+                                        type="date"
+                                        className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                                        value={formData.contactDate}
+                                        onChange={(e) => setFormData({ ...formData, contactDate: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Resolución</label>
+                                    <input
+                                        type="date"
+                                        className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                                        value={formData.resolutionDate}
+                                        onChange={(e) => setFormData({ ...formData, resolutionDate: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Resolución</label>
+                                <input
+                                    type="text"
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                                    value={formData.resolution}
+                                    onChange={(e) => setFormData({ ...formData, resolution: e.target.value })}
+                                    placeholder="Resultado breve..."
+                                />
+                            </div>
+
+
+
+                            {isResolutor && myAssignment?.approved && (
+                                <div className="bg-emerald-900/40 p-4 rounded-xl border border-emerald-700/50 flex flex-col gap-1">
+                                    <span className="text-sm font-bold text-emerald-400">✅ Resolución Finalizada</span>
+                                    {myAssignment.observaciones && (
+                                        <p className="text-xs text-emerald-200 italic">"{myAssignment.observaciones}"</p>
+                                    )}
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Detalle</label>
+                                <textarea
+                                    rows="2"
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                    value={formData.detail}
+                                    onChange={(e) => setFormData({ ...formData, detail: e.target.value })}
+                                    placeholder="Detalle extendido del seguimiento..."
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-2">
+                                <input
+                                    type="checkbox"
+                                    id="firstContactControl"
+                                    className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500"
+                                    checked={formData.firstContactControl}
+                                    onChange={(e) => setFormData({ ...formData, firstContactControl: e.target.checked })}
+                                />
+                                <label htmlFor="firstContactControl" className="text-sm font-medium text-gray-300">
+                                    Control 1er Contacto Realizado
+                                </label>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Multi-Resolutor Assignments Section */}
                     {(user?.role === 'RESPONSABLE' || user?.role === 'ADMINISTRADOR' || formData.assignments.length > 0) && (
@@ -830,6 +877,25 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             </div>
                         )}
                     </div>
+                    )}
+                    
+                    {/* Carga rápida de adjuntos */}
+                    {formData.id && (
+                        <div className="p-4 bg-gray-900/40 rounded-xl border border-gray-700 mt-6 animate-in slide-in-from-bottom-2">
+                            <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2 mb-3">
+                                <FileText className="h-4 w-4 text-indigo-400" /> Adjuntos Rápidos
+                            </h3>
+                            <div className="flex items-center justify-between gap-4">
+                                <label className={`bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white px-4 py-2 rounded-lg font-bold cursor-pointer transition-colors flex items-center gap-2 text-sm ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                                    <UploadCloud className="h-4 w-4" />
+                                    {isUploading ? 'Subiendo...' : 'Subir Archivo'}
+                                    <input type="file" className="hidden" disabled={isUploading} onChange={(e) => handleFileUpload(e.target.files[0])} />
+                                </label>
+                                <span className="text-xs text-gray-500 flex items-center gap-1">
+                                    <span className="font-bold text-white bg-gray-800 px-2 py-0.5 rounded">{adjuntos.length}</span> adjuntos cargados. (Ver pestaña Adjuntos para listado completo)
+                                </span>
+                            </div>
+                        </div>
                     )}
                         </form>
                     )}
