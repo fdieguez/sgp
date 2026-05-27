@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
-import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar, Users, Plus, Trash2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar, Users, Plus, Trash2, History, FileText, UploadCloud, Download, ArrowRight, MessageSquare } from 'lucide-react';
 import api from '../config/axios';
 import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
+import TicketSeguimiento from './TicketSeguimiento';
 
 export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData, configId }) {
     const { user } = useAuth();
@@ -31,46 +33,247 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const [showApproveConfirm, setShowApproveConfirm] = useState(false);
     const [approveObservations, setApproveObservations] = useState('');
 
+    // Tabs & extra states
+    const [activeTab, setActiveTab] = useState('detalles');
+    const [historial, setHistorial] = useState([]);
+    const [adjuntos, setAdjuntos] = useState([]);
+    const [isDragging, setIsDragging] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadingFields, setUploadingFields] = useState({});
+
+    const fetchAdjuntos = useCallback(async () => {
+        if (!formData.id) return;
+        try {
+            const res = await api.get(`/api/solicitudes/${formData.id}/adjuntos`);
+            setAdjuntos(res.data);
+        } catch (err) {
+            console.error("Error fetching adjuntos", err);
+        }
+    }, [formData.id]);
+
+    const fetchHistorial = useCallback(async () => {
+        if (!formData.id) return;
+        try {
+            const res = await api.get(`/api/solicitudes/${formData.id}/historial`);
+            setHistorial(res.data);
+        } catch (err) {
+            console.error("Error fetching history", err);
+        }
+    }, [formData.id]);
+
+    useEffect(() => {
+        if (isOpen && formData.id) {
+            if (activeTab === 'historial') {
+                fetchHistorial();
+            }
+            if (activeTab === 'adjuntos') {
+                fetchAdjuntos();
+            }
+        }
+    }, [isOpen, formData.id, activeTab, fetchHistorial, fetchAdjuntos]);
+
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+    const handleDragLeave = (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+    const handleDrop = async (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            await handleFileUpload(e.dataTransfer.files[0]);
+        }
+    };
+    const handleFileUpload = async (file) => {
+        if (!file) return;
+        setIsUploading(true);
+        const uploadData = new FormData();
+        uploadData.append('file', file);
+        try {
+            await api.post(`/api/solicitudes/${formData.id}/adjuntos`, uploadData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            fetchAdjuntos();
+            toast.success("Archivo subido con éxito");
+        } catch (err) {
+            console.error("Error subiendo archivo", err);
+            toast.error("Error al subir archivo");
+        } finally {
+            setIsUploading(false);
+        }
+    };
+    const handleDownload = async (adjunto) => {
+        try {
+            const res = await api.get(`/api/solicitudes/adjuntos/${adjunto.id}/download`, { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([res.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', adjunto.originalFileName);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => window.URL.revokeObjectURL(url), 100);
+        } catch (err) {
+            console.error("Error descargando archivo", err);
+            toast.error("Error al descargar");
+        }
+    };
+    const handleDeleteAdjunto = async (adjuntoId) => {
+        if(!window.confirm("¿Seguro que deseas eliminar este archivo?")) return;
+        try {
+            await api.delete(`/api/solicitudes/${formData.id}/adjuntos/${adjuntoId}`);
+            toast.success("Archivo eliminado");
+            fetchAdjuntos();
+        } catch (err) {
+            console.error("Error eliminando archivo", err);
+            toast.error("Error al eliminar el archivo");
+        }
+    };
+    const handleDynamicFileUpload = async (assignmentIndex, campoNombre, file) => {
+        if (!file) return;
+        if (!formData.id) {
+            toast.error("Guarde la solicitud antes de subir archivos en la resolución");
+            return;
+        }
+        const key = `${assignmentIndex}_${campoNombre}`;
+        setUploadingFields(prev => ({ ...prev, [key]: true }));
+
+        const uploadData = new FormData();
+        uploadData.append('file', file);
+
+        try {
+            const res = await api.post(`/api/solicitudes/${formData.id}/adjuntos`, uploadData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            
+            const newAssignments = [...formData.assignments];
+            const currentData = typeof newAssignments[assignmentIndex].detalle === 'object' && newAssignments[assignmentIndex].detalle !== null
+                ? newAssignments[assignmentIndex].detalle
+                : {};
+
+            const downloadUrl = `/api/solicitudes/adjuntos/${res.data.id}/download`;
+            newAssignments[assignmentIndex].detalle = {
+                ...currentData,
+                [campoNombre]: downloadUrl,
+                [`${campoNombre}_filename`]: res.data.originalFileName,
+                [`${campoNombre}_id`]: res.data.id
+            };
+
+            setFormData({ ...formData, assignments: newAssignments });
+            toast.success("Archivo subido correctamente");
+        } catch (err) {
+            console.error("Error subiendo archivo dinámico", err);
+            toast.error("Error al subir el archivo");
+        } finally {
+            setUploadingFields(prev => ({ ...prev, [key]: false }));
+        }
+    };
+
+    const handleDynamicFileDelete = async (assignmentIndex, campoNombre, adjuntoId) => {
+        if (!window.confirm("¿Seguro que deseas eliminar este archivo?")) return;
+        
+        try {
+            if (adjuntoId) {
+                await api.delete(`/api/solicitudes/adjuntos/${adjuntoId}`);
+            }
+            
+            const newAssignments = [...formData.assignments];
+            const currentData = typeof newAssignments[assignmentIndex].detalle === 'object' && newAssignments[assignmentIndex].detalle !== null
+                ? newAssignments[assignmentIndex].detalle
+                : {};
+                
+            const updatedData = { ...currentData };
+            delete updatedData[campoNombre];
+            delete updatedData[`${campoNombre}_filename`];
+            delete updatedData[`${campoNombre}_id`];
+            
+            newAssignments[assignmentIndex].detalle = updatedData;
+            setFormData({ ...formData, assignments: newAssignments });
+            toast.success("Archivo eliminado");
+        } catch (err) {
+            console.error("Error al eliminar archivo dinámico", err);
+            toast.error("Error al eliminar el archivo");
+        }
+    };
+
+    const fetchResponsables = useCallback(async () => {
+        try {
+            const res = await api.get('/api/responsables');
+            setResponsables(res.data);
+        } catch (err) {
+            console.error("Error fetching responsables", err);
+        }
+    }, []);
+
+    const fetchLocations = useCallback(async () => {
+        try {
+            const res = await api.get('/api/locations');
+            setLocations(res.data);
+        } catch (err) {
+            console.error("Error fetching locations", err);
+        }
+    }, []);
+
+    const fetchTiposResolucion = useCallback(async () => {
+        try {
+            const res = await api.get('/api/tipos-resolucion');
+            setTiposResolucion(res.data);
+        } catch (err) {
+            console.error("Error fetching tipos resolucion", err);
+        }
+    }, []);
+
     useEffect(() => {
         if (isOpen) {
             fetchResponsables();
             fetchLocations();
             fetchTiposResolucion();
+            
+            // Solo resetear el formulario si cambian los datos iniciales o si es una nueva apertura
             if (initialData) {
-                // Map entity to form
-                setFormData({
-                    ...initialData,
-                    type: initialData.amount !== undefined ? 'SUBSIDIO' : 'PEDIDO',
-                    person: initialData.person || { name: '', phone: '' },
-                    locationName: initialData.location?.type === 'NEIGHBORHOOD' ? (initialData.location?.parent?.name || '') : (initialData.location?.name || ''),
-                    barrio: initialData.location?.type === 'NEIGHBORHOOD' ? (initialData.location?.name || '') : '',
-                    responsableId: initialData.responsable?.id || '',
-                    amount: initialData.amount || '',
-                    grantDate: initialData.grantDate ? initialData.grantDate.split('T')[0] : '',
-                    zone: initialData.zone || '',
-                    contactDate: initialData.contactDate ? initialData.contactDate.split('T')[0] : '',
-                    resolutionDate: initialData.resolutionDate ? initialData.resolutionDate.split('T')[0] : '',
-                    entryDate: initialData.entryDate ? initialData.entryDate.split('T')[0] : '',
-                    observation: initialData.observation || '',
-                    resolution: initialData.resolution || '',
-                    suggestedResolutionType: initialData.suggestedResolutionType || '',
-                    resolutionApproved: initialData.resolutionApproved || false,
-                    detail: initialData.detail || '',
-                    firstContactControl: initialData.firstContactControl || false,
-                    origin: initialData.origin || 'MANUAL',
-                    assignments: initialData.resolutorAssignments?.map(a => {
-                        let parsedDetalle = a.detalle || '';
-                        try {
-                            if (a.detalle && typeof a.detalle === 'string' && a.detalle.startsWith('{')) {
-                                parsedDetalle = JSON.parse(a.detalle);
-                            }
-                        } catch (e) {}
-                        return {
-                            resolutorEmail: a.resolutor?.email || '',
-                            tipoResolucion: a.tipoResolucion || '',
-                            detalle: parsedDetalle
-                        };
-                    }) || []
+                // Evitar re-setear si el ID es el mismo para no romper la experiencia del usuario si el padre re-renderiza
+                setFormData(prev => {
+                    if (prev.id === initialData.id && prev.status === initialData.status) {
+                         return prev;
+                    }
+                    return {
+                        ...initialData,
+                        type: initialData.amount !== undefined ? 'SUBSIDIO' : 'PEDIDO',
+                        person: initialData.person || { name: '', phone: '' },
+                        locationName: initialData.location?.type === 'NEIGHBORHOOD' ? (initialData.location?.parent?.name || '') : (initialData.location?.name || ''),
+                        barrio: initialData.location?.type === 'NEIGHBORHOOD' ? (initialData.location?.name || '') : '',
+                        responsableId: initialData.responsable?.id || '',
+                        amount: initialData.amount || '',
+                        grantDate: initialData.grantDate ? initialData.grantDate.split('T')[0] : '',
+                        zone: initialData.zone || '',
+                        contactDate: initialData.contactDate ? initialData.contactDate.split('T')[0] : '',
+                        resolutionDate: initialData.resolutionDate ? initialData.resolutionDate.split('T')[0] : '',
+                        entryDate: initialData.entryDate ? initialData.entryDate.split('T')[0] : '',
+                        observation: initialData.observation || '',
+                        resolution: initialData.resolution || '',
+                        suggestedResolutionType: initialData.suggestedResolutionType || '',
+                        resolutionApproved: initialData.resolutionApproved || false,
+                        detail: initialData.detail || '',
+                        firstContactControl: initialData.firstContactControl || false,
+                        origin: initialData.origin || 'MANUAL',
+                        assignments: initialData.resolutorAssignments?.map(a => {
+                            let parsedDetalle = a.detalle || '';
+                            try {
+                                if (a.detalle && typeof a.detalle === 'string' && a.detalle.startsWith('{')) {
+                                    parsedDetalle = JSON.parse(a.detalle);
+                                }
+                            } catch (e) {}
+                            return {
+                                resolutorEmail: a.resolutor?.email || '',
+                                tipoResolucion: a.tipoResolucion || '',
+                                detalle: parsedDetalle
+                            };
+                        }) || []
+                    };
                 });
             } else {
                 setFormData({
@@ -96,36 +299,13 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     firstContactControl: false,
                     assignments: []
                 });
+                setActiveTab('detalles');
             }
+        } else {
+            // Cuando se cierra, podemos resetear el tab pero no es crítico
+            setActiveTab('detalles');
         }
-    }, [isOpen, initialData]);
-
-    const fetchResponsables = async () => {
-        try {
-            const res = await api.get('/api/responsables');
-            setResponsables(res.data);
-        } catch (err) {
-            console.error("Error fetching responsables", err);
-        }
-    };
-
-    const fetchLocations = async () => {
-        try {
-            const res = await api.get('/api/locations');
-            setLocations(res.data);
-        } catch (err) {
-            console.error("Error fetching locations", err);
-        }
-    };
-
-    const fetchTiposResolucion = async () => {
-        try {
-            const res = await api.get('/api/tipos-resolucion');
-            setTiposResolucion(res.data);
-        } catch (err) {
-            console.error("Error fetching tipos resolucion", err);
-        }
-    };
+    }, [isOpen, initialData?.id, fetchResponsables, fetchLocations, fetchTiposResolucion, isResponsable, user?.responsable?.id, user?.responsable?.zone]);
 
     // Computar listas dinámicas
     const availableCities = locations.filter(l => l.type === 'CITY' || l.type === 'LOCALITY');
@@ -137,27 +317,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        const validateDates = () => {
-            const dateFields = ['entryDate', 'grantDate', 'contactDate', 'resolutionDate'];
-            for (const field of dateFields) {
-                if (formData[field]) {
-                    const year = new Date(formData[field]).getFullYear();
-                    if (year > 2100 || year < 1900) {
-                        alert(`El año en el campo ${field} es inválido (${year}). Por favor corríjalo.`);
-                        return false;
-                    }
-                }
-            }
-            return true;
-        };
-
-        if (!validateDates()) {
-            setLoading(false);
-            return;
-        }
-
         try {
-
             // Limpiar asignaciones: filtrar vacías y serializar el detalle
             const assignments = formData.assignments
                 .filter(a => a.resolutorEmail && a.tipoResolucion)
@@ -166,6 +326,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     detalle: typeof a.detalle === 'object' ? JSON.stringify(a.detalle) : (a.detalle || '')
                 }));
 
+            let newId = null;
             if (formData.id) {
                 // PUT usa un DTO plano (SolicitudUpdateDTO) para evitar el problema de
                 // deserialización polimórfica de Jackson con la jerarquía abstracta de Solicitud.
@@ -186,14 +347,16 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     detail: formData.detail,
                     observation: formData.observation,
                     firstContactControl: formData.firstContactControl,
-                    // Clave: se envía el ID directo, no un objeto anidado
-                    responsableId: formData.responsableId ? Number(formData.responsableId) : null,
+                    // Clave: se envía el ID directo, no un objeto anidado. 
+                    // Se envía 0 para indicar desasignación explícita.
+                    responsableId: formData.responsableId ? Number(formData.responsableId) : 0,
                     suggestedResolutionType: formData.suggestedResolutionType || null,
                     resolutionApproved: formData.resolutionApproved,
                     // Campos de Subsidio
                     amount: formData.amount ? Number(formData.amount) : null,
                     grantDate: formData.grantDate || null,
-                    assignments
+                    assignments,
+                    status: formData.status
                 };
                 await api.put(`/api/solicitudes/${formData.id}`, updatePayload);
             } else {
@@ -203,13 +366,15 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     responsable: formData.responsableId ? { id: Number(formData.responsableId) } : null,
                     assignments
                 };
-                await api.post('/api/solicitudes', createPayload);
+                const response = await api.post('/api/solicitudes', createPayload);
+                newId = response.data?.id;
             }
+            toast.success(formData.id ? "Solicitud actualizada con éxito" : `Solicitud #${newId} creada con éxito`);
             onSuccess();
             onClose();
         } catch (err) {
             console.error("Error saving solicitud", err);
-            alert("Error al guardar la solicitud");
+            toast.error("Error al guardar la solicitud");
         } finally {
             setLoading(false);
         }
@@ -219,11 +384,12 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         setLoading(true);
         try {
             await api.post(`/api/solicitudes/${formData.id}/aprobar`, { observaciones: approveObservations });
+            toast.success("Resolución aprobada");
             onSuccess();
             onClose();
         } catch (err) {
             console.error("Error approving assignment", err);
-            alert("Error al finalizar la resolución");
+            toast.error("Error al finalizar la resolución");
         } finally {
             setLoading(false);
             setShowApproveConfirm(false);
@@ -242,52 +408,89 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 <div className="flex items-center justify-between p-6 border-b border-gray-700 bg-gray-800/50">
                     <h2 className="text-xl font-bold flex items-center gap-2">
                         <Clipboard className="text-indigo-500" />
-                        {formData.id ? 'Editar Solicitud' : 'Nueva Solicitud'}
+                        {formData.id ? `Editar Solicitud #${formData.id}` : 'Nueva Solicitud'}
                     </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+                    <button onClick={onClose} title="Cerrar" className="text-gray-400 hover:text-white transition-colors">
                         <X className="h-6 w-6" />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                <div className="flex border-b border-gray-700 px-6 bg-gray-900/20">
+                    <button
+                        onClick={() => setActiveTab('detalles')}
+                        className={`px-4 py-3 font-bold text-sm tracking-wide ${activeTab === 'detalles' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'}`}
+                    >
+                        Formulario / Detalles
+                    </button>
+                    {formData.id && (
+                        <>
+                            <button
+                                onClick={() => setActiveTab('comentarios')}
+                                className={`px-4 py-3 font-bold text-sm tracking-wide flex items-center gap-2 ${activeTab === 'comentarios' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'}`}
+                            >
+                                <MessageSquare className="h-4 w-4" /> Notas Seguimiento
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('historial')}
+                                className={`px-4 py-3 font-bold text-sm tracking-wide flex items-center gap-2 ${activeTab === 'historial' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'}`}
+                            >
+                                <History className="h-4 w-4" /> Historial
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('adjuntos')}
+                                className={`px-4 py-3 font-bold text-sm tracking-wide flex items-center gap-2 ${activeTab === 'adjuntos' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'}`}
+                            >
+                                <FileText className="h-4 w-4" /> Adjuntos
+                            </button>
+                        </>
+                    )}
+                </div>
+
+                <div className="max-h-[70vh] overflow-y-auto custom-scrollbar">
+                    {activeTab === 'detalles' && (
+                        <form onSubmit={handleSubmit} className="p-6 space-y-6">
                     {/* Type and Status */}
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Tipo</label>
-                            <select
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
-                                value={formData.type}
-                                disabled={!!formData.id}
-                                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                            >
-                                <option value="PEDIDO">Pedido</option>
-                                <option value="SUBSIDIO">Subsidio</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Estado</label>
-                            <select
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                                value={formData.status}
-                                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                            >
-                                <option value="pendiente">Pendiente</option>
-                                <option value="en proceso">En Proceso</option>
-                                <option value="en resolucion">En Resolución</option>
-                                <option value="completadas">Completado</option>
-                                <option value="rechazada">Rechazado</option>
-                            </select>
-                        </div>
+                        {user?.role !== 'OPERADOR' && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Tipo</label>
+                                <select
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
+                                    value={formData.type}
+                                    disabled={!!formData.id}
+                                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                                >
+                                    <option value="PEDIDO">Pedido</option>
+                                    <option value="SUBSIDIO">Subsidio</option>
+                                </select>
+                            </div>
+                        )}
+                        {!!formData.id && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Estado</label>
+                                <select
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    value={formData.status}
+                                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                >
+                                    <option value="pendiente">Pendiente</option>
+                                    <option value="en proceso">Asignadas</option>
+                                    <option value="en resolucion">En Resolución</option>
+                                    <option value="completadas">Resueltas</option>
+                                    <option value="rechazada">Rechazado</option>
+                                </select>
+                            </div>
+                        )}
                     </div>
 
                     {/* Person Data */}
                     <div className="space-y-4 p-4 bg-gray-900/40 rounded-xl border border-gray-700">
                         <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                            <UserIcon className="h-4 w-4 text-indigo-400" /> Beneficiario
+                            <UserIcon className="h-4 w-4 text-indigo-400" /> Solicitante
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm text-gray-500 mb-1">Nombre Completo</label>
+                                <label className="block text-sm text-gray-500 mb-1">Nombre Completo / Institución</label>
                                 <input
                                     type="text"
                                     required
@@ -305,6 +508,40 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     onChange={(e) => setFormData({ ...formData, person: { ...formData.person, phone: e.target.value } })}
                                 />
                             </div>
+                            <div>
+                                <label className="block text-sm text-gray-500 mb-1">Tipo Solicitante</label>
+                                <select
+                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                    value={formData.person.type || ''}
+                                    onChange={(e) => setFormData({ ...formData, person: { ...formData.person, type: e.target.value, subType: '' } })}
+                                >
+                                    <option value="">Seleccionar...</option>
+                                    <option value="Club">Club</option>
+                                    <option value="Iglesia">Iglesia</option>
+                                    <option value="Escuela">Escuela</option>
+                                    <option value="Gobierno Local">Gobierno Local</option>
+                                    <option value="ONGs">ONGs</option>
+                                    <option value="Grupo social">Grupo social</option>
+                                    <option value="Comedor/Merendero">Comedor/Merendero</option>
+                                    <option value="Personal">Personal</option>
+                                </select>
+                            </div>
+                            {formData.person.type === 'Personal' && (
+                                <div>
+                                    <label className="block text-sm text-gray-500 mb-1">Subtipo</label>
+                                    <select
+                                        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        value={formData.person.subType || ''}
+                                        onChange={(e) => setFormData({ ...formData, person: { ...formData.person, subType: e.target.value } })}
+                                    >
+                                        <option value="">Seleccionar...</option>
+                                        <option value="joven">Joven</option>
+                                        <option value="emprendedor">Emprendedor</option>
+                                        <option value="referente">Referente</option>
+                                        <option value="otro">Otro</option>
+                                    </select>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -349,17 +586,19 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     ))}
                                 </datalist>
                             </div>
-                            <div>
-                                <label className="block text-sm text-gray-500 mb-1">Zona / Eje</label>
-                                <input
-                                    type="text"
-                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-                                    value={formData.zone || ''}
-                                    disabled={isResponsable}
-                                    onChange={(e) => setFormData({ ...formData, zone: e.target.value })}
-                                    placeholder="Auto-asignada, o escriba aquí..."
-                                />
-                            </div>
+                            {user?.role !== 'OPERADOR' && (
+                                <div>
+                                    <label className="block text-sm text-gray-500 mb-1">Zona / Eje</label>
+                                    <input
+                                        type="text"
+                                        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                                        value={formData.zone || ''}
+                                        disabled={isResponsable}
+                                        onChange={(e) => setFormData({ ...formData, zone: e.target.value })}
+                                        placeholder="Auto-asignada, o escriba aquí..."
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -396,7 +635,9 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             <option value="MANUAL">Manual / Personal</option>
                             <option value="WHATSAPP">WhatsApp</option>
                             <option value="NOTE">Nota / Expediente</option>
-                            <option value="SOCIAL_MEDIA">Redes Sociales</option>
+                            <option value="INSTAGRAM">Instagram</option>
+                            <option value="FACEBOOK">Facebook</option>
+                            <option value="OTRO">Otro</option>
                             <option value="PHONE">Teléfono</option>
                             <option value="EMAIL">Email</option>
                         </select>
@@ -423,7 +664,6 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 </label>
                                 <input
                                     type="date"
-                                    max="2099-12-31"
                                     className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
                                     value={formData.grantDate}
                                     onChange={(e) => setFormData({ ...formData, grantDate: e.target.value })}
@@ -438,127 +678,130 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Ingreso</label>
                             <input
                                 type="date"
-                                max="2099-12-31"
                                 className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
                                 value={formData.entryDate}
                                 onChange={(e) => setFormData({ ...formData, entryDate: e.target.value })}
                             />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Responsable</label>
-                            <select
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-                                value={formData.responsableId}
-                                disabled={isResponsable}
-                                onChange={(e) => {
-                                    const respId = e.target.value;
-                                    const selectedResp = responsables.find(r => r.id.toString() === respId.toString());
-                                    setFormData({ 
-                                        ...formData, 
-                                        responsableId: respId,
-                                        zone: selectedResp ? (selectedResp.zone || '') : ''
-                                    });
-                                }}
-                            >
-                                <option value="">Seleccionar...</option>
-                                {responsables.map(r => (
-                                    <option key={r.id} value={r.id}>{r.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="p-4 bg-gray-900/40 rounded-xl border border-gray-700 space-y-4">
-                        <h3 className="text-sm font-semibold text-gray-300">Seguimiento</h3>
-                        <div className="grid grid-cols-2 gap-4">
+                        {user?.role !== 'OPERADOR' && (
                             <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Contacto</label>
-                                <input
-                                    type="date"
-                                    max="2099-12-31"
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                                    value={formData.contactDate}
-                                    onChange={(e) => setFormData({ ...formData, contactDate: e.target.value })}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Resolución</label>
-                                <input
-                                    type="date"
-                                    max="2099-12-31"
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                                    value={formData.resolutionDate}
-                                    onChange={(e) => setFormData({ ...formData, resolutionDate: e.target.value })}
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Resolución</label>
-                            <input
-                                type="text"
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                                value={formData.resolution}
-                                onChange={(e) => setFormData({ ...formData, resolution: e.target.value })}
-                                placeholder="Resultado breve..."
-                            />
-                        </div>
-
-
-
-                        {isResolutor && myAssignment?.approved && (
-                            <div className="bg-emerald-900/40 p-4 rounded-xl border border-emerald-700/50 flex flex-col gap-1">
-                                <span className="text-sm font-bold text-emerald-400">✅ Resolución Finalizada</span>
-                                {myAssignment.observaciones && (
-                                    <p className="text-xs text-emerald-200 italic">"{myAssignment.observaciones}"</p>
-                                )}
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Responsable</label>
+                                <select
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                                    value={formData.responsableId}
+                                    disabled={isResponsable}
+                                    onChange={(e) => {
+                                        const respId = e.target.value;
+                                        const selectedResp = responsables.find(r => r.id.toString() === respId.toString());
+                                        setFormData({ 
+                                            ...formData, 
+                                            responsableId: respId,
+                                            zone: selectedResp ? (selectedResp.zone || '') : ''
+                                        });
+                                    }}
+                                >
+                                    <option value="">Seleccionar...</option>
+                                    {responsables.map(r => (
+                                        <option key={r.id} value={r.id}>{r.name}</option>
+                                    ))}
+                                </select>
                             </div>
                         )}
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Detalle</label>
-                            <textarea
-                                rows="2"
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                value={formData.detail}
-                                onChange={(e) => setFormData({ ...formData, detail: e.target.value })}
-                                placeholder="Detalle extendido del seguimiento..."
-                            />
-                        </div>
-
-                        <div className="flex items-center gap-2 pt-2">
-                            <input
-                                type="checkbox"
-                                id="firstContactControl"
-                                className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500"
-                                checked={formData.firstContactControl}
-                                onChange={(e) => setFormData({ ...formData, firstContactControl: e.target.checked })}
-                            />
-                            <label htmlFor="firstContactControl" className="text-sm font-medium text-gray-300">
-                                Control 1er Contacto Realizado
-                            </label>
-                        </div>
                     </div>
 
+                    {user?.role !== 'OPERADOR' && (
+                        <div className="p-4 bg-gray-900/40 rounded-xl border border-gray-700 space-y-4">
+                            <h3 className="text-sm font-semibold text-gray-300">Seguimiento</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Contacto</label>
+                                    <input
+                                        type="date"
+                                        className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                                        value={formData.contactDate}
+                                        onChange={(e) => setFormData({ ...formData, contactDate: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Resolución</label>
+                                    <input
+                                        type="date"
+                                        className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                                        value={formData.resolutionDate}
+                                        onChange={(e) => setFormData({ ...formData, resolutionDate: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Resolución</label>
+                                <input
+                                    type="text"
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                                    value={formData.resolution}
+                                    onChange={(e) => setFormData({ ...formData, resolution: e.target.value })}
+                                    placeholder="Resultado breve..."
+                                />
+                            </div>
+
+
+
+                            {isResolutor && myAssignment?.approved && (
+                                <div className="bg-emerald-900/40 p-4 rounded-xl border border-emerald-700/50 flex flex-col gap-1">
+                                    <span className="text-sm font-bold text-emerald-400">✅ Resolución Finalizada</span>
+                                    {myAssignment.observaciones && (
+                                        <p className="text-xs text-emerald-200 italic">"{myAssignment.observaciones}"</p>
+                                    )}
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Detalle</label>
+                                <textarea
+                                    rows="2"
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                    value={formData.detail}
+                                    onChange={(e) => setFormData({ ...formData, detail: e.target.value })}
+                                    placeholder="Detalle extendido del seguimiento..."
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-2">
+                                <input
+                                    type="checkbox"
+                                    id="firstContactControl"
+                                    className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500"
+                                    checked={formData.firstContactControl}
+                                    onChange={(e) => setFormData({ ...formData, firstContactControl: e.target.checked })}
+                                />
+                                <label htmlFor="firstContactControl" className="text-sm font-medium text-gray-300">
+                                    Control 1er Contacto Realizado
+                                </label>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Multi-Resolutor Assignments Section */}
-                    {user?.role === 'RESPONSABLE' && (
+                    {(user?.role === 'RESPONSABLE' || user?.role === 'ADMINISTRADOR' || formData.assignments.length > 0) && (
                     <div className="p-4 bg-indigo-900/10 rounded-xl border border-indigo-700/30 space-y-4">
                         <div className="flex items-center justify-between">
                             <h3 className="text-sm font-semibold text-indigo-300 flex items-center gap-2">
                                 <Users className="h-4 w-4" /> Asignaciones Múltiples (Resolutores)
                             </h3>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setFormData({
-                                        ...formData,
-                                        assignments: [...formData.assignments, { resolutorEmail: '', tipoResolucion: '', detalle: '' }]
-                                    });
-                                }}
-                                className="text-xs flex items-center gap-1 bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded transition-colors"
-                            >
-                                <Plus className="h-3 w-3" /> Agregar
-                            </button>
+                            {!isResolutor && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setFormData({
+                                            ...formData,
+                                            assignments: [...formData.assignments, { resolutorEmail: '', tipoResolucion: '', detalle: '' }]
+                                        });
+                                    }}
+                                    className="text-xs flex items-center gap-1 bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded transition-colors"
+                                >
+                                    <Plus className="h-3 w-3" /> Agregar
+                                </button>
+                            )}
                         </div>
 
                         {formData.assignments.length === 0 ? (
@@ -569,7 +812,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     <div key={index} className="flex flex-col gap-2 p-3 bg-gray-900/60 rounded-lg border border-gray-700 relative group">
                                         <div className="flex items-center gap-2">
                                             <select
-                                                className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white"
+                                                className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white disabled:opacity-70"
+                                                disabled={isResolutor}
                                                 value={assignment.tipoResolucion}
                                                 onChange={(e) => {
                                                     const type = e.target.value;
@@ -596,27 +840,53 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                     );
                                                 })}
                                             </select>
-                                            <button 
-                                                type="button"
-                                                onClick={() => {
-                                                    const newAssignments = formData.assignments.filter((_, i) => i !== index);
-                                                    setFormData({ ...formData, assignments: newAssignments });
-                                                }}
-                                                className="text-red-400 hover:text-red-300 p-1"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
+                                            {!isResolutor && (
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newAssignments = formData.assignments.filter((_, i) => i !== index);
+                                                        setFormData({ ...formData, assignments: newAssignments });
+                                                    }}
+                                                    className="text-red-400 hover:text-red-300 p-1"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            )}
                                         </div>
                                         <div className="flex flex-col mt-2">
-                                            {(() => {
-                                                const config = tiposResolucion.find(c => c.tipo === assignment.tipoResolucion);
-                                                if (config && config.atributosConfig && config.atributosConfig.length > 0) {
-                                                    const sortedCampos = [...config.atributosConfig].sort((a,b) => a.orden - b.orden);
+                                                {(() => {
+                                                    const config = tiposResolucion.find(c => c.tipo === assignment.tipoResolucion);
+                                                    const canEditThis = !isResolutor || (assignment.resolutorEmail === user?.email);
+                                                    if (config && config.atributosConfig && config.atributosConfig.length > 0) {
+                                                        const sortedCampos = [...config.atributosConfig].sort((a,b) => a.orden - b.orden);
                                                     const currentData = typeof assignment.detalle === 'object' && assignment.detalle !== null ? assignment.detalle : {};
                                                     return (
                                                         <div className="space-y-4 p-4 bg-gray-800/80 border border-gray-600 rounded-lg shadow-inner">
                                                             {sortedCampos.map(ac => {
                                                                 const campo = ac.atributo;
+
+                                                                // Lógica condicional específica para SUBSIDIO
+                                                                if (assignment.tipoResolucion === 'SUBSIDIO') {
+                                                                    const tipoPedido = currentData['Tipo de pedido'] || '';
+                                                                    const camposPersonal = [
+                                                                        'Apellido y nombre', 'DNI', 'Dirección del DNI',
+                                                                        'Adjuntar DNI frente', 'Adjuntar DNI atras', 'Adjuntar Constancia de CBU'
+                                                                    ];
+                                                                    const camposInstitucional = [
+                                                                        'Nombre de la Institución', 'Dirección de la Institución', 'Localidad de la Institución',
+                                                                        'responsable1: Nombre', 'responsable1: DNI', 'responsable1: Cargo',
+                                                                        'responsable2: Nombre', 'responsable2: DNI', 'responsable2: Cargo',
+                                                                        'Adjuntar nota de pedido (jpg/pdf)'
+                                                                    ];
+
+                                                                    if (camposPersonal.includes(campo.nombre) && tipoPedido !== 'Personal') {
+                                                                        return null;
+                                                                    }
+                                                                    if (camposInstitucional.includes(campo.nombre) && !tipoPedido.startsWith('Institucional')) {
+                                                                        return null;
+                                                                    }
+                                                                }
+
                                                                 return (
                                                                 <div key={campo.id}>
                                                                     <label className="block text-[11px] text-gray-400 mb-1 uppercase tracking-wider font-semibold">
@@ -630,7 +900,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                                 newAssignments[index].detalle = { ...currentData, [campo.nombre]: e.target.value };
                                                                                 setFormData({ ...formData, assignments: newAssignments });
                                                                             }}
-                                                                            className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                                                            className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
+                                                                            disabled={!canEditThis}
                                                                         >
                                                                             <option value="">Seleccionar...</option>
                                                                             {campo.opciones && campo.opciones.split(',').map(opt => (
@@ -646,19 +917,89 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                                 setFormData({ ...formData, assignments: newAssignments });
                                                                             }}
                                                                             rows="2"
-                                                                            className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none block"
+                                                                            className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none block disabled:opacity-50"
+                                                                            disabled={!canEditThis}
                                                                         />
+                                                                    ) : campo.tipoDato === 'FILE' ? (
+                                                                        <div className="mt-1 flex flex-col gap-2 p-3 bg-gray-900/40 border border-gray-700/50 rounded-lg">
+                                                                            {currentData[campo.nombre] ? (
+                                                                                <div className="flex items-center justify-between text-xs text-indigo-300">
+                                                                                    <a 
+                                                                                        href={`${api.defaults.baseURL || ''}${currentData[campo.nombre]}`} 
+                                                                                        target="_blank" 
+                                                                                        rel="noopener noreferrer" 
+                                                                                        className="font-bold underline flex items-center gap-1 hover:text-indigo-200"
+                                                                                        title="Descargar/Ver archivo"
+                                                                                        onClick={async (e) => {
+                                                                                            // Usar el manejador de descargas para consistencia si no tiene baseURL absoluto
+                                                                                            e.preventDefault();
+                                                                                            try {
+                                                                                                const res = await api.get(currentData[campo.nombre], { responseType: 'blob' });
+                                                                                                const url = window.URL.createObjectURL(new Blob([res.data]));
+                                                                                                const link = document.createElement('a');
+                                                                                                link.href = url;
+                                                                                                link.setAttribute('download', currentData[`${campo.nombre}_filename`] || 'archivo');
+                                                                                                document.body.appendChild(link);
+                                                                                                link.click();
+                                                                                                link.remove();
+                                                                                                setTimeout(() => window.URL.revokeObjectURL(url), 100);
+                                                                                            } catch (err) {
+                                                                                                console.error("Error al descargar archivo dinámico", err);
+                                                                                                toast.error("Error al descargar archivo");
+                                                                                            }
+                                                                                        }}
+                                                                                    >
+                                                                                        📎 {currentData[`${campo.nombre}_filename`] || 'Ver archivo'}
+                                                                                    </a>
+                                                                                    {canEditThis && (
+                                                                                        <button
+                                                                                            type="button"
+                                                                                            onClick={() => handleDynamicFileDelete(index, campo.nombre, currentData[`${campo.nombre}_id`])}
+                                                                                            className="text-red-400 hover:text-red-300 font-semibold"
+                                                                                        >
+                                                                                            Eliminar
+                                                                                        </button>
+                                                                                    )}
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div>
+                                                                                    {uploadingFields[`${index}_${campo.nombre}`] ? (
+                                                                                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                                                                                            <span className="animate-spin text-indigo-500">⏳</span> Subiendo archivo...
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <div className="flex items-center justify-between gap-2">
+                                                                                            <input
+                                                                                                type="file"
+                                                                                                disabled={!canEditThis || !formData.id}
+                                                                                                onChange={async (e) => {
+                                                                                                    if (e.target.files && e.target.files.length > 0) {
+                                                                                                        await handleDynamicFileUpload(index, campo.nombre, e.target.files[0]);
+                                                                                                    }
+                                                                                                }}
+                                                                                                className="w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-600/30 file:text-indigo-300 hover:file:bg-indigo-600/40 disabled:opacity-50"
+                                                                                            />
+                                                                                            {!formData.id && (
+                                                                                                <span className="text-[10px] text-yellow-500 font-semibold leading-tight">
+                                                                                                    Guarde la solicitud antes de subir archivos.
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
                                                                     ) : (
                                                                         <input
-                                                                            type={campo.tipoDato === 'DATE' ? 'date' : 'text'}
-                                                                            placeholder={campo.tipoDato === 'FILE' ? 'Suba en Adjuntos y pegue el link / ref aquí...' : ''}
+                                                                            type={campo.tipoDato === 'DATE' ? 'date' : campo.tipoDato === 'NUMBER' ? 'number' : 'text'}
                                                                             value={currentData[campo.nombre] || ''}
                                                                             onChange={e => {
                                                                                 const newAssignments = [...formData.assignments];
                                                                                 newAssignments[index].detalle = { ...currentData, [campo.nombre]: e.target.value };
                                                                                 setFormData({ ...formData, assignments: newAssignments });
                                                                             }}
-                                                                            className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none block"
+                                                                            className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none block disabled:opacity-50"
+                                                                            disabled={!canEditThis}
                                                                         />
                                                                     )}
                                                                 </div>
@@ -671,7 +1012,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                         <input 
                                                             type="text"
                                                             placeholder="Detalle de la asignación..."
-                                                            className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-300"
+                                                            className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-300 disabled:opacity-50"
+                                                            disabled={!canEditThis}
                                                             value={typeof assignment.detalle === 'string' ? assignment.detalle : ''}
                                                             onChange={(e) => {
                                                                 const newAssignments = [...formData.assignments];
@@ -695,7 +1037,161 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         )}
                     </div>
                     )}
-                </form>
+                    
+                    {/* Carga rápida de adjuntos */}
+                    {formData.id && (
+                        <div className="p-4 bg-gray-900/40 rounded-xl border border-gray-700 mt-6 animate-in slide-in-from-bottom-2">
+                            <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2 mb-3">
+                                <FileText className="h-4 w-4 text-indigo-400" /> Adjuntos Rápidos
+                            </h3>
+                            <div className="flex items-center justify-between gap-4">
+                                <label className={`bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white px-4 py-2 rounded-lg font-bold cursor-pointer transition-colors flex items-center gap-2 text-sm ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                                    <UploadCloud className="h-4 w-4" />
+                                    {isUploading ? 'Subiendo...' : 'Subir Archivo'}
+                                    <input type="file" className="hidden" disabled={isUploading} onChange={(e) => handleFileUpload(e.target.files[0])} />
+                                </label>
+                                <span className="text-xs text-gray-500 flex items-center gap-1">
+                                    <span className="font-bold text-white bg-gray-800 px-2 py-0.5 rounded">{adjuntos.length}</span> adjuntos cargados. (Ver pestaña Adjuntos para listado completo)
+                                </span>
+                            </div>
+                        </div>
+                    )}
+                        </form>
+                    )}
+
+                    {activeTab === 'comentarios' && formData.id && (
+                        <div className="p-6">
+                            <TicketSeguimiento solicitudId={formData.id} />
+                        </div>
+                    )}
+
+                    {activeTab === 'historial' && formData.id && (
+                        <div className="p-6 space-y-4">
+                            {historial.length === 0 ? (
+                                <div className="text-center py-10 bg-gray-900/30 rounded-2xl border border-gray-700/50">
+                                    <History className="h-10 w-10 text-gray-600 mx-auto mb-3" />
+                                    <p className="text-gray-400 text-sm">No hay registros de asignación para esta solicitud.</p>
+                                </div>
+                            ) : (
+                                historial.map((record) => (
+                                    <div key={record.id} className="bg-gray-900/40 p-4 rounded-2xl border border-gray-700/50 flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`p-2 rounded-lg ${
+                                                record.actionType === 'CREATED' ? 'bg-amber-500/10 text-amber-400' :
+                                                record.actionType === 'ASSIGNED' ? 'bg-emerald-500/10 text-emerald-400' :
+                                                record.actionType === 'REASSIGNED' ? 'bg-indigo-500/10 text-indigo-400' :
+                                                record.actionType.startsWith('RESOLUCIÓN') ? 'bg-blue-500/10 text-blue-400' :
+                                                'bg-red-500/10 text-red-400'
+                                            }`}>
+                                                {record.actionType === 'CREATED' ? <Plus className="h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
+                                                        record.actionType === 'CREATED' ? 'bg-amber-900/30 text-amber-400 border-amber-800' :
+                                                        record.actionType === 'ASSIGNED' ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' :
+                                                        record.actionType === 'REASSIGNED' ? 'bg-indigo-900/30 text-indigo-400 border-indigo-800' :
+                                                        record.actionType.startsWith('RESOLUCIÓN') ? 'bg-blue-900/30 text-blue-400 border-blue-800' :
+                                                        'bg-red-900/30 text-red-400 border-red-800'
+                                                    }`}>
+                                                        {record.actionType === 'CREATED' ? 'Cargado/Creado' :
+                                                         record.actionType === 'ASSIGNED' ? 'Asignado' :
+                                                         record.actionType === 'REASSIGNED' ? 'Re-asignado' : 
+                                                         record.actionType.startsWith('RESOLUCIÓN') ? 'Resolución Aprobada' : 'Desasignado'}
+                                                    </span>
+                                                    <span className="text-xs text-gray-400">
+                                                        {new Date(record.actionDate).toLocaleString()}
+                                                    </span>
+                                                </div>
+                                                <div className="text-sm">
+                                                    {record.actionType === 'CREATED' ? (
+                                                        <span className="text-gray-300">
+                                                            Solicitud registrada inicialmente en el sistema.
+                                                        </span>
+                                                    ) : record.actionType === 'ASSIGNED' ? (
+                                                        <span className="text-gray-300">
+                                                            Asignado al responsable <span className="font-bold text-white">{record.responsable ? record.responsable.name : 'Ninguno'}</span>
+                                                        </span>
+                                                    ) : record.actionType === 'REASSIGNED' ? (
+                                                        <span className="text-gray-300">
+                                                            Re-asignado al responsable <span className="font-bold text-white">{record.responsable ? record.responsable.name : 'Ninguno'}</span>
+                                                        </span>
+                                                    ) : record.actionType === 'UNASSIGNED' ? (
+                                                        <span className="text-gray-300">
+                                                            Se retiró la asignación de responsable (anterior: {record.responsable ? record.responsable.name : 'Desconocido'})
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-300">
+                                                            <span className="font-bold text-white">{record.responsable ? record.responsable.name : 'Usuario'}</span> {record.actionType.toLowerCase().includes('aprobada') ? 'aprobó la resolución.' : ''}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="text-xs text-gray-500 mt-1">
+                                                    {record.actionType === 'CREATED' ? 'Operador: ' : 'Acción realizada por: '}
+                                                    <span className="font-medium text-gray-400">{record.assignedByUsername}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
+                    
+                    {activeTab === 'adjuntos' && formData.id && (
+                        <div className="p-6 space-y-6">
+                            <div 
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                                className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all ${isDragging ? 'border-indigo-500 bg-indigo-500/10' : 'border-gray-600 bg-gray-900/30'}`}
+                            >
+                                <UploadCloud className={`h-12 w-12 mx-auto mb-4 ${isDragging ? 'text-indigo-400' : 'text-gray-500'}`} />
+                                <h3 className="text-lg font-bold text-white mb-2">Subir Documento</h3>
+                                <p className="text-gray-400 text-sm mb-4">Arrastra aquí tu archivo o haz clic para seleccionar</p>
+                                <label className={`bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold cursor-pointer transition-colors inline-block ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                                    {isUploading ? 'Subiendo...' : 'Seleccionar Archivo'}
+                                    <input type="file" className="hidden" disabled={isUploading} onChange={(e) => handleFileUpload(e.target.files[0])} />
+                                </label>
+                            </div>
+
+                            <div className="space-y-4">
+                                <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                    <FileText className="h-4 w-4" /> Archivos Adjuntos ({adjuntos.length})
+                                </h3>
+                                {adjuntos.length === 0 ? (
+                                    <div className="text-center py-8 bg-gray-900/30 rounded-xl border border-gray-700/50">
+                                        <p className="text-gray-500 text-sm">No hay documentos adjuntos aún.</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        {adjuntos.map(adj => (
+                                            <div key={adj.id} className="bg-gray-800 border border-gray-700 p-4 rounded-xl flex items-center justify-between group">
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400 shrink-0">
+                                                        <FileText className="h-6 w-6" />
+                                                    </div>
+                                                    <div className="truncate min-w-0 flex-1">
+                                                        <p className="text-sm font-bold text-white truncate" title={adj.originalFileName}>{adj.originalFileName}</p>
+                                                        <p className="text-xs text-gray-500">{(adj.size / 1024 / 1024).toFixed(2)} MB • {new Date(adj.uploadedAt).toLocaleDateString()}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
+                                                    <button type="button" onClick={() => handleDownload(adj)} className="p-2 text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors" title="Descargar">
+                                                        <Download className="h-4 w-4" />
+                                                    </button>
+                                                    <button type="button" onClick={() => handleDeleteAdjunto(adj.id)} className="p-2 text-red-400 hover:text-white bg-red-900/20 hover:bg-red-600 rounded-lg transition-colors" title="Eliminar">
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
 
                 <div className="p-6 border-t border-gray-700 bg-gray-800/50 flex justify-between items-center gap-3">
                     <div>

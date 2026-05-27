@@ -32,10 +32,12 @@ export default function DashboardPage() {
     useEffect(() => {
         if (user?.role === 'ADMINISTRADOR') {
             fetchConfigs();
+        } else if (user) {
+            navigate('/mis-solicitudes', { replace: true });
         } else {
             setLoading(false);
         }
-    }, [user]);
+    }, [user, navigate]);
 
     const fetchConfigs = async () => {
         try {

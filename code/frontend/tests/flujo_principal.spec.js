@@ -12,11 +12,8 @@ test.describe.serial('Flujo Principal de Solicitud (Etapa 3)', () => {
     await page.fill('input[type="password"]', 'SGP_StrongPass_2026!');
     await page.click('button:has-text("Ingresar")');
     
-    // Esperar a que el login termine y cargue el dashboard
-    await expect(page.locator('text=Panel SGP')).toBeVisible();
-
-    // Ir a Mis Solicitudes
-    await page.goto('/mis-solicitudes');
+    // Esperar a que el login termine y cargue la vista de solicitudes
+    await page.waitForURL('**/mis-solicitudes', { timeout: 15000 });
 
     // Nueva Solicitud
     await page.click('button:has-text("Nueva Solicitud")');
@@ -45,14 +42,11 @@ test.describe.serial('Flujo Principal de Solicitud (Etapa 3)', () => {
     await page.fill('input[type="email"]', 'distribuidor@sgp.com');
     await page.fill('input[type="password"]', 'SGP_StrongPass_2026!');
     await page.click('button:has-text("Ingresar")');
-    await expect(page.locator('text=Panel SGP')).toBeVisible();
-
-    // Ir a Mis Solicitudes
-    await page.goto('/mis-solicitudes');
+    await page.waitForURL('**/mis-solicitudes', { timeout: 15000 });
 
     // Encontrar la solicitud y hacer clic en Editar
     const fila = page.locator('tr').filter({ hasText: descripcionSolicitud }).first();
-    await fila.locator('button[title="Editar"]').click();
+    await fila.locator('button[title="Ver / Editar Detalles"]').click();
 
     // Modal de edición
     await expect(page.locator('h2:has-text("Editar Solicitud")')).toBeVisible();
@@ -77,13 +71,11 @@ test.describe.serial('Flujo Principal de Solicitud (Etapa 3)', () => {
     await page.fill('input[type="email"]', 'jperez@sgp.com');
     await page.fill('input[type="password"]', '1234.5');
     await page.click('button:has-text("Ingresar")');
-    await expect(page.locator('text=Panel SGP')).toBeVisible();
-
-    await page.goto('/mis-solicitudes');
+    await page.waitForURL('**/mis-solicitudes', { timeout: 15000 });
 
     // Editar
     const fila = page.locator('tr').filter({ hasText: descripcionSolicitud }).first();
-    await fila.locator('button[title="Editar"]').click();
+    await fila.locator('button[title="Ver / Editar Detalles"]').click();
 
     // Modal
     await expect(page.locator('h2:has-text("Editar Solicitud")')).toBeVisible();
@@ -110,13 +102,11 @@ test.describe.serial('Flujo Principal de Solicitud (Etapa 3)', () => {
     await page.fill('input[type="email"]', 'resolutor@sgp.com');
     await page.fill('input[type="password"]', 'SGP_StrongPass_2026!');
     await page.click('button:has-text("Ingresar")');
-    await expect(page.locator('text=Panel SGP')).toBeVisible();
-
-    await page.goto('/mis-solicitudes');
+    await page.waitForURL('**/mis-solicitudes', { timeout: 15000 });
 
     // Editar
     const fila = page.locator('tr').filter({ hasText: descripcionSolicitud }).first();
-    await fila.locator('button[title="Editar"]').click();
+    await fila.locator('button[title="Ver / Editar Detalles"]').click();
 
     // Marcar resuelto
     // Como resolutor, puede aparecer "Aprobar Resolución"

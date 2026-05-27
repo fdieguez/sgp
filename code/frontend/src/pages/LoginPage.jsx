@@ -17,8 +17,12 @@ export default function LoginPage() {
         setError('');
         setLoading(true);
         try {
-            await login(email, password);
-            navigate('/dashboard');
+            const loggedInUser = await login(email, password);
+            if (loggedInUser && loggedInUser.role === 'ADMINISTRADOR') {
+                navigate('/dashboard');
+            } else {
+                navigate('/mis-solicitudes');
+            }
         } catch (err) {
             setError('Credenciales inválidas. Intente nuevamente.');
         } finally {

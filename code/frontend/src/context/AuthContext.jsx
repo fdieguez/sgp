@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import api from '../config/axios';
 
 const AuthContext = createContext();
@@ -45,19 +45,22 @@ export const AuthProvider = ({ children }) => {
                 const profileRes = await api.get('/api/users/me', {
                     headers: { Authorization: `Bearer ${newToken}` }
                 });
-                setUser({
+                const finalUser = {
                     ...profileRes.data.user,
                     responsable: profileRes.data.responsable
-                });
+                };
+                setUser(finalUser);
+                return finalUser;
             } catch (err) {
                 console.error("Failed to fetch full profile", err);
                 // Fallback to basic info from login
-                setUser({
+                const fallbackUser = {
                     email: response.data.email,
                     role: response.data.role
-                });
+                };
+                setUser(fallbackUser);
+                return fallbackUser;
             }
-            return true;
         } catch (error) {
             console.error("Login failed", error);
             throw error;
@@ -75,12 +78,26 @@ export const AuthProvider = ({ children }) => {
 
     // Try to restore user profile fully on load if token exists but user lacks responsable details
     useEffect(() => {
-        if (token && user && (!user.id || (user.role === 'RESPONSABLE' && user.responsable === undefined))) {
+        const needsRefresh = token && user && (
+            !user.id || 
+            (user.role === 'RESPONSABLE' && user.responsable === undefined)
+        );
+
+        if (needsRefresh) {
             api.get('/api/users/me')
                 .then(res => {
-                    setUser({
-                        ...res.data.user,
-                        responsable: res.data.responsable
+                    const userData = res.data.user;
+                    const responsableData = res.data.responsable;
+                    
+                    // Solo actualizar si realmente hay datos nuevos o diferentes para evitar loops
+                    setUser(prev => {
+                        if (prev && prev.id === userData.id && prev.responsable === responsableData) {
+                            return prev;
+                        }
+                        return {
+                            ...userData,
+                            responsable: responsableData
+                        };
                     });
                 })
                 .catch(err => {
@@ -90,10 +107,19 @@ export const AuthProvider = ({ children }) => {
                     }
                 });
         }
-    }, [token]);
+    }, [token, user?.id, user?.role, user?.responsable]); // Dependencias más específicas
+
+    const contextValue = useMemo(() => ({
+        token,
+        isAuthenticated: !!token,
+        login,
+        logout,
+        user,
+        loading
+    }), [token, user, loading]);
 
     return (
-        <AuthContext.Provider value={{ token, isAuthenticated: !!token, login, logout, user, loading }}>
+        <AuthContext.Provider value={contextValue}>
             {children}
         </AuthContext.Provider>
     );

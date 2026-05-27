@@ -2,9 +2,61 @@
 
 > **Propósito**: Este archivo registra todos los cambios, mejoras y decisiones técnicas del proyecto SGP para facilitar la continuidad entre sesiones de desarrollo.
 
-**Versión Actual**: `0.6.5` (Estabilidad de Datos y Auditoría Completa)
+**Versión Actual**: `0.8.5` (Refinamiento de Flujos y Filtros Avanzados)
 
 ---
+
+## 📅 Mayo 2026
+
+### 18/05/2026
+- **⭐️ Cierre de la Etapa 5** (Optimizaciones y UX):
+    - **Paginación en Servidor:** Migración de endpoints de solicitudes (`SolicitudController` y `SolicitudService`) a `Pageable` de Spring Data JPA. El frontend ahora carga de a 20 registros, optimizando la memoria y velocidad al conectar con la base productiva MySQL.
+    - **Operaciones Masivas (Bulk Actions):** Implementación de checkboxes en la grilla y barra flotante "sticky" inferior para asignación masiva de responsables y eliminación masiva (solo Admin).
+    - **Aprobación Ágil para Resolutores:** Agregado el botón de "Aprobación Rápida" directamente en la fila de la grilla principal, junto con la exhibición compactada de detalles de resolución.
+    - **Unificación de Vistas (Fix Final):** Las acciones "Ver" y "Editar" se han fusionado en un modal único, limpio de módulos legacy (subsidios) y adaptado condicionalmente al rol del usuario logueado.
+    - **Exportación de Datos:** Añadido el botón de descarga CSV respetando los filtros activos de la grilla.
+    - **Sistema de Notificaciones Moderno:** Reemplazo de todos los `alert()` nativos por `react-hot-toast`, con estética oscura alineada al diseño del sistema.
+    - **Filtro del Distribuidor:** Corrección crítica en `SolicitudService`. El Distribuidor ahora actúa como "despachador", visualizando *únicamente* aquellas solicitudes que no tienen responsable asignado (al asignar, la solicitud sale de su bandeja automáticamente). Se preservó el acceso completo del Administrador.
+    - **Limpieza del Repositorio:** Exclusión definitiva de archivos temporales de Playwright (`playwright-report/`, `test-results/`) y de la carpeta de subidas del backend (`uploads/`) del seguimiento de Git mediante `--cached`.
+
+### 06/05/2026
+- **⭐️ Versión 0.8.5** (Refinamiento de Flujos y Filtros Avanzados):
+    - **Optimización de Filtros (Server-side)**:
+        - Migrada la lógica de filtrado de `ProjectDetailsPage` al backend para mejorar el rendimiento en grandes volúmenes de datos.
+        - Nuevos parámetros de filtrado en API: `dateFrom`, `dateTo`, `responsableId`, `locationId` y `origin`.
+        - Soporte para búsqueda por ID de solicitud (N° Orden) en el filtro general.
+    - **Refinamiento de Desasignación**:
+        - Implementada desasignación explícita de responsables. Al seleccionar "Sin Asignar" o vaciar el campo, el sistema ahora permite limpiar la asignación enviando `0` al backend.
+        - Backend actualizado para manejar el valor `0` como `null` en la entidad, manteniendo la integridad de auditoría (`UNASSIGNED` en el historial).
+    - **Mejoras en Auditoría**:
+        - El historial ahora diferencia claramente entre una desasignación manual y un cambio de responsable.
+    - **Versión 0.8.0** (Saneamiento de Datos y Monitoreo Unificado):
+    - **Limpieza de Datos Basura (E2E Tests)**:
+        - Implementado motor de limpieza basado en SQL nativo en `DataInitializer.java`.
+        - El sistema ahora purga automáticamente usuarios, tipos de resolución y atributos generados por herramientas de testing (Cypress), manejando correctamente las restricciones de integridad referencial (Historial, Adjuntos y Resolutores por Defecto).
+    - **Sistema de Logs Proactivos (Fullstack)**:
+        - Implementación de `logback-spring.xml` con política de rotación cada **5MB**.
+        - Separación de flujos: `logback.log` (Backend) y `logfront.log` (Frontend).
+        - Nuevo endpoint de telemetría `/api/logs/frontend` para centralizar errores del cliente en los logs del servidor.
+        - Política unificada para entornos de Desarrollo y Producción (carpeta `/logs` centralizada).
+    - **Estabilización de Performance UI**:
+        - Eliminados bucles infinitos de re-renderizado en el Dashboard y Modal mediante optimización de dependencias en `AuthContext` y `useCallback` en servicios de datos.
+    - **Saneamiento de Identidad**:
+        - Normalización total del rol `ADMINISTRADOR` (antes `ADMIN`) en todo el sistema para garantizar acceso consistente a configuraciones críticas.
+
+### 04/05/2026
+- **⭐️ Versión 0.7.5** (Unificación de Interfaz y Auditoría Persistente):
+    - **Unificación de Vistas (UX)**: 
+        - Fusión de `SolicitudDetailModal` y `SolicitudModal` en una única interfaz centralizada.
+        - El modal de edición ahora incluye solapas para **Notas de Seguimiento (Chat)**, **Historial completo** y **Documentos Adjuntos**. Esto permite agregar comentarios de seguimiento y gestionar archivos sin salir de la vista de edición.
+    - **Saneamiento de Métricas**:
+        - Remoción de las métricas de montos económicos ("Subsidios Entregados") tanto en el Dashboard como en el listado de proyectos, simplificando la visualización hacia una gestión operativa pura.
+    - **Blindaje de Auditoría (Backend)**:
+        - Corregido error en `DataInitializer.java` que borraba el historial de asignaciones en cada reinicio del servidor. Ahora la trazabilidad es 100% persistente entre reinicios.
+    - **Mejoras en el Log de Historial**:
+        - Rediseño de la visualización del historial para identificar explícitamente al **Operador** (creación) y al **Distribuidor** (asignación), mejorando la transparencia del ciclo de vida de la solicitud.
+    - **Documentación**:
+        - Implementado Plan de Pruebas detallado en `/pruebas/plan_pruebas_unificacion_vistas.md` para facilitar la validación por parte de testers.
 
 ## 📅 Abril 2026
 
@@ -299,6 +351,12 @@
     - Configurado registro DNS tipo A: `solicitudes` → `149.50.128.168`
     - DNS propagado exitosamente (verificado con nslookup)
     - Actualizado `.env.example` con la nueva URL: `http://solicitudes.ultrasoft.website/api`
+    - Creada guía completa.
+### Arreglos y Estabilización (MySQL Migration Final)
+- Se configuró **UFW** en el servidor para permitir tráfico desde la red Docker (`172.18.0.0/16`) al puerto 3306 del host.
+- Se corrigió error `UnexpectedRollbackException` en `DataInitializer` eliminando consultas nativas incompatibles con MySQL.
+- Verificación exitosa del despliegue: Backend conectado a MySQL nativo y base de datos inicializada con semillas.
+- Documentación actualizada en `docs/DEPLOYMENT_PROCEDURE.md`.
     - Creada guía completa de deployment: `docs/DEPLOYMENT_GUIDE.md`
     - **Próxima fase**: Deployment en servidor VPS de DonWeb.
 - **🔧 Infraestructura: Nginx Reverse Proxy**:

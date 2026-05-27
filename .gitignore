@@ -47,10 +47,15 @@ docs/task*.md
 docs/implementation_plan*.md
 docs/PROMPT_*.md
 docs/Resumen_*.md
+docs/CHANGELOG*.md
+
+temp/
+
+# Informes de reuniones
+reuniones/
 
 # Archivos autogenerados de tests y subidas (Etapa 6)
 code/backend/uploads/
 code/frontend/playwright-report/
 code/frontend/test-results/
-reuniones/
 

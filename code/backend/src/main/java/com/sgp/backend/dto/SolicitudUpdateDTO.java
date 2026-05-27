@@ -63,5 +63,7 @@ public class SolicitudUpdateDTO {
         private Long id;
         private String name;
         private String phone;
+        private String type;
+        private String subType;
     }
 }

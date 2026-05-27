@@ -31,12 +31,15 @@ public class User {
     private String lastName;
 
     @Column(nullable = true)
+    private String dni;
+
+    @Column(nullable = true)
     private java.time.LocalDate birthDate;
 
     @Column(nullable = false)
     private String role; // e.g., "ADMIN", "USER"
 
-    @Column(nullable = true)
+    @Column(nullable = false)
     private String phone;
 
     @Column(nullable = true)

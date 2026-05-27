@@ -45,7 +45,7 @@ export default function DashboardStats() {
             border: "border-blue-800"
         },
         {
-            title: "Pendientes",
+            title: "Pendiente",
             value: stats.pendingSolicitudes,
             subValue: `${calculatePct(stats.pendingSolicitudes)}%`,
             icon: Clock,
@@ -79,20 +79,11 @@ export default function DashboardStats() {
             color: "text-red-400",
             bg: "bg-red-900/20",
             border: "border-red-800"
-        },
-        {
-            title: "Subsidios Entregados",
-            value: <span>${stats.totalSubsidiesDelivered?.toLocaleString()}</span>,
-            subValue: "Total Monto",
-            icon: DollarSign,
-            color: "text-indigo-400",
-            bg: "bg-indigo-900/20",
-            border: "border-indigo-800"
         }
     ];
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
             {cards.map((card, index) => (
                 <div key={index} className={`bg-gray-800 rounded-xl border ${card.border} p-6 shadow-lg`}>
                     <div className="flex items-center justify-between mb-4">

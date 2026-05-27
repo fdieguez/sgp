@@ -21,9 +21,11 @@ public class Person {
     @Column(nullable = false, length = 1000)
     private String name; // Name or Institution Name (up to 1000 chars for long institution descriptions)
 
-    // "INDIVIDUAL", "INSTITUTION", "GOVERNMENT"
+    // "INDIVIDUAL", "INSTITUTION", "GOVERNMENT" etc...
     @Column(nullable = false)
     private String type;
+
+    private String subType; // For "Personal" type: "joven", "emprendedor", "referente", "otro"
 
     private String dni; // Optional for institutions
 

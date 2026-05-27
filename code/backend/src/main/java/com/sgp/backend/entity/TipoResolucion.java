@@ -32,7 +32,7 @@ public class TipoResolucion {
     @JoinColumn(name = "default_resolutor_id")
     private User resolutor;
 
-    @OneToMany(mappedBy = "tipoResolucion", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "tipoResolucion", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @Builder.Default
     private List<TipoResolucionAtributo> atributosConfig = new ArrayList<>();
 }

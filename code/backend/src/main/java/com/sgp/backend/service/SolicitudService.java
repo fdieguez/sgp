@@ -36,9 +36,20 @@ public class SolicitudService {
     private final TipoResolucionRepository tipoResolucionRepository;
     private final SolicitudResolutorAssignmentRepository assignmentRepository;
 
-    public List<Solicitud> getAllSolicitudes(String status, String search) {
-        org.springframework.data.jpa.domain.Specification<Solicitud> spec = org.springframework.data.jpa.domain.Specification
-                .where(null);
+    public org.springframework.data.domain.Page<Solicitud> getAllSolicitudes(String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, org.springframework.data.domain.Pageable pageable) {
+        org.springframework.data.jpa.domain.Specification<Solicitud> spec = buildSpecification(status, search, responsableId, locationId, origin, dateFrom, dateTo);
+        return solicitudRepository.findAll(spec, pageable);
+    }
+
+    public org.springframework.data.domain.Page<Solicitud> getSolicitudesByConfig(Long configId, String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, org.springframework.data.domain.Pageable pageable) {
+        org.springframework.data.jpa.domain.Specification<Solicitud> baseSpec = org.springframework.data.jpa.domain.Specification
+                .where((root, query, cb) -> cb.equal(root.get("sheetsConfig").get("id"), configId));
+        org.springframework.data.jpa.domain.Specification<Solicitud> spec = baseSpec.and(buildSpecification(status, search, responsableId, locationId, origin, dateFrom, dateTo));
+        return solicitudRepository.findAll(spec, pageable);
+    }
+
+    private org.springframework.data.jpa.domain.Specification<Solicitud> buildSpecification(String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo) {
+        org.springframework.data.jpa.domain.Specification<Solicitud> spec = org.springframework.data.jpa.domain.Specification.where(null);
 
         if (status != null && !status.isEmpty()) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), status));
@@ -48,7 +59,32 @@ public class SolicitudService {
             String likePattern = "%" + search.toLowerCase() + "%";
             spec = spec.and((root, query, cb) -> cb.or(
                     cb.like(cb.lower(root.get("description")), likePattern),
-                    cb.like(cb.lower(root.get("person").get("name")), likePattern)));
+                    cb.like(cb.lower(root.get("person").get("name")), likePattern),
+                    cb.like(cb.lower(root.get("id").as(String.class)), likePattern)));
+        }
+
+        if (responsableId != null) {
+            if (responsableId == 0) {
+                spec = spec.and((root, query, cb) -> cb.isNull(root.get("responsable")));
+            } else {
+                spec = spec.and((root, query, cb) -> cb.equal(root.get("responsable").get("id"), responsableId));
+            }
+        }
+
+        if (locationId != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("location").get("id"), locationId));
+        }
+
+        if (origin != null && !origin.isEmpty()) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("origin"), origin));
+        }
+
+        if (dateFrom != null) {
+            spec = spec.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get("entryDate"), dateFrom));
+        }
+
+        if (dateTo != null) {
+            spec = spec.and((root, query, cb) -> cb.lessThanOrEqualTo(root.get("entryDate"), dateTo));
         }
 
         // Apply Role Based Filtering
@@ -57,33 +93,82 @@ public class SolicitudService {
             String email = auth.getName();
             User user = userRepository.findByEmail(email).orElse(null);
             if (user != null) {
-                if (user.getRole().equals("OPERADOR")) {
-                    spec = spec.and((root, query, cb) -> cb.equal(root.get("createdBy"), user));
-                } else if (user.getRole().equals("RESPONSABLE")) {
-                    spec = spec.and((root, query, cb) -> cb.equal(root.get("responsable"), user));
-                } else if (user.getRole().equals("RESOLUTOR")) {
+                String userRole = user.getRole();
+                // Si es ADMIN, tiene acceso completo a todas las solicitudes sin filtrado
+                if (userRole != null && !userRole.contains("ADMIN")) {
                     spec = spec.and((root, query, cb) -> {
-                        Subquery<Long> subquery = query.subquery(Long.class);
-                        Root<SolicitudResolutorAssignment> assignmentRoot = subquery.from(SolicitudResolutorAssignment.class);
-                        subquery.select(assignmentRoot.get("solicitud").get("id"))
-                                .where(cb.equal(assignmentRoot.get("resolutor"), user),
-                                       cb.equal(assignmentRoot.get("approved"), false)); // Solo pendientes
+                        query.distinct(true);
+                        jakarta.persistence.criteria.Join<Solicitud, SolicitudResolutorAssignment> assignments = root.join("resolutorAssignments", jakarta.persistence.criteria.JoinType.LEFT);
                         
-                        return cb.or(
-                            cb.and(cb.equal(root.get("resolutor"), user), cb.notEqual(root.get("status"), "completadas")),
-                            cb.in(root.get("id")).value(subquery)
-                        );
+                        List<jakarta.persistence.criteria.Predicate> orPredicates = new java.util.ArrayList<>();
+                        
+                        if (userRole.contains("OPERADOR")) {
+                            orPredicates.add(cb.equal(root.get("createdBy"), user));
+                        }
+                        if (userRole.contains("DISTRIBUIDOR")) {
+                            // El distribuidor solo ve solicitudes sin responsable asignado
+                            orPredicates.add(cb.isNull(root.get("responsable")));
+                        }
+                        if (userRole.contains("RESPONSABLE")) {
+                            orPredicates.add(cb.equal(root.get("responsable"), user));
+                        }
+                        if (userRole.contains("RESOLUTOR")) {
+                            jakarta.persistence.criteria.Predicate isLegacyResolutor = cb.and(
+                                cb.equal(root.get("resolutor").get("id"), user.getId()),
+                                cb.notEqual(root.get("status"), "completadas")
+                            );
+                            jakarta.persistence.criteria.Predicate isAssignedResolutor = cb.equal(assignments.get("resolutor").get("id"), user.getId());
+                            
+                            orPredicates.add(cb.or(isLegacyResolutor, isAssignedResolutor));
+                        }
+                        
+                        if (orPredicates.isEmpty()) {
+                            return cb.disjunction();
+                        }
+                        
+                        return cb.or(orPredicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
                     });
                 }
-                // DISTRIBUIDOR and ADMINISTRADOR see everything (no additional predicates).
             }
         }
 
-        return solicitudRepository.findAll(spec);
+        return spec;
     }
 
-    public List<Solicitud> getSolicitudesByConfig(Long configId) {
-        return solicitudRepository.findBySheetsConfigId(configId);
+    @org.springframework.transaction.annotation.Transactional
+    public void bulkAssign(List<Long> ids, Long responsableId) {
+        User responsable = null;
+        if (responsableId != null && responsableId > 0) {
+            responsable = userRepository.findById(responsableId)
+                    .orElseThrow(() -> new RuntimeException("Responsable no encontrado"));
+        }
+        
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        User asignador = null;
+        if (auth != null && auth.isAuthenticated() && !auth.getName().equals("anonymousUser")) {
+            asignador = userRepository.findByEmail(auth.getName()).orElse(null);
+        }
+
+        for (Long id : ids) {
+            Solicitud solicitud = solicitudRepository.findById(id).orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
+            solicitud.setResponsable(responsable);
+            solicitudRepository.save(solicitud);
+
+            AsignacionHistorial historial = new AsignacionHistorial();
+            historial.setSolicitud(solicitud);
+            historial.setResponsable(responsable);
+            historial.setActionDate(java.time.LocalDateTime.now());
+            historial.setAssignedByUsername(asignador != null ? asignador.getEmail() : "Sistema");
+            historial.setActionType(responsable == null ? "UNASSIGNED" : "ASSIGNED");
+            asignacionHistorialRepository.save(historial);
+        }
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void bulkDelete(List<Long> ids) {
+        for (Long id : ids) {
+            solicitudRepository.deleteById(id);
+        }
     }
 
     @org.springframework.transaction.annotation.Transactional
@@ -186,6 +271,7 @@ public class SolicitudService {
                 .orElseThrow(() -> new RuntimeException("Solicitud not found"));
 
         User oldResponsable = existing.getResponsable();
+        String oldStatus = existing.getStatus();
 
         // 1. Actualizar beneficiario
         if (dto.getPerson() != null) {
@@ -195,6 +281,8 @@ public class SolicitudService {
                 p = personRepository.findById(dto.getPerson().getId()).orElse(new Person());
                 p.setName(dto.getPerson().getName());
                 p.setPhone(dto.getPerson().getPhone());
+                p.setType(dto.getPerson().getType() != null ? dto.getPerson().getType() : p.getType());
+                p.setSubType(dto.getPerson().getSubType());
                 p = personRepository.save(p);
             } else {
                 // Persona nueva: buscar por nombre o crear
@@ -204,7 +292,8 @@ public class SolicitudService {
                     Person nueva = new Person();
                     nueva.setName(nombre);
                     nueva.setPhone(telefono);
-                    nueva.setType("INDIVIDUAL");
+                    nueva.setType(dto.getPerson().getType() != null ? dto.getPerson().getType() : "INDIVIDUAL");
+                    nueva.setSubType(dto.getPerson().getSubType());
                     return personRepository.save(nueva);
                 });
             }
@@ -286,18 +375,25 @@ public class SolicitudService {
         // Solo se actualiza si el DTO trae un responsableId explícito.
         // Si viene null, se CONSERVA el responsable actual (no se borra accidentalmente).
         if (dto.getResponsableId() != null) {
-            userRepository.findById(dto.getResponsableId())
-                    .ifPresent(existing::setResponsable);
+            if (dto.getResponsableId() <= 0) {
+                // Desasignación explícita (responsableId = 0)
+                existing.setResponsable(null);
+            } else {
+                userRepository.findById(dto.getResponsableId())
+                        .ifPresent(existing::setResponsable);
+            }
         }
-        // Nota: para desasignar explícitamente usar responsableId = 0 (no soportado aún)
 
         Solicitud saved = solicitudRepository.save(existing);
 
         // 7. Sincronizar asignaciones de resolutores
         processAssignments(saved, dto.getAssignments());
 
-        // 8. Recalcular estado automático
-        updateSolicitudStatus(saved);
+        // 8. Recalcular estado automático (solo si no se cambió de forma manual en el DTO)
+        boolean statusChangedManually = dto.getStatus() != null && !dto.getStatus().equalsIgnoreCase(oldStatus);
+        if (!statusChangedManually) {
+            updateSolicitudStatus(saved);
+        }
         solicitudRepository.save(saved);
 
         // 9. Auditoría de cambio de responsable
