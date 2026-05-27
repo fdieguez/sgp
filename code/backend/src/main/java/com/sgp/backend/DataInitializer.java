@@ -35,14 +35,8 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) throws Exception {
         System.out.println("🚀 Iniciando DataInitializer...");
 
-        // Limpieza de esquemas antiguos (Remanentes de Stage 2)
-        try {
-            entityManager.createNativeQuery("ALTER TABLE solicitudes DROP CONSTRAINT IF EXISTS FKEBLFBCPH338HYXL8QLN48EUOA").executeUpdate();
-            entityManager.createNativeQuery("DROP TABLE IF EXISTS responsables CASCADE").executeUpdate();
-            System.out.println("✅ Remanentes de esquema antiguo (Stage 2) eliminados exitosamente.");
-        } catch (Exception e) {
-            System.out.println("ℹ️ No se requirió limpieza de esquema antiguo o las tablas ya no existen.");
-        }
+        // Limpieza de esquemas antiguos (Remanentes de Stage 2) - Removido por incompatibilidad de sintaxis en MySQL y errores de rollback-only.
+
 
         // Migración de Estados: Normalización a español
         try {

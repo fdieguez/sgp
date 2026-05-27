@@ -43,9 +43,11 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt:ro
     networks:
       - sgp-network
-
-
+      - web-gateway
 
 networks:
   sgp-network:
     driver: bridge
+  web-gateway:
+    external: true
+
