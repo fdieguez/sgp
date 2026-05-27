@@ -47,3 +47,10 @@ docs/task*.md
 docs/implementation_plan*.md
 docs/PROMPT_*.md
 docs/Resumen_*.md
+
+# Archivos autogenerados de tests y subidas (Etapa 6)
+code/backend/uploads/
+code/frontend/playwright-report/
+code/frontend/test-results/
+reuniones/
+
