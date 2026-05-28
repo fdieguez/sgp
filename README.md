@@ -56,9 +56,41 @@ El sistema implementa un Control de Acceso Basado en Roles (RBAC) estricto:
 - Archivo `credentials.json` de Google Cloud Service Account en la raíz.
 
 ### Despliegue en Producción
-El despliegue se realiza mediante Docker, pero la base de datos MySQL corre nativamente en el host por rendimiento.
-1. Actualizar código: `git pull origin main`.
-2. Ejecutar script de despliegue: `/devops/scripts/deploy_mysql_version.sh`.
+El despliegue se gestiona con Docker Compose para los servicios de frontend y backend, mientras que la base de datos MySQL 8 corre nativamente en el host por cuestiones de rendimiento.
+
+#### 1. Copias de Seguridad (Backups)
+*   **Comando de backup manual:**
+    Se realiza con `mysqldump` utilizando `--no-tablespaces` debido a restricciones de privilegios:
+    ```bash
+    mysqldump --no-tablespaces -u sgp_admin -pP10xmK2vL9qRnW5z sgp_db > /root/backup_antes_etapa6_$(date +%F).sql
+    ```
+*   **Ubicación:** Los respaldos se almacenan en el directorio del usuario root (`/root/`).
+*   **Backup Etapa 6:** El respaldo antes de aplicar los cambios definitivos de la Etapa 6 quedó guardado en el servidor en la ruta: `/root/backup_antes_etapa6_2026_05_27.sql`.
+
+#### 2. Actualización del Sistema desde Git (Pull)
+Para actualizar el código en el servidor de producción preservando las configuraciones personalizadas del servidor web local (como el proxy de `megabares-app` en `nginx.conf`) y aplicar los cambios con Docker Compose, siga estos pasos:
+
+1.  **Resguardar cambios locales (Nginx):**
+    ```bash
+    cd /root/deploy/sgp/sgp
+    git stash
+    ```
+2.  **Bajar el código actualizado:**
+    ```bash
+    git pull origin main
+    ```
+3.  **Restaurar los cambios locales resguardados:**
+    ```bash
+    git stash pop
+    ```
+4.  **Reconstruir imágenes y levantar servicios:**
+    ```bash
+    cd code
+    docker compose down
+    docker compose up -d --build
+    ```
+    *Nota:* El contenedor frontend utiliza la red externa `web-gateway` para intercomunicarse con el servicio `megabares-app`. Esta red debe estar activa en el servidor y declarada en `docker-compose.yml` para evitar crasheos en el inicio de Nginx.
+
 
 ---
 
@@ -69,4 +101,5 @@ El despliegue se realiza mediante Docker, pero la base de datos MySQL corre nati
 - **Changelog:** Siempre consultar `docs/CHANGELOG.md` para entender en qué versión y etapa se encuentra el proyecto antes de sugerir cambios profundos.
 
 ---
-*Ultima actualización: Abril 2026*
+*Ultima actualización: Mayo 2026*
+
