@@ -59,3 +59,7 @@ code/backend/uploads/
 code/frontend/playwright-report/
 code/frontend/test-results/
 
+# Pruebas locales y evidencia
+/pruebas/
+
+

@@ -2,11 +2,28 @@
 
 > **Propósito**: Este archivo registra todos los cambios, mejoras y decisiones técnicas del proyecto SGP para facilitar la continuidad entre sesiones de desarrollo.
 
-**Versión Actual**: `0.8.5` (Refinamiento de Flujos y Filtros Avanzados)
+**Versión Actual**: `0.9.0` (Bypass de Dashboard, Tipos de Resolución Dinámicos y Mapeo de Estados)
 
 ---
 
 ## 📅 Mayo 2026
+
+### 28/05/2026
+- **⭐️ Cierre de la Etapa 6.2** (Bypass de Dashboard, Resoluciones Dinámicas y Traducción de Estados):
+    - **Bypass de Dashboard para No-Admins:** Redirección post-login inmediata a la grilla de solicitudes (`/mis-solicitudes`) para Operadores, Distribuidores, Responsables y Resolutores. Bloqueo reactivo en `/dashboard` para no-admins (redirección forzada por seguridad en frontend).
+    - **Carga de Tipos de Resolución Dinámicos (SQL v2):** Creación del script `init_resolution_types_6_2_v2.sql` para automatizar la configuración inicial de `AGENDA`, `SUBSIDIO`, `DECLARACION DE INTERES` y `OTRA` con el resolutor por defecto `resolutor@sgp.com` y sus atributos dinámicos obligatorios.
+    - **Formulario Dinámico con Adjuntos en Resoluciones:** Implementación de soporte para atributos tipo `FILE` en el formulario del Responsable. Los archivos se suben de forma asíncrona a la API del backend, y el enlace de descarga se almacena en el JSON de detalle.
+    - **Visualización Condicional en SUBSIDIO:** Implementada lógica reactiva en el modal de asignación de resoluciones. Si se elige el tipo de pedido "Personal", se despliegan campos y adjuntos de personas físicas (DNI, CBU, etc.). Si es institucional, se despliegan campos institucionales y la Nota de pedido (archivo).
+    - **Traducción Visual de Estados en UI:** Mapeo de etiquetas en tiempo de ejecución: el estado interno `"en proceso"` se muestra como `"Asignadas"`, y `"completadas"` se muestra como `"Resueltas"` en toda la interfaz (listados, selectores de estado, estadísticas y detalles), preservando la compatibilidad de los datos en el servidor.
+    - **Exclusión Gitignore Reforzada:** Configuración del `.gitignore` raíz para ignorar por completo las carpetas locales temporales y autogeneradas (`code/backend/uploads/`, `code/frontend/playwright-report/`, `code/frontend/test-results/` y `reuniones/`).
+    - **Aseguramiento de Pruebas E2E:** Corrección de aserciones desactualizadas e inicio de sesión por rol en Playwright. La suite de pruebas de regresión se ejecutó en verde con un éxito de **10/10 aprobados**.
+
+### 25/05/2026
+- **⭐️ Cierre de la Etapa 6.1** (Migraciones Customizadas y Clasificación de Solicitantes):
+    - **Motor de Migraciones Automáticas (`/boot`):** Implementación de `DatabaseMigrationRunner.java` en Spring Boot para ejecutar scripts SQL al inicio de forma ordenada e inactivarlos en la carpeta `boot/old/`.
+    - **Filtro de Localidades en UI:** Incorporación del atributo booleano `showInUi` en la entidad `Location` para restringir la selección a las localidades validadas en la zona de influencia (Santa Fe, Laguna Paiva, etc.).
+    - **Clasificación de Solicitantes:** Agregados campos `type` y `subType` a los beneficiarios para soportar clasificaciones detalladas (ej: tipo "Personal" con subtipo "emprendedor").
+    - **Toast Informativo con ID:** Notificación en caliente al crear una solicitud exitosamente mostrando la orden de solicitud generada.
 
 ### 18/05/2026
 - **⭐️ Cierre de la Etapa 5** (Optimizaciones y UX):

@@ -30,48 +30,55 @@ public class DashboardService {
     public DashboardStatsDTO getStats() {
         Specification<Solicitud> spec = Specification.where(null);
 
-        // Apply Role Based Filtering (aligned with SolicitudService)
+        // Aplicar filtrado basado en roles (alineado con SolicitudService)
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated()) {
             String email = auth.getName();
             User user = userRepository.findByEmail(email).orElse(null);
             if (user != null) {
-                spec = spec.and((root, query, cb) -> {
-                    List<jakarta.persistence.criteria.Predicate> orPredicates = new java.util.ArrayList<>();
-                    String userRole = user.getRole();
-                    
-                    if (userRole.contains("OPERADOR")) {
-                        orPredicates.add(cb.equal(root.get("createdBy"), user));
-                    }
-                    if (userRole.contains("RESPONSABLE")) {
-                        final String zoneStr = user.getZone();
-                        jakarta.persistence.criteria.Predicate zonePredicate = cb.disjunction();
-                        if (zoneStr != null && !zoneStr.trim().isEmpty()) {
-                            zonePredicate = cb.equal(
-                                    cb.lower(cb.trim(root.get("zone"))),
-                                    zoneStr.trim().toLowerCase());
-                        }
-                        jakarta.persistence.criteria.Predicate respPredicate = cb.equal(root.get("responsable"), user);
-                        orPredicates.add(cb.or(zonePredicate, respPredicate));
-                    }
-                    if (userRole.contains("RESOLUTOR")) {
-                        Subquery<Long> subquery = query.subquery(Long.class);
-                        Root<SolicitudResolutorAssignment> assignmentRoot = subquery.from(SolicitudResolutorAssignment.class);
-                        subquery.select(assignmentRoot.get("solicitud").get("id"))
-                                .where(cb.equal(assignmentRoot.get("resolutor"), user));
+                String userRole = user.getRole();
+                // Si es ADMIN, tiene acceso completo a todas las estadísticas sin filtrar
+                if (userRole != null && !userRole.contains("ADMIN")) {
+                    spec = spec.and((root, query, cb) -> {
+                        List<jakarta.persistence.criteria.Predicate> orPredicates = new java.util.ArrayList<>();
                         
-                        orPredicates.add(cb.or(
-                            cb.equal(root.get("resolutor"), user),
-                            cb.in(root.get("id")).value(subquery)
-                        ));
-                    }
-                    
-                    if (orPredicates.isEmpty()) {
-                        return cb.disjunction();
-                    }
-                    
-                    return cb.or(orPredicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
-                });
+                        if (userRole.contains("OPERADOR")) {
+                            orPredicates.add(cb.equal(root.get("createdBy"), user));
+                        }
+                        if (userRole.contains("DISTRIBUIDOR")) {
+                            // El distribuidor solo ve estadísticas de solicitudes sin responsable asignado
+                            orPredicates.add(cb.isNull(root.get("responsable")));
+                        }
+                        if (userRole.contains("RESPONSABLE")) {
+                            final String zoneStr = user.getZone();
+                            jakarta.persistence.criteria.Predicate zonePredicate = cb.disjunction();
+                            if (zoneStr != null && !zoneStr.trim().isEmpty()) {
+                                zonePredicate = cb.equal(
+                                        cb.lower(cb.trim(root.get("zone"))),
+                                        zoneStr.trim().toLowerCase());
+                            }
+                            jakarta.persistence.criteria.Predicate respPredicate = cb.equal(root.get("responsable"), user);
+                            orPredicates.add(cb.or(zonePredicate, respPredicate));
+                        }
+                        if (userRole.contains("RESOLUTOR")) {
+                            Subquery<Long> subquery = query.subquery(Long.class);
+                            Root<SolicitudResolutorAssignment> assignmentRoot = subquery.from(SolicitudResolutorAssignment.class);
+                            subquery.select(assignmentRoot.get("solicitud").get("id"))
+                                    .where(cb.equal(assignmentRoot.get("resolutor"), user));
+                            
+                            orPredicates.add(cb.or(
+                                cb.equal(root.get("resolutor"), user),
+                                cb.in(root.get("id")).value(subquery)
+                            ));
+                        }
+                        
+                        if (orPredicates.isEmpty()) {
+                            return cb.disjunction();
+                        }
+                        
+                        return cb.or(orPredicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+                    });
+                }
             }
         }
 

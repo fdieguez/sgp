@@ -451,7 +451,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         <form onSubmit={handleSubmit} className="p-6 space-y-6">
                     {/* Type and Status */}
                     <div className="grid grid-cols-2 gap-4">
-                        {user?.role !== 'OPERADOR' && (
+                        {user?.role !== 'OPERADOR' && user?.role !== 'DISTRIBUIDOR' && (
                             <div>
                                 <label className="block text-sm font-medium text-gray-400 mb-1">Tipo</label>
                                 <select
@@ -586,7 +586,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     ))}
                                 </datalist>
                             </div>
-                            {user?.role !== 'OPERADOR' && (
+                            {user?.role !== 'OPERADOR' && user?.role !== 'DISTRIBUIDOR' && (
                                 <div>
                                     <label className="block text-sm text-gray-500 mb-1">Zona / Eje</label>
                                     <input
@@ -709,7 +709,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         )}
                     </div>
 
-                    {user?.role !== 'OPERADOR' && (
+                    {user?.role !== 'OPERADOR' && user?.role !== 'DISTRIBUIDOR' && (
                         <div className="p-4 bg-gray-900/40 rounded-xl border border-gray-700 space-y-4">
                             <h3 className="text-sm font-semibold text-gray-300">Seguimiento</h3>
                             <div className="grid grid-cols-2 gap-4">
