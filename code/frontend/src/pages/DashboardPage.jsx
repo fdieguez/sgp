@@ -215,7 +215,7 @@ export default function DashboardPage() {
                             </div>
                         )}
                     </div>
-                ) }}
+                )}
 
                 <CreateConfigModal
                     isOpen={isModalOpen}

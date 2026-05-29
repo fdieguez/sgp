@@ -355,8 +355,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     // Campos de Subsidio
                     amount: formData.amount ? Number(formData.amount) : null,
                     grantDate: formData.grantDate || null,
-                    assignments,
-                    status: formData.status
+                    assignments
                 };
                 await api.put(`/api/solicitudes/${formData.id}`, updatePayload);
             } else {
