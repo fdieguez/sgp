@@ -59,22 +59,23 @@ public class UserController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMINISTRADOR')")
-    public ResponseEntity<?> createUser(@RequestBody Map<String, String> request) {
+    public ResponseEntity<?> createUser(@RequestBody java.util.Map<String, Object> request) {
         try {
-            String email = request.get("email");
-            String password = request.get("password");
-            String role = request.get("role");
-            String firstName = request.get("firstName");
-            String lastName = request.get("lastName");
-            String phone = request.get("phone");
-            String zone = request.get("zone");
-            String dni = request.get("dni");
+            String email = (String) request.get("email");
+            String password = (String) request.get("password");
+            String role = (String) request.get("role");
+            String firstName = (String) request.get("firstName");
+            String lastName = (String) request.get("lastName");
+            String phone = (String) request.get("phone");
+            String zone = (String) request.get("zone");
+            String dni = (String) request.get("dni");
+            List<Number> tipoResolucionIds = (List<Number>) request.get("tipoResolucionIds");
 
             if (email == null || password == null) {
                 return ResponseEntity.badRequest().body("Email and password are required");
             }
 
-            User user = userService.createUser(email, password, role, firstName, lastName, phone, zone, dni);
+            User user = userService.createUser(email, password, role, firstName, lastName, phone, zone, dni, tipoResolucionIds);
             user.setPassword(null); // Don't return password
             return ResponseEntity.ok(user);
         } catch (IllegalArgumentException e) {
@@ -84,18 +85,19 @@ public class UserController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMINISTRADOR')")
-    public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody Map<String, String> request) {
+    public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody java.util.Map<String, Object> request) {
         try {
-            String email = request.get("email");
-            String password = request.get("password");
-            String role = request.get("role");
-            String firstName = request.get("firstName");
-            String lastName = request.get("lastName");
-            String phone = request.get("phone");
-            String zone = request.get("zone");
-            String dni = request.get("dni");
+            String email = (String) request.get("email");
+            String password = (String) request.get("password");
+            String role = (String) request.get("role");
+            String firstName = (String) request.get("firstName");
+            String lastName = (String) request.get("lastName");
+            String phone = (String) request.get("phone");
+            String zone = (String) request.get("zone");
+            String dni = (String) request.get("dni");
+            List<Number> tipoResolucionIds = (List<Number>) request.get("tipoResolucionIds");
 
-            User user = userService.updateUser(id, email, password, role, firstName, lastName, phone, zone, dni);
+            User user = userService.updateUser(id, email, password, role, firstName, lastName, phone, zone, dni, tipoResolucionIds);
             user.setPassword(null);
             return ResponseEntity.ok(user);
         } catch (IllegalArgumentException e) {

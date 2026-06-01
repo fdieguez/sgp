@@ -59,55 +59,132 @@ public class DataInitializer implements CommandLineRunner {
 
         // 1. Seed Users (5 Roles Test Users)
         try {
-            System.out.println("⏳ Sembrando usuarios iniciales...");
-            // Admin con contraseña segura pero conocida por el sistema
-            createUserIfNotFound("admin@sgp.com", "SGP_Admin_#2026_Prod_Secure_!", "ADMINISTRADOR", "Admin", "Supremo", LocalDate.of(1990, 1, 1), null, null);
-            createUserIfNotFound("operador@sgp.com", "SGP_StrongPass_2026!", "OPERADOR", "Juan", "Operador", LocalDate.of(1990, 1, 1), null, null);
-            createUserIfNotFound("distribuidor@sgp.com", "SGP_StrongPass_2026!", "DISTRIBUIDOR", "Maria", "Distribuidora", LocalDate.of(1990, 1, 1), null, null);
+            System.out.println("⏳ Sembrando usuarios iniciales y limpiando anteriores...");
+            
+            List<String> keepEmails = List.of(
+                "admin@sgp.com",
+                "celestesolari19@gmail.com",
+                "matias.ippolito@gmail.com",
+                "sabrivschmidt@gmail.com",
+                "matias.ippolito.responsable@gmail.com",
+                "barbarabrancatto@gmail.com",
+                "matias.ippolito.resolutor@gmail.com",
+                "barbarabrancatto.resolutor@gmail.com",
+                "martinnocioni@gmail.com",
+                "mvgonza79@gmail.com",
+                "ealfaro.51@gmail.com"
+            );
 
-            createUserIfNotFound("jperez@sgp.com", "1234.5", "RESPONSABLE", "Juan", "Perez", LocalDate.of(1990, 1, 1), null, "Norte");
-            createUserIfNotFound("pgrillo@sgp.com", "1234.5", "RESPONSABLE", "Pepe", "Grillo", LocalDate.of(1990, 1, 1), null, "Sur");
-
-            User resolutor = createUserIfNotFound("resolutor@sgp.com", "SGP_StrongPass_2026!", "RESOLUTOR", "Ana", "Resolutora", LocalDate.of(1990, 1, 1), null, null);
-
-            System.out.println("⏳ Limpiando datos basura (SQL Nativo)...");
             try {
-                // 1. Eliminar relaciones que bloquean el borrado de usuarios
-                entityManager.createNativeQuery("DELETE FROM asignacion_historial WHERE responsable_user_id IN (SELECT id FROM users WHERE last_name REGEXP '.*[0-9].*' OR email REGEXP '.*[0-9].*')").executeUpdate();
-                entityManager.createNativeQuery("DELETE FROM solicitud_resolutor_assignment WHERE resolutor_id IN (SELECT id FROM users WHERE last_name REGEXP '.*[0-9].*' OR email REGEXP '.*[0-9].*')").executeUpdate();
+                // Eliminar relaciones de historial y asignaciones de resolutores anteriores
+                entityManager.createNativeQuery("DELETE FROM asignacion_historial WHERE responsable_user_id NOT IN (SELECT id FROM users WHERE email IN (:emails))")
+                             .setParameter("emails", keepEmails).executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM solicitud_resolutor_assignment WHERE resolutor_id NOT IN (SELECT id FROM users WHERE email IN (:emails))")
+                             .setParameter("emails", keepEmails).executeUpdate();
+                entityManager.createNativeQuery("UPDATE tipo_resolucion SET default_resolutor_id = NULL WHERE default_resolutor_id NOT IN (SELECT id FROM users WHERE email IN (:emails))")
+                             .setParameter("emails", keepEmails).executeUpdate();
+                entityManager.createNativeQuery("UPDATE solicitudes SET responsable_id = NULL WHERE responsable_id NOT IN (SELECT id FROM users WHERE email IN (:emails))")
+                             .setParameter("emails", keepEmails).executeUpdate();
+                entityManager.createNativeQuery("UPDATE solicitudes SET resolutor_asignado_id = NULL WHERE resolutor_asignado_id NOT IN (SELECT id FROM users WHERE email IN (:emails))")
+                             .setParameter("emails", keepEmails).executeUpdate();
+                entityManager.createNativeQuery("UPDATE solicitudes SET created_by_id = NULL WHERE created_by_id NOT IN (SELECT id FROM users WHERE email IN (:emails))")
+                             .setParameter("emails", keepEmails).executeUpdate();
+                entityManager.createNativeQuery("UPDATE documento_adjunto SET uploaded_by_id = NULL WHERE uploaded_by_id NOT IN (SELECT id FROM users WHERE email IN (:emails))")
+                             .setParameter("emails", keepEmails).executeUpdate();
+                
+                // Limpiar tabla intermedia de relaciones de resolutores anteriores
+                entityManager.createNativeQuery("DELETE FROM user_tipo_resolucion WHERE user_id NOT IN (SELECT id FROM users WHERE email IN (:emails))")
+                             .setParameter("emails", keepEmails).executeUpdate();
 
-                // Limpiar default_resolutor_id en tipo_resolucion
-                entityManager.createNativeQuery("UPDATE tipo_resolucion SET default_resolutor_id = NULL WHERE default_resolutor_id IN (SELECT id FROM users WHERE last_name REGEXP '.*[0-9].*' OR email REGEXP '.*[0-9].*')").executeUpdate();
+                // Limpiar configuración de resolutor y definiciones de campos para evitar fallos de integridad referencial
+                try {
+                    entityManager.createNativeQuery("DELETE FROM resolucion_campo_definicion WHERE resolutor_config_id IN (SELECT id FROM resolutor_config WHERE user_id NOT IN (SELECT id FROM users WHERE email IN (:emails)))")
+                                 .setParameter("emails", keepEmails).executeUpdate();
+                    entityManager.createNativeQuery("DELETE FROM resolutor_config WHERE user_id NOT IN (SELECT id FROM users WHERE email IN (:emails))")
+                                 .setParameter("emails", keepEmails).executeUpdate();
+                } catch (Exception e) {
+                    System.err.println("⚠️ Nota: Error al limpiar tablas obsoletas de configuraciones: " + e.getMessage());
+                }
 
-                // 2. Limpiar referencias en solicitudes y adjuntos (poner a null)
-                entityManager.createNativeQuery("UPDATE solicitudes SET responsable_id = NULL WHERE responsable_id IN (SELECT id FROM users WHERE last_name REGEXP '.*[0-9].*' OR email REGEXP '.*[0-9].*')").executeUpdate();
-                entityManager.createNativeQuery("UPDATE solicitudes SET resolutor_asignado_id = NULL WHERE resolutor_asignado_id IN (SELECT id FROM users WHERE last_name REGEXP '.*[0-9].*' OR email REGEXP '.*[0-9].*')").executeUpdate();
-                entityManager.createNativeQuery("UPDATE solicitudes SET created_by_id = NULL WHERE created_by_id IN (SELECT id FROM users WHERE last_name REGEXP '.*[0-9].*' OR email REGEXP '.*[0-9].*')").executeUpdate();
-                entityManager.createNativeQuery("UPDATE documento_adjunto SET uploaded_by_id = NULL WHERE uploaded_by_id IN (SELECT id FROM users WHERE last_name REGEXP '.*[0-9].*' OR email REGEXP '.*[0-9].*')").executeUpdate();
-
-                // 3. Borrar usuarios basura
-                int deletedUsers = entityManager.createNativeQuery("DELETE FROM users WHERE last_name REGEXP '.*[0-9].*' OR email REGEXP '.*[0-9].*'").executeUpdate();
-                if (deletedUsers > 0) System.out.println("🗑️ Usuarios basura eliminados: " + deletedUsers);
-
-                // 4. Limpiar Tipos y Atributos basura
-                entityManager.createNativeQuery("DELETE FROM tipo_resolucion_atributo WHERE tipo_resolucion_id IN (SELECT id FROM tipo_resolucion WHERE tipo REGEXP '.*[0-9].*')").executeUpdate();
-                entityManager.createNativeQuery("DELETE FROM tipo_resolucion_atributo WHERE atributo_resolucion_id IN (SELECT id FROM atributo_resolucion WHERE nombre REGEXP '.*[0-9].*')").executeUpdate();
-
-                int deletedTypes = entityManager.createNativeQuery("DELETE FROM tipo_resolucion WHERE tipo REGEXP '.*[0-9].*'").executeUpdate();
-                int deletedAttrs = entityManager.createNativeQuery("DELETE FROM atributo_resolucion WHERE nombre REGEXP '.*[0-9].*'").executeUpdate();
-
-                if (deletedTypes > 0) System.out.println("🗑️ Tipos de resolución basura eliminados: " + deletedTypes);
-                if (deletedAttrs > 0) System.out.println("🗑️ Atributos basura eliminados: " + deletedAttrs);
-
+                // Eliminar los usuarios obsoletos
+                int deletedOld = entityManager.createNativeQuery("DELETE FROM users WHERE email NOT IN (:emails)")
+                                              .setParameter("emails", keepEmails).executeUpdate();
+                if (deletedOld > 0) System.out.println("🗑️ Usuarios antiguos eliminados: " + deletedOld);
             } catch (Exception e) {
-                System.err.println("⚠️ Nota: Error parcial en limpieza SQL (posiblemente ya limpio o restricciones remanentes): " + e.getMessage());
+                System.err.println("⚠️ Nota: Error parcial al purgar usuarios viejos: " + e.getMessage());
             }
+
+            // Sembrar Administrador Supremo
+            createUserIfNotFound("admin@sgp.com", "SGP_Admin_#2026_Prod_Secure_!", "ADMINISTRADOR", "Admin", "Supremo", LocalDate.of(1990, 1, 1), "3420000000", null, "12.345.678");
+
+            // Sembrar Operador
+            createUserIfNotFound("celestesolari19@gmail.com", "Celeste_SGP_2026#", "OPERADOR", "Celeste", "Solari", LocalDate.of(1990, 1, 1), "3424760480", null, "30.562.372");
+
+            // Sembrar Distribuidores
+            createUserIfNotFound("matias.ippolito@gmail.com", "Matias_Dist_SGP_2026!", "DISTRIBUIDOR", "Matías", "Ippolito", LocalDate.of(1990, 1, 1), "3426148609", null, "28.925.931");
+            createUserIfNotFound("sabrivschmidt@gmail.com", "Sabrina_SGP_2026$", "DISTRIBUIDOR", "Sabrina", "Schmidt", LocalDate.of(1990, 1, 1), "3424777085", null, "31.273.418");
+
+            // Sembrar Responsables
+            createUserIfNotFound("matias.ippolito.responsable@gmail.com", "Matias_Resp_SGP_2026!", "RESPONSABLE", "Matías", "Ippolito", LocalDate.of(1990, 1, 1), "3426148609", "Norte", "28.925.931");
+            createUserIfNotFound("barbarabrancatto@gmail.com", "Barbara_Resp_SGP_2026!", "RESPONSABLE", "Barbara", "Brancatto", LocalDate.of(1990, 1, 1), "3424216840", "Sur", "26.972.841");
+
+            // Sembrar Resolutores
+            User resMatias = createUserIfNotFound("matias.ippolito.resolutor@gmail.com", "Matias_Res_SGP_2026!", "RESOLUTOR", "Matías", "Ippolito", LocalDate.of(1990, 1, 1), "3426148609", null, "28.925.931");
+            User resBarbara = createUserIfNotFound("barbarabrancatto.resolutor@gmail.com", "Barbara_Res_SGP_2026!", "RESOLUTOR", "Barbara", "Brancatto", LocalDate.of(1990, 1, 1), "3424216840", null, "26.972.841");
+            User resMartin = createUserIfNotFound("martinnocioni@gmail.com", "Martin_SGP_2026*", "RESOLUTOR", "Martín", "Nocioni", LocalDate.of(1990, 1, 1), "3426144703", null, "31.111.251");
+            User resMaria = createUserIfNotFound("mvgonza79@gmail.com", "Maria_SGP_2026%", "RESOLUTOR", "María Veronica", "Gonzalez", LocalDate.of(1990, 1, 1), "3425119354", null, "27.620.830");
+            User resEduardo = createUserIfNotFound("ealfaro.51@gmail.com", "Eduardo_SGP_2026^", "RESOLUTOR", "Eduardo", "Alfaro", LocalDate.of(1990, 1, 1), "3434404035", null, "32.831.230");
 
             // 2. Initialize Locations from dataset
             initializeLocations();
 
-            // 3. Seed TipoResolucion and Atributos Globales
-            seedTiposYAtributos(resolutor);
+            // 3. Seed TipoResolucion y Atributos (Omitido)
+            seedTiposYAtributos(null);
+
+            // 4. Vincular Tipos de Resolución a Resolutores en la Base de Datos (ManyToMany)
+            System.out.println("⏳ Vinculando tipos de resolución a perfiles de resolutores...");
+            
+            tipoResolucionRepository.findByTipoIgnoreCase("AGENDA").ifPresent(tr -> {
+                tr.setResolutor(resMaria);
+                tipoResolucionRepository.save(tr);
+                
+                resMaria.getTiposResolucion().clear();
+                resMaria.getTiposResolucion().add(tr);
+                userRepository.save(resMaria);
+            });
+
+            tipoResolucionRepository.findByTipoIgnoreCase("SUBSIDIO").ifPresent(tr -> {
+                tr.setResolutor(resMartin);
+                tipoResolucionRepository.save(tr);
+                
+                resMartin.getTiposResolucion().clear();
+                resMartin.getTiposResolucion().add(tr);
+                userRepository.save(resMartin);
+            });
+
+            tipoResolucionRepository.findByTipoIgnoreCase("DECLARACION DE INTERES").ifPresent(tr -> {
+                tr.setResolutor(resEduardo);
+                tipoResolucionRepository.save(tr);
+                
+                resEduardo.getTiposResolucion().clear();
+                resEduardo.getTiposResolucion().add(tr);
+                userRepository.save(resEduardo);
+            });
+
+            tipoResolucionRepository.findByTipoIgnoreCase("OTRA").ifPresent(tr -> {
+                // Asignar Matías Ippolito como el resolutor por defecto de OTRA
+                tr.setResolutor(resMatias);
+                tipoResolucionRepository.save(tr);
+                
+                resMatias.getTiposResolucion().clear();
+                resMatias.getTiposResolucion().add(tr);
+                userRepository.save(resMatias);
+
+                // Barbara también puede resolver OTRA
+                resBarbara.getTiposResolucion().clear();
+                resBarbara.getTiposResolucion().add(tr);
+                userRepository.save(resBarbara);
+            });
 
             System.out.println("✅ DataInitializer finalizado exitosamente.");
         } catch (Exception e) {
@@ -202,7 +279,7 @@ public class DataInitializer implements CommandLineRunner {
         }
     }
 
-    private User createUserIfNotFound(String email, String password, String role, String firstName, String lastName, LocalDate birthDate, String phone, String zone) {
+    private User createUserIfNotFound(String email, String password, String role, String firstName, String lastName, LocalDate birthDate, String phone, String zone, String dni) {
         User user = userRepository.findByEmail(email).orElse(null);
         boolean isNew = false;
 
@@ -226,6 +303,7 @@ public class DataInitializer implements CommandLineRunner {
         user.setBirthDate(birthDate);
         user.setPhone(phone);
         user.setZone(zone);
+        user.setDni(dni);
         
         User savedUser = userRepository.save(user);
         System.out.println((isNew ? "✅ User created: " : "✅ User updated: ") + email + " (" + role + ")");

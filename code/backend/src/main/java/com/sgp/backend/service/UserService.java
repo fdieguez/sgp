@@ -15,6 +15,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.sgp.backend.repository.TipoResolucionRepository tipoResolucionRepository;
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
@@ -25,6 +26,10 @@ public class UserService {
     }
 
     public User createUser(String email, String password, String role, String firstName, String lastName, String phone, String zone, String dni) {
+        return createUser(email, password, role, firstName, lastName, phone, zone, dni, null);
+    }
+
+    public User createUser(String email, String password, String role, String firstName, String lastName, String phone, String zone, String dni, List<Number> tipoResolucionIds) {
         if (userRepository.findByEmail(email).isPresent()) {
             throw new IllegalArgumentException("Email already exists");
         }
@@ -43,10 +48,22 @@ public class UserService {
         user.setZone(zone);
         user.setDni(dni);
 
+        if (tipoResolucionIds != null) {
+            java.util.Set<com.sgp.backend.entity.TipoResolucion> tipos = new java.util.HashSet<>();
+            for (Number tid : tipoResolucionIds) {
+                tipoResolucionRepository.findById(tid.longValue()).ifPresent(tipos::add);
+            }
+            user.setTiposResolucion(tipos);
+        }
+
         return userRepository.save(user);
     }
 
     public User updateUser(Long id, String email, String password, String role, String firstName, String lastName, String phone, String zone, String dni) {
+        return updateUser(id, email, password, role, firstName, lastName, phone, zone, dni, null);
+    }
+
+    public User updateUser(Long id, String email, String password, String role, String firstName, String lastName, String phone, String zone, String dni, List<Number> tipoResolucionIds) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
@@ -75,6 +92,14 @@ public class UserService {
         }
         if (zone != null) user.setZone(zone);
         if (dni != null) user.setDni(dni);
+
+        if (tipoResolucionIds != null) {
+            java.util.Set<com.sgp.backend.entity.TipoResolucion> tipos = new java.util.HashSet<>();
+            for (Number tid : tipoResolucionIds) {
+                tipoResolucionRepository.findById(tid.longValue()).ifPresent(tipos::add);
+            }
+            user.setTiposResolucion(tipos);
+        }
 
         return userRepository.save(user);
     }

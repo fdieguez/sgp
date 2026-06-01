@@ -45,6 +45,18 @@ public class User {
     @Column(nullable = true)
     private String zone;
 
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+        name = "user_tipo_resolucion",
+        joinColumns = @JoinColumn(name = "user_id"),
+        inverseJoinColumns = @JoinColumn(name = "tipo_resolucion_id")
+    )
+    @Builder.Default
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties("resolutor")
+    @lombok.EqualsAndHashCode.Exclude
+    @lombok.ToString.Exclude
+    private java.util.Set<TipoResolucion> tiposResolucion = new java.util.HashSet<>();
+
     /**
      * Devuelve el nombre completo para el frontend.
      */

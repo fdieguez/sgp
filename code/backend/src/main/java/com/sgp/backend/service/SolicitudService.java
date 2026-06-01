@@ -113,13 +113,26 @@ public class SolicitudService {
                             orPredicates.add(cb.equal(root.get("responsable"), user));
                         }
                         if (userRole.contains("RESOLUTOR")) {
-                            jakarta.persistence.criteria.Predicate isLegacyResolutor = cb.and(
-                                cb.equal(root.get("resolutor").get("id"), user.getId()),
-                                cb.notEqual(root.get("status"), "completadas")
-                            );
-                            jakarta.persistence.criteria.Predicate isAssignedResolutor = cb.equal(assignments.get("resolutor").get("id"), user.getId());
+                            List<String> tiposAsignados = user.getTiposResolucion().stream()
+                                    .map(com.sgp.backend.entity.TipoResolucion::getTipo)
+                                    .collect(java.util.stream.Collectors.toList());
                             
-                            orPredicates.add(cb.or(isLegacyResolutor, isAssignedResolutor));
+                            if (tiposAsignados.isEmpty()) {
+                                orPredicates.add(cb.disjunction());
+                            } else {
+                                jakarta.persistence.criteria.Predicate isAssignedAndCorrectType = cb.and(
+                                    cb.equal(assignments.get("resolutor").get("id"), user.getId()),
+                                    assignments.get("tipoResolucion").in(tiposAsignados)
+                                );
+                                
+                                jakarta.persistence.criteria.Predicate isLegacyResolutor = cb.and(
+                                    cb.equal(root.get("resolutor").get("id"), user.getId()),
+                                    cb.notEqual(root.get("status"), "completadas"),
+                                    root.get("suggestedResolutionType").in(tiposAsignados)
+                                );
+                                
+                                orPredicates.add(cb.or(isLegacyResolutor, isAssignedAndCorrectType));
+                            }
                         }
                         
                         if (orPredicates.isEmpty()) {

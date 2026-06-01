@@ -30,6 +30,9 @@ public class TipoResolucion {
 
     @ManyToOne
     @JoinColumn(name = "default_resolutor_id")
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties("tiposResolucion")
+    @lombok.EqualsAndHashCode.Exclude
+    @lombok.ToString.Exclude
     private User resolutor;
 
     @OneToMany(mappedBy = "tipoResolucion", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
