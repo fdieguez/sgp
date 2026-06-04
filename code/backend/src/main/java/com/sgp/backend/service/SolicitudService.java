@@ -48,6 +48,38 @@ public class SolicitudService {
         return solicitudRepository.findAll(spec, pageable);
     }
 
+    public java.util.Map<String, Object> getSolicitudStats(Long configId, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo) {
+        org.springframework.data.jpa.domain.Specification<Solicitud> spec = org.springframework.data.jpa.domain.Specification.where(null);
+        if (configId != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("sheetsConfig").get("id"), configId));
+        }
+        spec = spec.and(buildSpecification(null, search, responsableId, locationId, origin, dateFrom, dateTo));
+        
+        List<Solicitud> allMatching = solicitudRepository.findAll(spec);
+        
+        long pendiente = allMatching.stream().filter(s -> s.getStatus() != null && "pendiente".equalsIgnoreCase(s.getStatus().trim())).count();
+        long enProceso = allMatching.stream().filter(s -> s.getStatus() != null && "en proceso".equalsIgnoreCase(s.getStatus().trim())).count();
+        long enResolucion = allMatching.stream().filter(s -> s.getStatus() != null && "en resolucion".equalsIgnoreCase(s.getStatus().trim())).count();
+        long completadas = allMatching.stream().filter(s -> s.getStatus() != null && "completadas".equalsIgnoreCase(s.getStatus().trim())).count();
+        long rechazada = allMatching.stream().filter(s -> s.getStatus() != null && "rechazada".equalsIgnoreCase(s.getStatus().trim())).count();
+        
+        java.math.BigDecimal totalSubsidios = allMatching.stream()
+                .filter(s -> s instanceof com.sgp.backend.entity.Subsidio && s.getStatus() != null && "completadas".equalsIgnoreCase(s.getStatus().trim()))
+                .map(s -> ((com.sgp.backend.entity.Subsidio) s).getAmount())
+                .filter(java.util.Objects::nonNull)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
+                
+        java.util.Map<String, Object> stats = new java.util.HashMap<>();
+        stats.put("pendiente", pendiente);
+        stats.put("enProceso", enProceso);
+        stats.put("enResolucion", enResolucion);
+        stats.put("completadas", completadas);
+        stats.put("rechazada", rechazada);
+        stats.put("totalSubsidios", totalSubsidios);
+        
+        return stats;
+    }
+
     private org.springframework.data.jpa.domain.Specification<Solicitud> buildSpecification(String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo) {
         org.springframework.data.jpa.domain.Specification<Solicitud> spec = org.springframework.data.jpa.domain.Specification.where(null);
 
@@ -94,8 +126,8 @@ public class SolicitudService {
             User user = userRepository.findByEmail(email).orElse(null);
             if (user != null) {
                 String userRole = user.getRole();
-                // Si es ADMIN, tiene acceso completo a todas las solicitudes sin filtrado
-                if (userRole != null && !userRole.contains("ADMIN")) {
+                // Si es ADMIN o DISTRIBUIDOR, tiene acceso completo a todas las solicitudes sin filtrado
+                if (userRole != null && !userRole.contains("ADMIN") && !userRole.contains("DISTRIBUIDOR")) {
                     spec = spec.and((root, query, cb) -> {
                         query.distinct(true);
                         jakarta.persistence.criteria.Join<Solicitud, SolicitudResolutorAssignment> assignments = root.join("resolutorAssignments", jakarta.persistence.criteria.JoinType.LEFT);
@@ -104,10 +136,6 @@ public class SolicitudService {
                         
                         if (userRole.contains("OPERADOR")) {
                             orPredicates.add(cb.equal(root.get("createdBy"), user));
-                        }
-                        if (userRole.contains("DISTRIBUIDOR")) {
-                            // El distribuidor solo ve solicitudes sin responsable asignado
-                            orPredicates.add(cb.isNull(root.get("responsable")));
                         }
                         if (userRole.contains("RESPONSABLE")) {
                             orPredicates.add(cb.equal(root.get("responsable"), user));

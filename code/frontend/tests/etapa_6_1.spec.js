@@ -19,14 +19,13 @@ test.describe.serial('Suite de Validación: Etapa 6.1 (Migraciones y Roles)', ()
 
     test('Caso de Prueba 2: Visibilidad Limitada por Rol (Operadores)', async ({ page }) => {
         // Asumiendo que existe un operador.
-        await login(page, 'operador@sgp.com', 'SGP_StrongPass_2026!');
+        await login(page, 'celestesolari19@gmail.com', 'Celeste_SGP_2026#');
         await page.goto('/mis-solicitudes');
         await page.click('button:has-text("Nueva Solicitud")');
         await expect(page.locator('h2:has-text("Nueva Solicitud")')).toBeVisible();
 
-        // 3. Verificar que no aparezca el combo de "Tipo" (Pedido/Subsidio).
-        // En unificacion_vistas usaba label:text-is("Tipo").
-        await expect(page.locator('label:text-is("Tipo")')).toBeHidden();
+        // 3. Verificar que aparezca el combo de "Tipo" (Pedido/Subsidio) según Etapa 7.
+        await expect(page.locator('label:text-is("Tipo")')).toBeVisible();
 
         // 4. Confirmar que no existen Zona / Eje, Responsable y Seguimiento.
         await expect(page.locator('label:text-is("Zona / Eje")')).toBeHidden();

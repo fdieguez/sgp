@@ -116,6 +116,16 @@ test.describe('Validación E2E SGP: Flujo Maestro Consolidado', () => {
     await expect(page.locator(`text=${resolutionTypeName}`)).toBeVisible();
     console.log("DEBUG: Tipo de Resolución creado.");
 
+    // --- PASO 1.5: ADMINISTRADOR - ASIGNAR TIPO DE RESOLUCIÓN AL RESOLUTOR ---
+    console.log("DEBUG: Asignando el nuevo tipo de resolución al usuario Resolutor en Settings...");
+    await page.click('button:has-text("Usuarios")');
+    const userRow = page.locator('tr').filter({ hasText: userResolutor.email }).first();
+    await userRow.locator('button.text-blue-400').click();
+    await expect(page.locator('h2:has-text("Editar Usuario")')).toBeVisible();
+    await page.locator(`label:has-text("${resolutionTypeName}") input[type="checkbox"]`).check();
+    await page.click('button:has-text("Guardar Cambios")');
+    await page.waitForTimeout(2000);
+
     // --- PASO 2: CREACIÓN Y ASIGNACIÓN (ADMIN) ---
     console.log("DEBUG: Iniciando Paso 2: Creación de Solicitud y Asignaciones...");
     await page.goto('/mis-solicitudes');
@@ -137,6 +147,7 @@ test.describe('Validación E2E SGP: Flujo Maestro Consolidado', () => {
 
     // Asignar Responsable (el que creamos)
     console.log("DEBUG: Asignando Responsable...");
+    await page.locator('label:text-is("Zona Territorial") + select').selectOption('Zona E2E');
     await page.locator('label:has-text("Responsable") + select').selectOption({ label: userResponsable.fullName });
     
     // Agregar Asignación de Resolutor

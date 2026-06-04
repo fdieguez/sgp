@@ -18,6 +18,6 @@ echo.
 echo =======================================
 echo Iniciando Servidor Spring Boot Local...
 echo =======================================
-java -jar target\backend-0.1.0.jar
+java -Dfile.encoding=UTF-8 -jar target\backend-0.1.0.jar
 
 pause

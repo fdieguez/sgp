@@ -53,9 +53,14 @@ export default function UsersPage({ isEmbedded = false }) {
         }
     };
 
-    // --- User Handlers ---
     const handleUserSubmit = async (e) => {
         e.preventDefault();
+        
+        if (userFormData.role.includes('RESPONSABLE') && (!userFormData.zone || !userFormData.zone.trim())) {
+            alert('La zona es obligatoria para el rol Responsable');
+            return;
+        }
+
         try {
             // Asegurarse de que tipoResolucionIds solo se envíe si el rol contiene RESOLUTOR
             const payload = {

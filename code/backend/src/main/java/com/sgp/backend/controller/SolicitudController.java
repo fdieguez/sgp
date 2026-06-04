@@ -118,4 +118,27 @@ public class SolicitudController {
         solicitudService.aprobarAsignacion(id, auth.getName(), observaciones);
         return ResponseEntity.ok().build();
     }
+
+    @GetMapping("/stats")
+    public ResponseEntity<java.util.Map<String, Object>> getSolicitudStats(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long responsableId,
+            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) String origin,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateTo) {
+        return ResponseEntity.ok(solicitudService.getSolicitudStats(null, search, responsableId, locationId, origin, dateFrom, dateTo));
+    }
+
+    @GetMapping("/config/{configId}/stats")
+    public ResponseEntity<java.util.Map<String, Object>> getSolicitudStatsByConfig(
+            @PathVariable Long configId,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long responsableId,
+            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) String origin,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateTo) {
+        return ResponseEntity.ok(solicitudService.getSolicitudStats(configId, search, responsableId, locationId, origin, dateFrom, dateTo));
+    }
 }

@@ -2,9 +2,19 @@
 
 > **Propósito**: Este archivo registra todos los cambios, mejoras y decisiones técnicas del proyecto SGP para facilitar la continuidad entre sesiones de desarrollo.
 
-**Versión Actual**: `0.9.0` (Bypass de Dashboard, Tipos de Resolución Dinámicos y Mapeo de Estados)
+**Versión Actual**: `0.9.5` (Multi-Resolución por Checkboxes y Catálogo Seguro de Usuarios)
 
 ---
+
+## 📅 Junio 2026
+
+### 01/06/2026
+- **⭐️ Cierre de la Etapa 6.3** (Multi-Resolución por Checkboxes y Catálogo Seguro de Usuarios):
+    - **Gestión Multi-Resolución por Checkboxes:** Implementación en el backend y frontend para permitir la asociación múltiple de tipos de resolución a un Resolutor. Los formularios de creación/edición de usuarios despliegan condicionalmente checkboxes si el rol incluye `RESOLUTOR`.
+    - **Filtro Inteligente de Bandeja:** Modificación en la consulta del backend (`SolicitudService.java`) para filtrar las solicitudes visibles por los Resolutores, mostrando solo las asignaciones cuyos tipos coinciden con los checkboxes tildados en sus perfiles en tiempo real.
+    - **Catálogo Seguro de Usuarios:** Renovación completa de los usuarios iniciales del sistema (removiendo usuarios de prueba basura) y siembra de nómina real de empleados con teléfonos y DNIs válidos.
+    - **Cuentas Diferenciadas por Rol:** Creación de usuarios con nombres de correo sufijados (ej. `matias.ippolito.responsable@gmail.com` y `matias.ippolito.resolutor@gmail.com`) para personas que cumplen múltiples roles en la organización.
+    - **Pruebas Funcionales Playwright E2E:** Adición de la suite de pruebas `etapa_6_3_funcional.spec.js` validando la creación de solicitudes por Operadores, asignación de datos por Administradores, aprobación por Resolutores y la ocultación reactiva en bandeja al modificar la configuración de checkboxes de resolución en el perfil del usuario.
 
 ## 📅 Mayo 2026
 

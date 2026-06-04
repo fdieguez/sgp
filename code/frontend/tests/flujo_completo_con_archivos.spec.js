@@ -81,7 +81,7 @@ test.describe('Flujo de Prueba Funcional Avanzado', () => {
     // PASO 1: OPERADOR - CREACIÓN DE LA SOLICITUD
     // ==========================================
     console.log(`[TEST] PASO 1: Ingresando como Operador...`);
-    await robustLogin('operador@sgp.com', 'SGP_StrongPass_2026!');
+    await robustLogin('celestesolari19@gmail.com', 'Celeste_SGP_2026#');
     
     console.log(`[TEST] Creando la solicitud para: "${solicitanteName}"`);
     await page.click('button:has-text("Nueva Solicitud")');
@@ -145,7 +145,7 @@ test.describe('Flujo de Prueba Funcional Avanzado', () => {
     // PASO 2: DISTRIBUIDOR - ASIGNACIÓN DE RESPONSABLE (CP2)
     // ==========================================
     console.log(`[TEST] PASO 2: Ingresando como Distribuidor (Verificación CP2)...`);
-    await robustLogin('distribuidor@sgp.com', 'SGP_StrongPass_2026!');
+    await robustLogin('matias.ippolito@gmail.com', 'Matias_Dist_SGP_2026!');
 
     console.log(`[TEST] Buscando solicitud #${solicitudId} para distribución...`);
     const searchInputDist = page.locator('input[placeholder*="Buscar"]');
@@ -175,15 +175,28 @@ test.describe('Flujo de Prueba Funcional Avanzado', () => {
     const responsableSelect = page.locator('label:text-is("Responsable") + select');
     await expect(responsableSelect).toBeVisible();
 
-    // Asignar el responsable "Pepe Grillo"
-    console.log(`[TEST] Distribuidor asigna la solicitud a Pepe Grillo...`);
-    await responsableSelect.selectOption({ label: 'Pepe Grillo' });
+    // Asignar el responsable "Matías Ippolito" de la zona Norte
+    console.log(`[TEST] Distribuidor selecciona la Zona Territorial Norte...`);
+    await page.locator('label:text-is("Zona Territorial") + select').selectOption('Norte');
+    
+    console.log(`[TEST] Distribuidor asigna la solicitud a Matías Ippolito...`);
+    await responsableSelect.selectOption({ label: 'Matías Ippolito' });
 
     // Guardar pantalla de verificación del Distribuidor
     await page.screenshot({ path: path.join(pruebaDir, '2_distribuidor_verificacion_cp2.png') });
 
     await page.click('button:has-text("Guardar Solicitud")');
     await expect(page.locator('h2:has-text("Editar Solicitud")')).toBeHidden({ timeout: 10000 });
+
+    // Verificar que el distribuidor siga viendo la solicitud después de asignar al responsable
+    console.log(`[TEST] Verificando que el Distribuidor siga viendo la solicitud #${solicitudId} después de asignar...`);
+    await searchInputDist.click({ clickCount: 3 });
+    await page.keyboard.press('Control+A');
+    await page.keyboard.press('Backspace');
+    await searchInputDist.fill(solicitudId);
+    await page.waitForTimeout(1500);
+    const filaDistDespues = page.locator('tr').filter({ hasText: solicitanteName }).first();
+    await expect(filaDistDespues).toBeVisible({ timeout: 10000 });
 
     // Cerrar sesión
     await page.click('button:has-text("Salir")');
@@ -192,8 +205,8 @@ test.describe('Flujo de Prueba Funcional Avanzado', () => {
     // ==========================================
     // PASO 3: RESPONSABLE - PROPUESTA Y DERIVACIÓN
     // ==========================================
-    console.log(`[TEST] PASO 3: Ingresando como Responsable (pgrillo@sgp.com)...`);
-    await robustLogin('pgrillo@sgp.com', '1234.5');
+    console.log(`[TEST] PASO 3: Ingresando como Responsable (matias.ippolito.responsable@gmail.com)...`);
+    await robustLogin('matias.ippolito.responsable@gmail.com', 'Matias_Resp_SGP_2026!');
 
     console.log(`[TEST] Buscando solicitud #${solicitudId}...`);
     const searchInputResp = page.locator('input[placeholder*="Buscar"]');
@@ -230,8 +243,8 @@ test.describe('Flujo de Prueba Funcional Avanzado', () => {
     // ==========================================
     // PASO 4: RESOLUTOR - RESOLUCIÓN Y APROBACIÓN
     // ==========================================
-    console.log(`[TEST] PASO 4: Ingresando como Resolutor (resolutor@sgp.com)...`);
-    await robustLogin('resolutor@sgp.com', 'SGP_StrongPass_2026!');
+    console.log(`[TEST] PASO 4: Ingresando como Resolutor (matias.ippolito.resolutor@gmail.com)...`);
+    await robustLogin('matias.ippolito.resolutor@gmail.com', 'Matias_Res_SGP_2026!');
 
     console.log(`[TEST] Buscando solicitud #${solicitudId}...`);
     const searchInputResol = page.locator('input[placeholder*="Buscar"]');

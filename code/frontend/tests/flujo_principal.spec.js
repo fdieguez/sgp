@@ -8,8 +8,8 @@ test.describe.serial('Flujo Principal de Solicitud (Etapa 3)', () => {
     await page.goto('/');
     
     // Login
-    await page.fill('input[type="email"]', 'operador@sgp.com');
-    await page.fill('input[type="password"]', 'SGP_StrongPass_2026!');
+    await page.fill('input[type="email"]', 'celestesolari19@gmail.com');
+    await page.fill('input[type="password"]', 'Celeste_SGP_2026#');
     await page.click('button:has-text("Ingresar")');
     
     // Esperar a que el login termine y cargue la vista de solicitudes
@@ -39,8 +39,8 @@ test.describe.serial('Flujo Principal de Solicitud (Etapa 3)', () => {
     await page.goto('/');
 
     // Login
-    await page.fill('input[type="email"]', 'distribuidor@sgp.com');
-    await page.fill('input[type="password"]', 'SGP_StrongPass_2026!');
+    await page.fill('input[type="email"]', 'matias.ippolito@gmail.com');
+    await page.fill('input[type="password"]', 'Matias_Dist_SGP_2026!');
     await page.click('button:has-text("Ingresar")');
     await page.waitForURL('**/mis-solicitudes', { timeout: 15000 });
 
@@ -52,7 +52,8 @@ test.describe.serial('Flujo Principal de Solicitud (Etapa 3)', () => {
     await expect(page.locator('h2:has-text("Editar Solicitud")')).toBeVisible();
 
     // Asignar Responsable
-    await page.locator('label:has-text("Responsable") + select').selectOption({ label: 'Juan Perez' }); // o 'Juan Perez (Norte)' según cómo esté cargado
+    await page.locator('label:text-is("Zona Territorial") + select').selectOption('Norte');
+    await page.locator('label:has-text("Responsable") + select').selectOption({ label: 'Matías Ippolito' });
 
     // Guardar
     await page.click('button:has-text("Guardar Solicitud")');
@@ -68,8 +69,8 @@ test.describe.serial('Flujo Principal de Solicitud (Etapa 3)', () => {
     await page.goto('/');
 
     // Login
-    await page.fill('input[type="email"]', 'jperez@sgp.com');
-    await page.fill('input[type="password"]', '1234.5');
+    await page.fill('input[type="email"]', 'matias.ippolito.responsable@gmail.com');
+    await page.fill('input[type="password"]', 'Matias_Resp_SGP_2026!');
     await page.click('button:has-text("Ingresar")');
     await page.waitForURL('**/mis-solicitudes', { timeout: 15000 });
 
@@ -84,8 +85,8 @@ test.describe.serial('Flujo Principal de Solicitud (Etapa 3)', () => {
     await page.click('button:has-text("Agregar")');
 
     // Seleccionar el tipo de resolución (esto asigna automáticamente al resolutor configurado)
-    const selectArea = page.locator('select').filter({ has: page.locator('option:has-text("Seleccione Área...")') });
-    await selectArea.selectOption({ label: 'AGENDA - Ana Resolutora' });
+    const selectArea = page.locator('div.p-4.bg-indigo-900\\/10 select').last();
+    await selectArea.selectOption('AGENDA');
 
     // Guardar
     await page.click('button:has-text("Guardar Solicitud")');
@@ -99,8 +100,8 @@ test.describe.serial('Flujo Principal de Solicitud (Etapa 3)', () => {
     await page.goto('/');
 
     // Login
-    await page.fill('input[type="email"]', 'resolutor@sgp.com');
-    await page.fill('input[type="password"]', 'SGP_StrongPass_2026!');
+    await page.fill('input[type="email"]', 'mvgonza79@gmail.com');
+    await page.fill('input[type="password"]', 'Maria_SGP_2026%');
     await page.click('button:has-text("Ingresar")');
     await page.waitForURL('**/mis-solicitudes', { timeout: 15000 });
 

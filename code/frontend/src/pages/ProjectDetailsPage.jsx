@@ -98,6 +98,14 @@ export default function ProjectDetailsPage() {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [responsablesList, setResponsablesList] = useState([]);
     const [locationsList, setLocationsList] = useState([]);
+    const [stats, setStats] = useState({
+        pendiente: 0,
+        enProceso: 0,
+        enResolucion: 0,
+        completadas: 0,
+        rechazada: 0,
+        totalSubsidios: 0
+    });
 
     useEffect(() => {
         fetchResponsables();
@@ -174,9 +182,25 @@ export default function ProjectDetailsPage() {
             }
 
             const endpoint = configId ? `/api/solicitudes/config/${configId}` : `/api/solicitudes`;
-            const response = await api.get(endpoint, { params });
+            const endpointStats = configId ? `/api/solicitudes/config/${configId}/stats` : `/api/solicitudes/stats`;
+
+            const statsParams = {
+                search: searchTerm || null,
+                origin: filters.origin || null,
+                responsableId: filters.responsableId || null,
+                locationId: filters.locationId || null,
+            };
+            if (params.dateFrom) statsParams.dateFrom = params.dateFrom;
+            if (params.dateTo) statsParams.dateTo = params.dateTo;
+
+            const [response, statsResponse] = await Promise.all([
+                api.get(endpoint, { params }),
+                api.get(endpointStats, { params: statsParams })
+            ]);
+
             setSolicitudes(response.data.content);
             setTotalPages(response.data.totalPages);
+            setStats(statsResponse.data);
         } catch (err) {
             console.error(err);
             setError("Error cargando las solicitudes.");
@@ -543,7 +567,7 @@ export default function ProjectDetailsPage() {
                                 <div className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]"></div> Pendiente
                             </div>
                             <div className="text-3xl font-black text-white">
-                                {processedData.stats.pendiente}
+                                {stats.pendiente}
                             </div>
                         </button>
                         <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'en proceso' ? '' : 'en proceso' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'en proceso' ? 'bg-blue-900/40 border-2 border-blue-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
@@ -551,7 +575,7 @@ export default function ProjectDetailsPage() {
                                 <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></div> Asignadas
                             </div>
                             <div className="text-3xl font-black text-white">
-                                {processedData.stats.enProceso}
+                                {stats.enProceso || stats.en_proceso || 0}
                             </div>
                         </button>
                         <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'en resolucion' ? '' : 'en resolucion' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'en resolucion' ? 'bg-purple-900/40 border-2 border-purple-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
@@ -559,7 +583,7 @@ export default function ProjectDetailsPage() {
                                 <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.6)]"></div> En Resolución
                             </div>
                             <div className="text-3xl font-black text-white">
-                                {processedData.stats.enResolucion}
+                                {stats.enResolucion || stats.en_resolucion || 0}
                             </div>
                         </button>
                         <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'completadas' ? '' : 'completadas' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'completadas' ? 'bg-green-900/40 border-2 border-green-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
@@ -567,7 +591,7 @@ export default function ProjectDetailsPage() {
                                 <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div> Resueltas
                             </div>
                             <div className="text-3xl font-black text-white">
-                                {processedData.stats.completadas}
+                                {stats.completadas}
                             </div>
                         </button>
                         <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'rechazada' ? '' : 'rechazada' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'rechazada' ? 'bg-red-900/40 border-2 border-red-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
@@ -575,7 +599,7 @@ export default function ProjectDetailsPage() {
                                 <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"></div> Rechazados
                             </div>
                             <div className="text-3xl font-black text-white">
-                                {processedData.stats.rechazada}
+                                {stats.rechazada}
                             </div>
                         </button>
                     </div>

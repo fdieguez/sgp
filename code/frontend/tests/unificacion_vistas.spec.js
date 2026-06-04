@@ -54,8 +54,8 @@ test.describe('Suite de Validación: Unificación de Vistas (Etapa 05)', () => {
     await page.locator('label:text-is("Tipo") + select').selectOption('PEDIDO');
     await expect(page.locator('label:has-text("Monto")')).toBeHidden();
 
-    // Pestañas deben estar ocultas en nueva solicitud
-    await expect(page.locator('button:has-text("Notas Seguimiento")')).toBeHidden();
+    // Pestañas deben estar deshabilitadas en nueva solicitud según Etapa 7
+    await expect(page.locator('button:has-text("Notas Seguimiento")')).toBeDisabled();
     
     // Crear solicitud
     await page.locator('label:has-text("Nombre Completo") + input').fill('Beneficiario Test Unificado');

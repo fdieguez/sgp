@@ -96,12 +96,23 @@ public class DataInitializer implements CommandLineRunner {
                 entityManager.createNativeQuery("DELETE FROM user_tipo_resolucion WHERE user_id NOT IN (SELECT id FROM users WHERE email IN (:emails))")
                              .setParameter("emails", keepEmails).executeUpdate();
 
-                // Limpiar configuración de resolutor y definiciones de campos para evitar fallos de integridad referencial
+                // Limpiar configuración de resolutor y definiciones de campos para evitar fallos de integridad referencial si las tablas existen
                 try {
-                    entityManager.createNativeQuery("DELETE FROM resolucion_campo_definicion WHERE resolutor_config_id IN (SELECT id FROM resolutor_config WHERE user_id NOT IN (SELECT id FROM users WHERE email IN (:emails)))")
-                                 .setParameter("emails", keepEmails).executeUpdate();
-                    entityManager.createNativeQuery("DELETE FROM resolutor_config WHERE user_id NOT IN (SELECT id FROM users WHERE email IN (:emails))")
-                                 .setParameter("emails", keepEmails).executeUpdate();
+                    Number countDef = (Number) entityManager.createNativeQuery(
+                        "SELECT COUNT(*) FROM information_schema.tables WHERE UPPER(table_name) = 'RESOLUCION_CAMPO_DEFINICION'"
+                    ).getSingleResult();
+                    if (countDef != null && countDef.intValue() > 0) {
+                        entityManager.createNativeQuery("DELETE FROM resolucion_campo_definicion WHERE resolutor_config_id IN (SELECT id FROM resolutor_config WHERE user_id NOT IN (SELECT id FROM users WHERE email IN (:emails)))")
+                                     .setParameter("emails", keepEmails).executeUpdate();
+                    }
+                    
+                    Number countConfig = (Number) entityManager.createNativeQuery(
+                        "SELECT COUNT(*) FROM information_schema.tables WHERE UPPER(table_name) = 'RESOLUTOR_CONFIG'"
+                    ).getSingleResult();
+                    if (countConfig != null && countConfig.intValue() > 0) {
+                        entityManager.createNativeQuery("DELETE FROM resolutor_config WHERE user_id NOT IN (SELECT id FROM users WHERE email IN (:emails))")
+                                     .setParameter("emails", keepEmails).executeUpdate();
+                    }
                 } catch (Exception e) {
                     System.err.println("⚠️ Nota: Error al limpiar tablas obsoletas de configuraciones: " + e.getMessage());
                 }
@@ -185,6 +196,21 @@ public class DataInitializer implements CommandLineRunner {
                 resBarbara.getTiposResolucion().add(tr);
                 userRepository.save(resBarbara);
             });
+
+            // Asignar zona por defecto de forma secuencial a los responsables que no tengan una asignada
+            List<User> todosLosUsuarios = userRepository.findAll();
+            int contadorZona = 1;
+            for (User u : todosLosUsuarios) {
+                if (u.getRole() != null && u.getRole().contains("RESPONSABLE")) {
+                    if (u.getZone() == null || u.getZone().trim().isEmpty()) {
+                        String zonaAutomatica = "zona" + contadorZona;
+                        u.setZone(zonaAutomatica);
+                        userRepository.save(u);
+                        System.out.println("⚠️ Responsable sin zona detectado: " + u.getEmail() + ". Asignada zona automatica: " + zonaAutomatica);
+                        contadorZona++;
+                    }
+                }
+            }
 
             System.out.println("✅ DataInitializer finalizado exitosamente.");
         } catch (Exception e) {
@@ -319,12 +345,12 @@ public class DataInitializer implements CommandLineRunner {
         });
 
         // Seed Global Attributes
-        AtributoResolucion attrDatoObs = obtenerOCrearAtributo("Detalle u observaciones", "TEXTAREA", null);
+        AtributoResolucion attrDatoObs = obtenerOCrearAtributo("Observaciones", "TEXTAREA", null);
         AtributoResolucion attrFecha = obtenerOCrearAtributo("Fecha", "DATE", null);
-        AtributoResolucion attrMonto = obtenerOCrearAtributo("Monto solicitado", "NUMBER", null);
-        AtributoResolucion attrInstitucion = obtenerOCrearAtributo("Dato de la institución / solicitante", "TEXT", null);
-        AtributoResolucion attrDecInteres = obtenerOCrearAtributo("Declaración Interés", "SELECT", "SI,NO");
-        AtributoResolucion attrCBU = obtenerOCrearAtributo("Constancia de CBU (adjuntar pdf)", "FILE", null);
+        AtributoResolucion attrMonto = obtenerOCrearAtributo("Monto", "NUMBER", null);
+        AtributoResolucion attrInstitucion = obtenerOCrearAtributo("Nombre de institución", "TEXT", null);
+        AtributoResolucion attrDecInteres = obtenerOCrearAtributo("Declaración de interés", "SELECT", "si,no");
+        AtributoResolucion attrCBU = obtenerOCrearAtributo("Constancia de CBU", "FILE", null);
 
         // Definición de tipos básicos
         upsertTipoResolucion("AGENDA", resolutorDefault, List.of(
@@ -340,8 +366,6 @@ public class DataInitializer implements CommandLineRunner {
             new AtributoConfig(attrDatoObs, false, 4)
         ));
 
-        upsertTipoResolucion("MATERIALES", resolutorDefault, List.of());
-        upsertTipoResolucion("ASESORAMIENTO", resolutorDefault, List.of());
         upsertTipoResolucion("DECLARACION DE INTERES", resolutorDefault, List.of());
 
         System.out.println("✅ Seeding Formatos Dinámicos Nivel 2 Terminado.");

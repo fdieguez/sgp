@@ -34,8 +34,8 @@ test.describe('Validación E2E SGP en Producción', () => {
     };
 
     // --- PASO 1: CREACIÓN (OPERADOR) ---
-    console.log(`[E2E-PROD] Iniciando login como Operador (operador@sgp.com)...`);
-    await robustLogin('operador@sgp.com', 'SGP_StrongPass_2026!');
+    console.log(`[E2E-PROD] Iniciando login como Operador (celestesolari19@gmail.com)...`);
+    await robustLogin('celestesolari19@gmail.com', 'Celeste_SGP_2026#');
     console.log(`[E2E-PROD] Creando nueva solicitud con Solicitante: "${solicitanteName}"...`);
     
     await page.click('button:has-text("Nueva Solicitud")');
@@ -70,8 +70,8 @@ test.describe('Validación E2E SGP en Producción', () => {
     await page.waitForURL('**/login');
 
     // --- PASO 2: DISTRIBUCIÓN (DISTRIBUIDOR) ---
-    console.log(`[E2E-PROD] Iniciando login como Distribuidor (distribuidor@sgp.com)...`);
-    await robustLogin('distribuidor@sgp.com', 'SGP_StrongPass_2026!');
+    console.log(`[E2E-PROD] Iniciando login como Distribuidor (matias.ippolito@gmail.com)...`);
+    await robustLogin('matias.ippolito@gmail.com', 'Matias_Dist_SGP_2026!');
 
     // Buscar la solicitud por su número de orden / ID
     console.log(`[E2E-PROD] Buscando solicitud #${solicitudId} en la grilla...`);
@@ -83,21 +83,34 @@ test.describe('Validación E2E SGP en Producción', () => {
     await expect(filaDist).toBeVisible({ timeout: 10000 });
     await filaDist.locator('button[title="Ver / Editar Detalles"]').click();
 
-    // Asignar Responsable "Pepe Grillo"
-    console.log(`[E2E-PROD] Asignando responsable Pepe Grillo...`);
-    await page.locator('label:has-text("Responsable") + select').selectOption({ label: 'Pepe Grillo' });
+    // Asignar Responsable "Matías Ippolito" de la zona Norte
+    console.log(`[E2E-PROD] Seleccionando Zona Territorial Norte...`);
+    await page.locator('label:text-is("Zona Territorial") + select').selectOption('Norte');
+    
+    console.log(`[E2E-PROD] Asignando responsable Matías Ippolito...`);
+    await page.locator('label:has-text("Responsable") + select').selectOption({ label: 'Matías Ippolito' });
     
     // Guardar
     await page.click('button:has-text("Guardar Solicitud")');
     await expect(page.locator('h2:has-text("Editar Solicitud")')).toBeHidden({ timeout: 10000 });
+
+    // Verificar que el distribuidor siga viendo la solicitud después de asignar al responsable
+    console.log(`[E2E-PROD] Verificando que el Distribuidor siga viendo la solicitud #${solicitudId} después de asignar...`);
+    await searchInputDist.click({ clickCount: 3 });
+    await page.keyboard.press('Control+A');
+    await page.keyboard.press('Backspace');
+    await searchInputDist.fill(solicitudId);
+    await page.waitForTimeout(1500);
+    const filaDistDespues = page.locator('tr').filter({ hasText: solicitanteName }).first();
+    await expect(filaDistDespues).toBeVisible({ timeout: 10000 });
 
     // Cerrar sesión
     await page.click('button:has-text("Salir")');
     await page.waitForURL('**/login');
 
     // --- PASO 3: PROPUESTA Y DERIVACIÓN (RESPONSABLE) ---
-    console.log(`[E2E-PROD] Iniciando login como Responsable (pgrillo@sgp.com)...`);
-    await robustLogin('pgrillo@sgp.com', '1234.5');
+    console.log(`[E2E-PROD] Iniciando login como Responsable (matias.ippolito.responsable@gmail.com)...`);
+    await robustLogin('matias.ippolito.responsable@gmail.com', 'Matias_Resp_SGP_2026!');
 
     // Buscar la solicitud
     console.log(`[E2E-PROD] Buscando solicitud #${solicitudId}...`);
@@ -131,8 +144,8 @@ test.describe('Validación E2E SGP en Producción', () => {
     await page.waitForURL('**/login');
 
     // --- PASO 4: RESOLUCIÓN Y APROBACIÓN (RESOLUTOR) ---
-    console.log(`[E2E-PROD] Iniciando login como Resolutor (resolutor@sgp.com)...`);
-    await robustLogin('resolutor@sgp.com', 'SGP_StrongPass_2026!');
+    console.log(`[E2E-PROD] Iniciando login como Resolutor (matias.ippolito.resolutor@gmail.com)...`);
+    await robustLogin('matias.ippolito.resolutor@gmail.com', 'Matias_Res_SGP_2026!');
 
     // Buscar la solicitud
     console.log(`[E2E-PROD] Buscando solicitud #${solicitudId} en grilla de Resolutor...`);

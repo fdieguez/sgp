@@ -37,17 +37,13 @@ public class DashboardService {
             User user = userRepository.findByEmail(email).orElse(null);
             if (user != null) {
                 String userRole = user.getRole();
-                // Si es ADMIN, tiene acceso completo a todas las estadísticas sin filtrar
-                if (userRole != null && !userRole.contains("ADMIN")) {
+                // Si es ADMIN o DISTRIBUIDOR, tiene acceso completo a todas las estadísticas sin filtrar
+                if (userRole != null && !userRole.contains("ADMIN") && !userRole.contains("DISTRIBUIDOR")) {
                     spec = spec.and((root, query, cb) -> {
                         List<jakarta.persistence.criteria.Predicate> orPredicates = new java.util.ArrayList<>();
                         
                         if (userRole.contains("OPERADOR")) {
                             orPredicates.add(cb.equal(root.get("createdBy"), user));
-                        }
-                        if (userRole.contains("DISTRIBUIDOR")) {
-                            // El distribuidor solo ve estadísticas de solicitudes sin responsable asignado
-                            orPredicates.add(cb.isNull(root.get("responsable")));
                         }
                         if (userRole.contains("RESPONSABLE")) {
                             final String zoneStr = user.getZone();

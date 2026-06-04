@@ -27,6 +27,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     });
 
     const [responsables, setResponsables] = useState([]);
+    const [selectedZone, setSelectedZone] = useState('');
     const [locations, setLocations] = useState([]);
     const [tiposResolucion, setTiposResolucion] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -275,6 +276,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         }) || []
                     };
                 });
+                setSelectedZone(initialData.responsable?.zone || '');
             } else {
                 setFormData({
                     type: 'PEDIDO',
@@ -299,6 +301,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     firstContactControl: false,
                     assignments: []
                 });
+                setSelectedZone('');
                 setActiveTab('detalles');
             }
         } else {
@@ -395,6 +398,14 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         }
     };
 
+    // Computar zonas únicas de responsables
+    const uniqueZones = [...new Set(responsables.map(r => r.zone).filter(Boolean))].sort();
+
+    // Filtrar responsables por zona seleccionada
+    const filteredResponsables = selectedZone
+        ? responsables.filter(r => r.zone === selectedZone)
+        : [];
+
     if (!isOpen) return null;
 
     // Verificar si el usuario actual tiene una asignación pendiente en esta solicitud
@@ -416,54 +427,77 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
 
                 <div className="flex border-b border-gray-700 px-6 bg-gray-900/20">
                     <button
+                        type="button"
                         onClick={() => setActiveTab('detalles')}
                         className={`px-4 py-3 font-bold text-sm tracking-wide ${activeTab === 'detalles' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'}`}
                     >
                         Formulario / Detalles
                     </button>
-                    {formData.id && (
-                        <>
-                            <button
-                                onClick={() => setActiveTab('comentarios')}
-                                className={`px-4 py-3 font-bold text-sm tracking-wide flex items-center gap-2 ${activeTab === 'comentarios' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'}`}
-                            >
-                                <MessageSquare className="h-4 w-4" /> Notas Seguimiento
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('historial')}
-                                className={`px-4 py-3 font-bold text-sm tracking-wide flex items-center gap-2 ${activeTab === 'historial' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'}`}
-                            >
-                                <History className="h-4 w-4" /> Historial
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('adjuntos')}
-                                className={`px-4 py-3 font-bold text-sm tracking-wide flex items-center gap-2 ${activeTab === 'adjuntos' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'}`}
-                            >
-                                <FileText className="h-4 w-4" /> Adjuntos
-                            </button>
-                        </>
-                    )}
+                    <button
+                        type="button"
+                        disabled={!formData.id}
+                        onClick={() => setActiveTab('comentarios')}
+                        title={!formData.id ? "Debe guardar la solicitud primero para escribir notas" : ""}
+                        className={`px-4 py-3 font-bold text-sm tracking-wide flex items-center gap-2 transition-all ${
+                            !formData.id 
+                                ? 'text-gray-600 opacity-50 cursor-not-allowed' 
+                                : activeTab === 'comentarios' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'
+                        }`}
+                    >
+                        <MessageSquare className="h-4 w-4" /> Notas Seguimiento
+                    </button>
+                    <button
+                        type="button"
+                        disabled={!formData.id}
+                        onClick={() => setActiveTab('historial')}
+                        title={!formData.id ? "El historial estará disponible una vez guardada la solicitud" : ""}
+                        className={`px-4 py-3 font-bold text-sm tracking-wide flex items-center gap-2 transition-all ${
+                            !formData.id 
+                                ? 'text-gray-600 opacity-50 cursor-not-allowed' 
+                                : activeTab === 'historial' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'
+                        }`}
+                    >
+                        <History className="h-4 w-4" /> Historial
+                    </button>
+                    <button
+                        type="button"
+                        disabled={!formData.id}
+                        onClick={() => setActiveTab('adjuntos')}
+                        title={!formData.id ? "Debe guardar la solicitud primero para subir adjuntos" : ""}
+                        className={`px-4 py-3 font-bold text-sm tracking-wide flex items-center gap-2 transition-all ${
+                            !formData.id 
+                                ? 'text-gray-600 opacity-50 cursor-not-allowed' 
+                                : activeTab === 'adjuntos' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'
+                        }`}
+                    >
+                        <FileText className="h-4 w-4" /> Adjuntos
+                    </button>
                 </div>
 
                 <div className="max-h-[70vh] overflow-y-auto custom-scrollbar">
                     {activeTab === 'detalles' && (
                         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                    {/* Type and Status */}
-                    <div className="grid grid-cols-2 gap-4">
-                        {user?.role !== 'OPERADOR' && user?.role !== 'DISTRIBUIDOR' && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Tipo</label>
-                                <select
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
-                                    value={formData.type}
-                                    disabled={!!formData.id}
-                                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                                >
-                                    <option value="PEDIDO">Pedido</option>
-                                    <option value="SUBSIDIO">Subsidio</option>
-                                </select>
-                            </div>
-                        )}
+                            {!formData.id && (
+                                <div className="bg-indigo-950/40 border border-indigo-800 rounded-xl p-3 text-xs text-indigo-300 text-center animate-in fade-in duration-300">
+                                    📢 <strong>Nota:</strong> Guarde la solicitud primero para poder agregar adjuntos, notas de seguimiento o consultar el historial de auditoría.
+                                </div>
+                            )}
+                            {/* Type and Status */}
+                            <div className="grid grid-cols-2 gap-4">
+                                {user?.role !== 'DISTRIBUIDOR' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-400 mb-1">Tipo</label>
+                                        <select
+                                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
+                                            value={formData.type}
+                                            disabled={!!formData.id}
+                                            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                                        >
+                                            <option value="PEDIDO">Pedido</option>
+                                            <option value="SUBSIDIO">Subsidio</option>
+                                        </select>
+                                    </div>
+                                )}
                         {!!formData.id && (
                             <div>
                                 <label className="block text-sm font-medium text-gray-400 mb-1">Estado</label>
@@ -683,28 +717,53 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             />
                         </div>
                         {user?.role !== 'OPERADOR' && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Responsable</label>
-                                <select
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-                                    value={formData.responsableId}
-                                    disabled={isResponsable}
-                                    onChange={(e) => {
-                                        const respId = e.target.value;
-                                        const selectedResp = responsables.find(r => r.id.toString() === respId.toString());
-                                        setFormData({ 
-                                            ...formData, 
-                                            responsableId: respId,
-                                            zone: selectedResp ? (selectedResp.zone || '') : ''
-                                        });
-                                    }}
-                                >
-                                    <option value="">Seleccionar...</option>
-                                    {responsables.map(r => (
-                                        <option key={r.id} value={r.id}>{r.name}</option>
-                                    ))}
-                                </select>
-                            </div>
+                            <>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Zona Territorial</label>
+                                    <select
+                                        className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                                        value={selectedZone}
+                                        disabled={isResponsable}
+                                        onChange={(e) => {
+                                            const z = e.target.value;
+                                            setSelectedZone(z);
+                                            // Al cambiar la zona, limpiamos el responsable anterior en formData
+                                            setFormData(prev => ({ 
+                                                ...prev, 
+                                                responsableId: '',
+                                                zone: z
+                                            }));
+                                        }}
+                                    >
+                                        <option value="">Seleccionar Zona...</option>
+                                        {uniqueZones.map(z => (
+                                            <option key={z} value={z}>{z}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Responsable</label>
+                                    <select
+                                        className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                                        value={formData.responsableId}
+                                        disabled={isResponsable || !selectedZone}
+                                        onChange={(e) => {
+                                            const respId = e.target.value;
+                                            const selectedResp = responsables.find(r => r.id.toString() === respId.toString());
+                                            setFormData({ 
+                                                ...formData, 
+                                                responsableId: respId,
+                                                zone: selectedResp ? (selectedResp.zone || '') : ''
+                                            });
+                                        }}
+                                    >
+                                        <option value="">Seleccionar Responsable...</option>
+                                        {filteredResponsables.map(r => (
+                                            <option key={r.id} value={r.id}>{r.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </>
                         )}
                     </div>
 
@@ -868,14 +927,14 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                 if (assignment.tipoResolucion === 'SUBSIDIO') {
                                                                     const tipoPedido = currentData['Tipo de pedido'] || '';
                                                                     const camposPersonal = [
-                                                                        'Apellido y nombre', 'DNI', 'Dirección del DNI',
-                                                                        'Adjuntar DNI frente', 'Adjuntar DNI atras', 'Adjuntar Constancia de CBU'
+                                                                        'Nombre y apellido', 'DNI', 'Dirección de DNI',
+                                                                        'DNI frente', 'DNI dorso', 'Constancia de CBU'
                                                                     ];
                                                                     const camposInstitucional = [
-                                                                        'Nombre de la Institución', 'Dirección de la Institución', 'Localidad de la Institución',
-                                                                        'responsable1: Nombre', 'responsable1: DNI', 'responsable1: Cargo',
-                                                                        'responsable2: Nombre', 'responsable2: DNI', 'responsable2: Cargo',
-                                                                        'Adjuntar nota de pedido (jpg/pdf)'
+                                                                        'Nombre de institución', 'Dirección de institución', 'Localidad',
+                                                                        'Responsable 1: Nombre', 'Responsable 1: DNI', 'Responsable 1: Cargo',
+                                                                        'Responsable 2: Nombre', 'Responsable 2: DNI', 'Responsable 2: Cargo',
+                                                                        'Nota de pedido'
                                                                     ];
 
                                                                     if (camposPersonal.includes(campo.nombre) && tipoPedido !== 'Personal') {

@@ -38,10 +38,17 @@ public class UserService {
             throw new IllegalArgumentException("El teléfono es obligatorio");
         }
 
+        String finalRole = role != null ? role.toUpperCase() : "OPERADOR";
+        if (finalRole.contains("RESPONSABLE")) {
+            if (zone == null || zone.trim().isEmpty()) {
+                throw new IllegalArgumentException("La zona es obligatoria para el rol Responsable");
+            }
+        }
+
         User user = new User();
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(password));
-        user.setRole(role != null ? role.toUpperCase() : "OPERADOR");
+        user.setRole(finalRole);
         user.setFirstName(firstName != null ? firstName : "");
         user.setLastName(lastName != null ? lastName : "");
         user.setPhone(phone);
@@ -92,6 +99,12 @@ public class UserService {
         }
         if (zone != null) user.setZone(zone);
         if (dni != null) user.setDni(dni);
+
+        if (user.getRole() != null && user.getRole().contains("RESPONSABLE")) {
+            if (user.getZone() == null || user.getZone().trim().isEmpty()) {
+                throw new IllegalArgumentException("La zona es obligatoria para el rol Responsable");
+            }
+        }
 
         if (tipoResolucionIds != null) {
             java.util.Set<com.sgp.backend.entity.TipoResolucion> tipos = new java.util.HashSet<>();

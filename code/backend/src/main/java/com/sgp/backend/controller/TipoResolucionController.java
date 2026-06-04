@@ -2,6 +2,7 @@ package com.sgp.backend.controller;
 
 import com.sgp.backend.entity.TipoResolucion;
 import com.sgp.backend.entity.TipoResolucionAtributo;
+import com.sgp.backend.entity.User;
 import com.sgp.backend.repository.TipoResolucionRepository;
 import com.sgp.backend.repository.UserRepository;
 import com.sgp.backend.repository.AtributoResolucionRepository;
@@ -48,7 +49,17 @@ public class TipoResolucionController {
             dto.setAtributosConfig(new ArrayList<>());
         }
 
-        return ResponseEntity.ok(repository.save(dto));
+        // 1. Guardar primero para evitar TransientObjectException
+        TipoResolucion saved = repository.save(dto);
+
+        // 2. Sincronizar relación ManyToMany en el usuario resolutor
+        if (saved.getResolutor() != null) {
+            User res = saved.getResolutor();
+            res.getTiposResolucion().add(saved);
+            userRepository.save(res);
+        }
+
+        return ResponseEntity.ok(saved);
     }
 
     @PutMapping("/{id}")
@@ -57,6 +68,8 @@ public class TipoResolucionController {
         return repository.findById(id).map(existing -> {
             existing.setTipo(dto.getTipo());
             
+            User oldResolutor = existing.getResolutor();
+
             if (dto.getResolutor() != null && dto.getResolutor().getId() != null) {
                 userRepository.findById(dto.getResolutor().getId()).ifPresent(existing::setResolutor);
             } else {
@@ -74,7 +87,23 @@ public class TipoResolucionController {
                 }
             }
 
-            return ResponseEntity.ok(repository.save(existing));
+            // 1. Guardar la entidad de tipo de resolución primero
+            TipoResolucion saved = repository.save(existing);
+
+            // 2. Sincronizar ManyToMany en el nuevo resolutor asignado
+            if (saved.getResolutor() != null) {
+                User res = saved.getResolutor();
+                res.getTiposResolucion().add(saved);
+                userRepository.save(res);
+            }
+
+            // 3. Limpiar ManyToMany en el resolutor anterior si cambió
+            if (oldResolutor != null && (saved.getResolutor() == null || !oldResolutor.getId().equals(saved.getResolutor().getId()))) {
+                oldResolutor.getTiposResolucion().remove(saved);
+                userRepository.save(oldResolutor);
+            }
+
+            return ResponseEntity.ok(saved);
         }).orElse(ResponseEntity.notFound().build());
     }
 

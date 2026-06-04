@@ -64,10 +64,10 @@ public class DatabaseMigrationRunner implements CommandLineRunner {
                 
                 log.info("✅ Script ejecutado correctamente: {}", file.getName());
                 
-                // Mover archivo a boot/old
+                // Mover archivo a boot/old reemplazando si ya existe
                 Path source = file.toPath();
                 Path target = Paths.get(oldDir.getAbsolutePath(), file.getName());
-                Files.move(source, target);
+                Files.move(source, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 log.info("📁 Movido a {}", target.toString());
                 
             } catch (Exception e) {

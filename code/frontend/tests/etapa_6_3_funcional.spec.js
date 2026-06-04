@@ -68,6 +68,7 @@ test.describe('Etapa 6.3 - Pruebas Funcionales de Multi-Resolución', () => {
 
         // Cargar responsable
         console.log('[TEST 1] Asignando responsable y resolución de tipo SUBSIDIO');
+        await page.locator('label:text-is("Zona Territorial") + select').selectOption('Norte');
         await page.locator('label:has-text("Responsable") + select').selectOption({ index: 1 });
 
         // Agregar asignación de tipo SUBSIDIO (que por defecto se asigna a Martín Nocioni)
@@ -143,6 +144,7 @@ test.describe('Etapa 6.3 - Pruebas Funcionales de Multi-Resolución', () => {
         await page.locator('label:has-text("Tel") + input').first().fill('3424001122');
         await page.locator('label:has-text("Descripción / Pedido") + textarea').fill('Test de filtrado por tipo de resolución');
         await page.locator('label:text-is("Tipo") + select').selectOption('SUBSIDIO');
+        await page.locator('label:text-is("Zona Territorial") + select').selectOption('Norte');
         await page.locator('label:has-text("Responsable") + select').selectOption({ index: 1 });
 
         await page.click('button:has-text("Agregar")');
@@ -170,7 +172,7 @@ test.describe('Etapa 6.3 - Pruebas Funcionales de Multi-Resolución', () => {
         await expect(page.locator('h2:has-text("Editar Usuario")')).toBeVisible();
 
         // Desmarcar Subsidio
-        const subsidioCheckbox = page.locator('label:has-text("SUBSIDIO") input[type="checkbox"]');
+        const subsidioCheckbox = page.locator('label').filter({ hasText: /^SUBSIDIO$/ }).locator('input[type="checkbox"]');
         await subsidioCheckbox.uncheck();
         await page.click('button:has-text("Guardar Cambios")');
         await page.waitForTimeout(1500);
@@ -202,8 +204,7 @@ test.describe('Etapa 6.3 - Pruebas Funcionales de Multi-Resolución', () => {
         const filaUsuarioRestaurar = page.locator('tbody tr').filter({ hasText: 'martinnocioni@gmail.com' }).first();
         await filaUsuarioRestaurar.locator('button').first().click();
         await expect(page.locator('h2:has-text("Editar Usuario")')).toBeVisible();
-
-        const subsidioCheckboxRestaurar = page.locator('label:has-text("SUBSIDIO") input[type="checkbox"]');
+        const subsidioCheckboxRestaurar = page.locator('label').filter({ hasText: /^SUBSIDIO$/ }).locator('input[type="checkbox"]');
         await subsidioCheckboxRestaurar.check();
         await page.click('button:has-text("Guardar Cambios")');
         await page.waitForTimeout(1500);

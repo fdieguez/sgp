@@ -1,3 +1,6 @@
+-- Desactivar integridad referencial en H2 para evitar violaciones de clave foránea al recrear tablas
+SET REFERENTIAL_INTEGRITY FALSE;
+
 -- 1. Limpiar por completo las relaciones de atributos de resolución para evitar violaciones de clave foránea (FK)
 DELETE FROM tipo_resolucion_atributo;
 
@@ -7,18 +10,11 @@ DELETE FROM tipo_resolucion;
 -- 3. Limpiar todos los atributos de resolución
 DELETE FROM atributo_resolucion;
 
--- 4. Recrear los 4 tipos de resolución base asignando el resolutor por defecto resolutor@sgp.com
-INSERT INTO tipo_resolucion (tipo, activo, default_resolutor_id) 
-SELECT 'AGENDA', true, id FROM users WHERE email = 'resolutor@sgp.com';
-
-INSERT INTO tipo_resolucion (tipo, activo, default_resolutor_id) 
-SELECT 'SUBSIDIO', true, id FROM users WHERE email = 'resolutor@sgp.com';
-
-INSERT INTO tipo_resolucion (tipo, activo, default_resolutor_id) 
-SELECT 'DECLARACION DE INTERES', true, id FROM users WHERE email = 'resolutor@sgp.com';
-
-INSERT INTO tipo_resolucion (tipo, activo, default_resolutor_id) 
-SELECT 'OTRA', true, id FROM users WHERE email = 'resolutor@sgp.com';
+-- 4. Recrear los 4 tipos de resolución base asignando el resolutor por defecto resolutor@sgp.com como null inicialmente
+INSERT INTO tipo_resolucion (tipo, activo, default_resolutor_id) VALUES ('AGENDA', true, null);
+INSERT INTO tipo_resolucion (tipo, activo, default_resolutor_id) VALUES ('SUBSIDIO', true, null);
+INSERT INTO tipo_resolucion (tipo, activo, default_resolutor_id) VALUES ('DECLARACION DE INTERES', true, null);
+INSERT INTO tipo_resolucion (tipo, activo, default_resolutor_id) VALUES ('OTRA', true, null);
 
 -- 5. Insertar atributos dinámicos para SUBSIDIO
 INSERT INTO atributo_resolucion (nombre, tipo_dato, opciones, activo) VALUES ('Tipo de pedido', 'SELECT', 'Personal,Institucional en dinero,Institucional en especie,Institucional indistinto', true);
@@ -213,3 +209,6 @@ SELECT tr.id, ar.id, true, 2 FROM tipo_resolucion tr, atributo_resolucion ar WHE
 
 INSERT INTO tipo_resolucion_atributo (tipo_resolucion_id, atributo_resolucion_id, requerido, orden)
 SELECT tr.id, ar.id, false, 3 FROM tipo_resolucion tr, atributo_resolucion ar WHERE tr.tipo = 'OTRA' AND ar.nombre = 'Adjuntos adicionales';
+
+-- Reactivar integridad referencial
+SET REFERENTIAL_INTEGRITY TRUE;
