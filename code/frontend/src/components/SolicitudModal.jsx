@@ -706,7 +706,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     )}
 
                     {/* Dates and Tracking */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className={`grid gap-4 ${user?.role !== 'OPERADOR' ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
                         <div>
                             <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Ingreso</label>
                             <input
