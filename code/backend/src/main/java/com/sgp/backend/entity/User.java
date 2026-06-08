@@ -45,6 +45,11 @@ public class User {
     @Column(nullable = true)
     private String zone;
 
+    // Campo para indicar si el usuario está activo (soporte de borrado lógico)
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean activo = true;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
         name = "user_tipo_resolucion",

@@ -48,10 +48,10 @@ public class SolicitudWorkflowTest {
     @BeforeEach
     void setUp() {
         // Crear usuarios de prueba en base de datos en memoria
-        operador    = userRepository.save(User.builder().email("operador@test.com").password("123").firstName("Op").lastName("1").role("OPERADOR").build());
-        responsable = userRepository.save(User.builder().email("responsable@test.com").password("123").firstName("Resp").lastName("1").role("RESPONSABLE").build());
-        resolutor1  = userRepository.save(User.builder().email("resolutor1@test.com").password("123").firstName("Res").lastName("1").role("RESOLUTOR").build());
-        resolutor2  = userRepository.save(User.builder().email("resolutor2@test.com").password("123").firstName("Res").lastName("2").role("RESOLUTOR").build());
+        operador    = userRepository.save(User.builder().email("operador@test.com").password("123").firstName("Op").lastName("1").role("OPERADOR").phone("123456789").build());
+        responsable = userRepository.save(User.builder().email("responsable@test.com").password("123").firstName("Resp").lastName("1").role("RESPONSABLE").phone("123456789").build());
+        resolutor1  = userRepository.save(User.builder().email("resolutor1@test.com").password("123").firstName("Res").lastName("1").role("RESOLUTOR").phone("123456789").build());
+        resolutor2  = userRepository.save(User.builder().email("resolutor2@test.com").password("123").firstName("Res").lastName("2").role("RESOLUTOR").phone("123456789").build());
 
         person = personRepository.save(Person.builder().name("Juan Perez").phone("123456").type("INDIVIDUAL").build());
 

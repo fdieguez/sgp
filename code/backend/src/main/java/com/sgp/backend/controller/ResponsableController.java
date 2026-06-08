@@ -23,8 +23,8 @@ public class ResponsableController {
 
     @GetMapping
     public ResponseEntity<List<User>> getResponsables() {
-        // Obtenemos todos los usuarios con rol RESPONSABLE o RESOLUTOR para permitir asignaciones múltiples
-        List<User> responsables = userRepository.findByRoleIn(java.util.Arrays.asList("RESPONSABLE", "RESOLUTOR"));
+        // Obtenemos todos los usuarios activos con rol RESPONSABLE o RESOLUTOR para permitir asignaciones múltiples
+        List<User> responsables = userRepository.findByRoleInAndActivoTrue(java.util.Arrays.asList("RESPONSABLE", "RESOLUTOR"));
         
         // Quitamos las contraseñas por seguridad
         responsables.forEach(u -> u.setPassword(null));

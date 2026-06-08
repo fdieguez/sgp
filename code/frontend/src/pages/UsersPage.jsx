@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../config/axios';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import {
     ArrowLeft,
     UserPlus,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 
 export default function UsersPage({ isEmbedded = false }) {
+    const { user: currentUser } = useAuth();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [users, setUsers] = useState([]);
@@ -82,12 +84,17 @@ export default function UsersPage({ isEmbedded = false }) {
     };
 
     const handleUserDelete = async (id) => {
+        if (id === currentUser?.id) {
+            alert('No puedes eliminarte a ti mismo del sistema.');
+            return;
+        }
         if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
         try {
             await api.delete(`/api/users/${id}`);
             fetchAll();
         } catch (err) {
-            alert('Error al eliminar usuario');
+            const errMsg = err.response?.data?.error || err.response?.data || 'Error al eliminar usuario';
+            alert(errMsg);
         }
     };
 
@@ -162,11 +169,16 @@ export default function UsersPage({ isEmbedded = false }) {
                             </thead>
                             <tbody className="divide-y divide-gray-700">
                                 {users.map(user => (
-                                    <tr key={user.id} className="hover:bg-gray-700/50 transition-colors">
+                                    <tr key={user.id} className={`hover:bg-gray-700/50 transition-colors ${user.activo === false ? 'opacity-50 text-gray-500 bg-gray-950/20' : ''}`}>
                                         <td className="p-4">
                                             <div className="flex items-center gap-2">
                                                 <UserIcon className="h-4 w-4 text-indigo-400" />
                                                 <span className="text-sm text-gray-200 font-bold">{user.firstName} {user.lastName}</span>
+                                                {user.activo === false && (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-950/40 text-red-400 border border-red-900 uppercase tracking-wider ml-1">
+                                                        Inactivo
+                                                    </span>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="p-4">
@@ -200,7 +212,9 @@ export default function UsersPage({ isEmbedded = false }) {
                                         <td className="p-4 text-right">
                                             <div className="flex justify-end gap-2">
                                                 <button onClick={() => openEditUser(user)} className="p-2 text-blue-400 hover:bg-blue-900/20 rounded-lg transition-colors"><Pencil className="h-4 w-4" /></button>
-                                                <button onClick={() => handleUserDelete(user.id)} className="p-2 text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 className="h-4 w-4" /></button>
+                                                {user.id !== currentUser?.id && (
+                                                    <button onClick={() => handleUserDelete(user.id)} className="p-2 text-red-400 hover:bg-red-900/20 rounded-lg transition-colors" title="Eliminar usuario"><Trash2 className="h-4 w-4" /></button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

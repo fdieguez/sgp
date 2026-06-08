@@ -120,36 +120,81 @@ public class UserService {
 
     @org.springframework.transaction.annotation.Transactional
     public void deleteUser(Long id) {
-        if (!userRepository.existsById(id)) {
-            throw new IllegalArgumentException("User not found");
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        // 1. Validación de Resolutor por Defecto:
+        // Si el usuario es resolutor por defecto en TipoResolucion, lanzar error (IllegalStateException).
+        long countDefaultResolutor = entityManager.createQuery(
+                "SELECT COUNT(tr) FROM TipoResolucion tr WHERE tr.resolutor.id = :id", Long.class)
+                .setParameter("id", id)
+                .getSingleResult();
+        if (countDefaultResolutor > 0) {
+            throw new IllegalStateException("No se puede eliminar al usuario. Está configurado como resolutor por defecto para algún tipo de resolución. Cambie esta configuración antes de continuar");
         }
 
-        // 1. Desvincular en tipo_resolucion (default_resolutor_id)
-        entityManager.createQuery("UPDATE TipoResolucion tr SET tr.resolutor = null WHERE tr.resolutor.id = :id")
-                     .setParameter("id", id).executeUpdate();
+        // 2. Verificación de Dependencias en tablas transaccionales:
+        long countSolicitudes = entityManager.createQuery(
+                "SELECT COUNT(s) FROM Solicitud s WHERE s.createdBy.id = :id OR s.responsable.id = :id OR s.resolutor.id = :id", Long.class)
+                .setParameter("id", id)
+                .getSingleResult();
 
-        // 2. Eliminar de solicitud_resolutor_assignment
-        entityManager.createQuery("DELETE FROM SolicitudResolutorAssignment sra WHERE sra.resolutor.id = :id")
-                     .setParameter("id", id).executeUpdate();
+        long countAssignments = entityManager.createQuery(
+                "SELECT COUNT(sra) FROM SolicitudResolutorAssignment sra WHERE sra.resolutor.id = :id", Long.class)
+                .setParameter("id", id)
+                .getSingleResult();
 
-        // 3. Desvincular en solicitudes (createdBy, resolutor, responsable)
-        entityManager.createQuery("UPDATE Solicitud s SET s.createdBy = null WHERE s.createdBy.id = :id")
-                     .setParameter("id", id).executeUpdate();
-        entityManager.createQuery("UPDATE Solicitud s SET s.resolutor = null WHERE s.resolutor.id = :id")
-                     .setParameter("id", id).executeUpdate();
-        entityManager.createQuery("UPDATE Solicitud s SET s.responsable = null WHERE s.responsable.id = :id")
-                     .setParameter("id", id).executeUpdate();
+        long countHistorial = entityManager.createQuery(
+                "SELECT COUNT(ah) FROM AsignacionHistorial ah WHERE ah.responsable.id = :id", Long.class)
+                .setParameter("id", id)
+                .getSingleResult();
 
-        // 4. Desvincular en asignacion_historial
-        entityManager.createQuery("UPDATE AsignacionHistorial ah SET ah.responsable = null WHERE ah.responsable.id = :id")
-                     .setParameter("id", id).executeUpdate();
+        long countAdjuntos = entityManager.createQuery(
+                "SELECT COUNT(da) FROM DocumentoAdjunto da WHERE da.uploadedBy.id = :id", Long.class)
+                .setParameter("id", id)
+                .getSingleResult();
 
-        // 5. Desvincular de user_tipo_resolucion (limpiar relación ManyToMany)
-        User user = userRepository.findById(id).orElseThrow();
-        user.getTiposResolucion().clear();
-        userRepository.save(user);
+        boolean tieneDependencias = (countSolicitudes > 0 || countAssignments > 0 || countHistorial > 0 || countAdjuntos > 0);
 
-        // 6. Eliminar el usuario
-        userRepository.delete(user);
+        if (!tieneDependencias) {
+            // Caso A (Sin dependencias): Borrado Físico
+            // Limpiar la relación ManyToMany user_tipo_resolucion
+            user.getTiposResolucion().clear();
+            userRepository.save(user);
+
+            userRepository.delete(user);
+        } else {
+            // Caso B (Con dependencias): Borrado Lógico
+            // Si tiene solicitudes activas asignadas como responsable, setear responsable = null y registrar la desvinculación en AsignacionHistorial.
+            List<com.sgp.backend.entity.Solicitud> solicitudesActivas = entityManager.createQuery(
+                    "SELECT s FROM Solicitud s WHERE s.responsable.id = :id AND s.status NOT IN ('completadas', 'rechazada', 'cancelada')", com.sgp.backend.entity.Solicitud.class)
+                    .setParameter("id", id)
+                    .getResultList();
+
+            String currentUser = "SISTEMA";
+            org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.isAuthenticated() && !auth.getName().equals("anonymousUser")) {
+                currentUser = auth.getName();
+            }
+
+            for (com.sgp.backend.entity.Solicitud s : solicitudesActivas) {
+                s.setResponsable(null);
+                
+                // Registrar desvinculación en historial
+                com.sgp.backend.entity.AsignacionHistorial history = com.sgp.backend.entity.AsignacionHistorial.builder()
+                        .solicitud(s)
+                        .responsable(user)
+                        .actionType("UNASSIGNED")
+                        .assignedByUsername(currentUser)
+                        .actionDate(java.time.LocalDateTime.now())
+                        .build();
+                entityManager.persist(history);
+                entityManager.merge(s);
+            }
+
+            // Ejecutar borrado lógico
+            user.setActivo(false);
+            userRepository.save(user);
+        }
     }
 }

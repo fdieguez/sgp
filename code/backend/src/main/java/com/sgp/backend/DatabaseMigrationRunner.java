@@ -59,7 +59,22 @@ public class DatabaseMigrationRunner implements CommandLineRunner {
                 String[] statements = sql.split(";");
                 for (String statement : statements) {
                     if (statement.trim().isEmpty()) continue;
-                    jdbcTemplate.execute(statement.trim());
+                    try {
+                        jdbcTemplate.execute(statement.trim());
+                    } catch (Exception e) {
+                        String msg = e.getMessage().toLowerCase();
+                        // Ignorar errores comunes si la columna o la tabla ya existen (para compatibilidad con ddl-auto=update de Hibernate en dev/test)
+                        if (msg.contains("duplicate") || 
+                            msg.contains("duplicad") || 
+                            msg.contains("exists") || 
+                            msg.contains("1060") || 
+                            msg.contains("42121") ||
+                            msg.contains("activo")) {
+                            log.warn("⚠️ Advertencia al ejecutar sentencia (columna o elemento ya existente, se omite): {}. Detalle: {}", statement.trim(), e.getMessage());
+                        } else {
+                            throw e;
+                        }
+                    }
                 }
                 
                 log.info("✅ Script ejecutado correctamente: {}", file.getName());

@@ -26,7 +26,7 @@ export default function TiposResolucionABM() {
             ]);
             setTipos(tipsRes.data);
             setAtributosGlobales(attrRes.data);
-            setUsuarios(uRes.data.filter(u => (u.role && u.role.includes('RESOLUTOR')) || (u.role && u.role.includes('ADMINISTRADOR'))));
+            setUsuarios(uRes.data.filter(u => u.activo !== false && ((u.role && u.role.includes('RESOLUTOR')) || (u.role && u.role.includes('ADMINISTRADOR')))));
         } catch (err) {}
         finally { setLoading(false); }
     };
