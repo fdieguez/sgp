@@ -162,10 +162,10 @@ test.describe('Validación E2E SGP en Producción', () => {
     await page.click('button:has-text("Aprobar")');
     await page.locator('textarea[placeholder*="detalles"]').fill(`Resolución aprobada de forma automatizada por script E2E en Prod. ID de control: ${idUnico}`);
     await page.click('button:has-text("Confirmar")');
+    await expect(page.locator('h2:has-text("Editar Solicitud")')).toBeHidden({ timeout: 15000 });
 
     // Verificar estado final
     console.log(`[E2E-PROD] Validando estado final de la solicitud...`);
-    await page.waitForTimeout(2000);
     await page.reload();
     
     const searchInputFinal = page.locator('input[placeholder*="Buscar"]');
