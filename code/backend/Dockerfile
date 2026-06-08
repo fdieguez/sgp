@@ -15,8 +15,11 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
-# Copy JAR from build stage
+# Copiar el JAR compilado desde la etapa de construcción
 COPY --from=build /app/target/*.jar app.jar
+
+# Copiar el directorio boot para ejecutar las migraciones SQL al iniciar la app
+COPY boot ./boot
 
 # Expose port
 EXPOSE 8080
