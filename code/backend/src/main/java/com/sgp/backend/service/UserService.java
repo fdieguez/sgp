@@ -16,6 +16,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final com.sgp.backend.repository.TipoResolucionRepository tipoResolucionRepository;
+    private final jakarta.persistence.EntityManager entityManager;
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
@@ -117,10 +118,38 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public void deleteUser(Long id) {
         if (!userRepository.existsById(id)) {
             throw new IllegalArgumentException("User not found");
         }
-        userRepository.deleteById(id);
+
+        // 1. Desvincular en tipo_resolucion (default_resolutor_id)
+        entityManager.createQuery("UPDATE TipoResolucion tr SET tr.resolutor = null WHERE tr.resolutor.id = :id")
+                     .setParameter("id", id).executeUpdate();
+
+        // 2. Eliminar de solicitud_resolutor_assignment
+        entityManager.createQuery("DELETE FROM SolicitudResolutorAssignment sra WHERE sra.resolutor.id = :id")
+                     .setParameter("id", id).executeUpdate();
+
+        // 3. Desvincular en solicitudes (createdBy, resolutor, responsable)
+        entityManager.createQuery("UPDATE Solicitud s SET s.createdBy = null WHERE s.createdBy.id = :id")
+                     .setParameter("id", id).executeUpdate();
+        entityManager.createQuery("UPDATE Solicitud s SET s.resolutor = null WHERE s.resolutor.id = :id")
+                     .setParameter("id", id).executeUpdate();
+        entityManager.createQuery("UPDATE Solicitud s SET s.responsable = null WHERE s.responsable.id = :id")
+                     .setParameter("id", id).executeUpdate();
+
+        // 4. Desvincular en asignacion_historial
+        entityManager.createQuery("UPDATE AsignacionHistorial ah SET ah.responsable = null WHERE ah.responsable.id = :id")
+                     .setParameter("id", id).executeUpdate();
+
+        // 5. Desvincular de user_tipo_resolucion (limpiar relación ManyToMany)
+        User user = userRepository.findById(id).orElseThrow();
+        user.getTiposResolucion().clear();
+        userRepository.save(user);
+
+        // 6. Eliminar el usuario
+        userRepository.delete(user);
     }
 }
