@@ -58,7 +58,7 @@ export default function UsersPage({ isEmbedded = false }) {
     const handleUserSubmit = async (e) => {
         e.preventDefault();
         
-        if (userFormData.role.includes('RESPONSABLE') && (!userFormData.zone || !userFormData.zone.trim())) {
+        if (userFormData.role === 'RESPONSABLE' && (!userFormData.zone || !userFormData.zone.trim())) {
             alert('La zona es obligatoria para el rol Responsable');
             return;
         }
@@ -67,7 +67,7 @@ export default function UsersPage({ isEmbedded = false }) {
             // Asegurarse de que tipoResolucionIds solo se envíe si el rol contiene RESOLUTOR
             const payload = {
                 ...userFormData,
-                tipoResolucionIds: userFormData.role.includes('RESOLUTOR') ? userFormData.tipoResolucionIds : []
+                tipoResolucionIds: userFormData.role === 'RESOLUTOR' ? userFormData.tipoResolucionIds : []
             };
             if (editingUser) {
                 await api.put(`/api/users/${editingUser.id}`, payload);
@@ -266,20 +266,14 @@ export default function UsersPage({ isEmbedded = false }) {
                                     ].map(r => (
                                         <label key={r.val} className="flex items-center gap-2 cursor-pointer">
                                             <input
-                                                type="checkbox"
-                                                checked={userFormData.role.includes(r.val)}
-                                                onChange={(e) => {
-                                                    const checked = e.target.checked;
-                                                    const currentRoles = userFormData.role.split(',').filter(Boolean);
-                                                    let newRoles;
-                                                    if (checked) {
-                                                        newRoles = [...currentRoles, r.val];
-                                                    } else {
-                                                        newRoles = currentRoles.filter(x => x !== r.val);
-                                                    }
-                                                    setUserFormData({ ...userFormData, role: newRoles.join(',') });
+                                                type="radio"
+                                                name="userRole"
+                                                value={r.val}
+                                                checked={userFormData.role === r.val}
+                                                onChange={() => {
+                                                    setUserFormData({ ...userFormData, role: r.val });
                                                 }}
-                                                className="rounded border-gray-600 text-indigo-600 focus:ring-indigo-500 bg-gray-800"
+                                                className="border-gray-600 text-indigo-600 focus:ring-indigo-500 bg-gray-800"
                                             />
                                             <span className="text-sm text-gray-300">{r.lbl}</span>
                                         </label>
@@ -298,14 +292,14 @@ export default function UsersPage({ isEmbedded = false }) {
                                 </div>
                             </div>
 
-                            {userFormData.role.includes('RESPONSABLE') && (
+                            {userFormData.role === 'RESPONSABLE' && (
                                 <div className="animate-in fade-in slide-in-from-top-2">
                                     <label className="block text-xs font-bold text-emerald-500 uppercase mb-1">Zona Territorial</label>
                                     <input type="text" placeholder="Ej: Norte, Sur..." required value={userFormData.zone} onChange={(e) => setUserFormData({ ...userFormData, zone: e.target.value })} className="w-full px-4 py-2 bg-gray-900 border border-emerald-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                                 </div>
                             )}
 
-                            {userFormData.role.includes('RESOLUTOR') && (
+                            {userFormData.role === 'RESOLUTOR' && (
                                 <div className="animate-in fade-in slide-in-from-top-2 space-y-2">
                                     <label className="block text-xs font-bold text-indigo-400 uppercase mb-1">Tipos de Resolución Asignados</label>
                                     <div className="grid grid-cols-2 gap-2 bg-gray-900 p-3 rounded-xl border border-gray-600">
