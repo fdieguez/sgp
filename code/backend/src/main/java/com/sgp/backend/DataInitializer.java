@@ -64,12 +64,11 @@ public class DataInitializer implements CommandLineRunner {
             List<String> keepEmails = List.of(
                 "admin@sgp.com",
                 "celestesolari19@gmail.com",
+                "matias.ippolito.gmail.com", // Distribuidor corregido en DB
                 "matias.ippolito@gmail.com",
                 "sabrivschmidt@gmail.com",
                 "matias.ippolito.responsable@gmail.com",
                 "barbarabrancatto@gmail.com",
-                "matias.ippolito.resolutor@gmail.com",
-                "barbarabrancatto.resolutor@gmail.com",
                 "martinnocioni@gmail.com",
                 "mvgonza79@gmail.com",
                 "ealfaro.51@gmail.com"
@@ -140,8 +139,6 @@ public class DataInitializer implements CommandLineRunner {
             createUserIfNotFound("barbarabrancatto@gmail.com", "Barbara_Resp_SGP_2026!", "RESPONSABLE", "Barbara", "Brancatto", LocalDate.of(1990, 1, 1), "3424216840", "Sur", "26.972.841");
 
             // Sembrar Resolutores
-            User resMatias = createUserIfNotFound("matias.ippolito.resolutor@gmail.com", "Matias_Res_SGP_2026!", "RESOLUTOR", "Matías", "Ippolito", LocalDate.of(1990, 1, 1), "3426148609", null, "28.925.931");
-            User resBarbara = createUserIfNotFound("barbarabrancatto.resolutor@gmail.com", "Barbara_Res_SGP_2026!", "RESOLUTOR", "Barbara", "Brancatto", LocalDate.of(1990, 1, 1), "3424216840", null, "26.972.841");
             User resMartin = createUserIfNotFound("martinnocioni@gmail.com", "Martin_SGP_2026*", "RESOLUTOR", "Martín", "Nocioni", LocalDate.of(1990, 1, 1), "3426144703", null, "31.111.251");
             User resMaria = createUserIfNotFound("mvgonza79@gmail.com", "Maria_SGP_2026%", "RESOLUTOR", "María Veronica", "Gonzalez", LocalDate.of(1990, 1, 1), "3425119354", null, "27.620.830");
             User resEduardo = createUserIfNotFound("ealfaro.51@gmail.com", "Eduardo_SGP_2026^", "RESOLUTOR", "Eduardo", "Alfaro", LocalDate.of(1990, 1, 1), "3434404035", null, "32.831.230");
@@ -183,18 +180,9 @@ public class DataInitializer implements CommandLineRunner {
             });
 
             tipoResolucionRepository.findByTipoIgnoreCase("OTRA").ifPresent(tr -> {
-                // Asignar Matías Ippolito como el resolutor por defecto de OTRA
-                tr.setResolutor(resMatias);
+                // Queda sin resolutor por defecto momentáneamente
+                tr.setResolutor(null);
                 tipoResolucionRepository.save(tr);
-                
-                resMatias.getTiposResolucion().clear();
-                resMatias.getTiposResolucion().add(tr);
-                userRepository.save(resMatias);
-
-                // Barbara también puede resolver OTRA
-                resBarbara.getTiposResolucion().clear();
-                resBarbara.getTiposResolucion().add(tr);
-                userRepository.save(resBarbara);
             });
 
             // Asignar zona por defecto de forma secuencial a los responsables que no tengan una asignada
