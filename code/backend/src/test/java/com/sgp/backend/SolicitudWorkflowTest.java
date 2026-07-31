@@ -2,7 +2,6 @@ package com.sgp.backend;
 
 import com.sgp.backend.dto.ResolutorAssignmentDTO;
 import com.sgp.backend.dto.SolicitudUpdateDTO;
-import com.sgp.backend.entity.Pedido;
 import com.sgp.backend.entity.Person;
 import com.sgp.backend.entity.Solicitud;
 import com.sgp.backend.entity.User;
@@ -66,7 +65,7 @@ public class SolicitudWorkflowTest {
      */
     private SolicitudUpdateDTO dtoDesde(Solicitud s) {
         SolicitudUpdateDTO dto = new SolicitudUpdateDTO();
-        dto.setType(s instanceof com.sgp.backend.entity.Subsidio ? "SUBSIDIO" : "PEDIDO");
+        dto.setType(s.getType() != null ? s.getType() : "PEDIDO");
         dto.setDescription(s.getDescription());
         dto.setStatus(s.getStatus());
         dto.setOrigin(s.getOrigin());
@@ -96,7 +95,8 @@ public class SolicitudWorkflowTest {
     @Test
     void testFullWorkflow() {
         // 1. Operador crea solicitud → estado inicial: pendiente
-        Pedido s = new Pedido();
+        Solicitud s = new Solicitud();
+        s.setType("PEDIDO");
         s.setDescription("Test workflow");
         s.setOrigin("MANUAL");
         s.setPerson(person);
@@ -127,13 +127,13 @@ public class SolicitudWorkflowTest {
         assertEquals(2, updated2.getResolutorAssignments().size());
 
         // 4. Resolutor 1 aprueba — la solicitud debe seguir en resolución
-        solicitudService.aprobarAsignacion(updated2.getId(), resolutor1.getEmail(), "Todo ok resolutor 1");
+        solicitudService.aprobarAsignacion(updated2.getId(), resolutor1.getEmail(), "Todo ok resolutor 1", null, null);
 
         Solicitud statusAfter1 = solicitudService.getSolicitudById(updated2.getId());
         assertEquals("en resolucion", statusAfter1.getStatus(), "Debe seguir en resolución porque falta resolutor 2");
 
         // 5. Resolutor 2 aprueba — la solicitud debe completarse
-        solicitudService.aprobarAsignacion(updated2.getId(), resolutor2.getEmail(), "Finalizado por resolutor 2");
+        solicitudService.aprobarAsignacion(updated2.getId(), resolutor2.getEmail(), "Finalizado por resolutor 2", null, null);
 
         Solicitud statusAfter2 = solicitudService.getSolicitudById(updated2.getId());
         assertEquals("completadas", statusAfter2.getStatus(), "Debe estar completada ahora que todos aprobaron");
@@ -142,7 +142,8 @@ public class SolicitudWorkflowTest {
     @Test
     void testDocumentIntegrity() {
         // Crear solicitud base
-        Pedido s = new Pedido();
+        Solicitud s = new Solicitud();
+        s.setType("PEDIDO");
         s.setDescription("Doc integrity test");
         s.setPerson(person);
         Solicitud saved = solicitudService.createSolicitud(s);
@@ -155,5 +156,32 @@ public class SolicitudWorkflowTest {
         assertNotNull(updated);
         assertEquals(saved.getId(), updated.getId());
         assertEquals(responsable.getId(), updated.getResponsable().getId());
+    }
+
+    @Test
+    void testSubsidioAssignmentAmountExtraction() {
+        // Crear solicitud de prueba
+        Solicitud s = new Solicitud();
+        s.setType("SUBSIDIO");
+        s.setDescription("Prueba de extracción de monto en subsidio");
+        s.setPerson(person);
+        Solicitud saved = solicitudService.createSolicitud(s);
+
+        // Crear asignación SUBSIDIO con JSON conteniendo el monto 75000
+        List<ResolutorAssignmentDTO> assignments = new ArrayList<>();
+        assignments.add(new ResolutorAssignmentDTO(resolutor1.getEmail(), "SUBSIDIO", "{\"Monto\": 75000, \"Concepto\": \"Ayuda economica\"}"));
+
+        SolicitudUpdateDTO dto = dtoDesde(saved);
+        dto.setAssignments(assignments);
+        Solicitud updated = solicitudService.updateSolicitud(saved.getId(), dto);
+
+        // Verificar que el monto fue extraído y guardado correctamente en la solicitud
+        assertNotNull(updated.getAmount(), "El monto de la solicitud no debe ser nulo");
+        assertEquals(0, new java.math.BigDecimal("75000").compareTo(updated.getAmount()), "El monto extraído debe ser 75000");
+
+        // También verificar recuperando la solicitud desde la base de datos
+        Solicitud reloaded = solicitudService.getSolicitudById(saved.getId());
+        assertNotNull(reloaded.getAmount(), "El monto en BD no debe ser nulo");
+        assertEquals(0, new java.math.BigDecimal("75000").compareTo(reloaded.getAmount()), "El monto recuperado de BD debe ser 75000");
     }
 }

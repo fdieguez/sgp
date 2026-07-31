@@ -15,7 +15,10 @@ import com.sgp.backend.entity.SolicitudResolutorAssignment;
 import com.sgp.backend.repository.SolicitudResolutorAssignmentRepository;
 import com.sgp.backend.dto.ResolutorAssignmentDTO;
 import com.sgp.backend.dto.SolicitudUpdateDTO;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import jakarta.persistence.criteria.Subquery;
 import jakarta.persistence.criteria.Root;
@@ -35,6 +38,13 @@ public class SolicitudService {
     private final AsignacionHistorialRepository asignacionHistorialRepository;
     private final TipoResolucionRepository tipoResolucionRepository;
     private final SolicitudResolutorAssignmentRepository assignmentRepository;
+    private final com.sgp.backend.repository.SheetsConfigRepository sheetsConfigRepository;
+    private final com.sgp.backend.repository.ProjectRepository projectRepository;
+    
+    // Servicios adicionales de la Etapa 8
+    private final GoogleCalendarService googleCalendarService;
+    private final EmailService emailService;
+    private final ObjectMapper objectMapper;
 
     public org.springframework.data.domain.Page<Solicitud> getAllSolicitudes(String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, org.springframework.data.domain.Pageable pageable) {
         org.springframework.data.jpa.domain.Specification<Solicitud> spec = buildSpecification(status, search, responsableId, locationId, origin, dateFrom, dateTo);
@@ -62,10 +72,11 @@ public class SolicitudService {
         long enResolucion = allMatching.stream().filter(s -> s.getStatus() != null && "en resolucion".equalsIgnoreCase(s.getStatus().trim())).count();
         long completadas = allMatching.stream().filter(s -> s.getStatus() != null && "completadas".equalsIgnoreCase(s.getStatus().trim())).count();
         long rechazada = allMatching.stream().filter(s -> s.getStatus() != null && "rechazada".equalsIgnoreCase(s.getStatus().trim())).count();
+        long consideracion = allMatching.stream().filter(s -> s.getStatus() != null && "consideracion".equalsIgnoreCase(s.getStatus().trim())).count();
         
         java.math.BigDecimal totalSubsidios = allMatching.stream()
-                .filter(s -> s instanceof com.sgp.backend.entity.Subsidio && s.getStatus() != null && "completadas".equalsIgnoreCase(s.getStatus().trim()))
-                .map(s -> ((com.sgp.backend.entity.Subsidio) s).getAmount())
+                .filter(s -> "SUBSIDIO".equalsIgnoreCase(s.getType()) && s.getStatus() != null && "completadas".equalsIgnoreCase(s.getStatus().trim()))
+                .map(Solicitud::getAmount)
                 .filter(java.util.Objects::nonNull)
                 .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add);
                 
@@ -75,6 +86,7 @@ public class SolicitudService {
         stats.put("enResolucion", enResolucion);
         stats.put("completadas", completadas);
         stats.put("rechazada", rechazada);
+        stats.put("consideracion", consideracion);
         stats.put("totalSubsidios", totalSubsidios);
         
         return stats;
@@ -119,7 +131,7 @@ public class SolicitudService {
             spec = spec.and((root, query, cb) -> cb.lessThanOrEqualTo(root.get("entryDate"), dateTo));
         }
 
-        // Apply Role Based Filtering
+        // Aplicar filtrado basado en roles
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated()) {
             String email = auth.getName();
@@ -214,7 +226,7 @@ public class SolicitudService {
 
     @org.springframework.transaction.annotation.Transactional
     public Solicitud createSolicitud(Solicitud solicitud) {
-        // 1. Handle Person
+        // 1. Procesar Persona
         if (solicitud.getPerson() != null) {
             Person p = solicitud.getPerson();
             if (p.getId() == null) {
@@ -230,12 +242,12 @@ public class SolicitudService {
             solicitud.setPerson(p);
         }
 
-        // 2. Handle Location (using locationName and barrio from frontend payload)
+        // 2. Procesar Ubicación (usando locationName y barrio del payload del frontend)
         if (solicitud.getLocationName() != null && !solicitud.getLocationName().trim().isEmpty()) {
             final String cityName = solicitud.getLocationName().trim();
             final String inputBarrio = (solicitud.getBarrio() != null && !solicitud.getBarrio().trim().isEmpty()) ? solicitud.getBarrio().trim() : null;
 
-            // Find or create City
+            // Buscar o crear Ciudad
             Location cityLocation = locationRepository.findFirstByNameAndType(cityName, "CITY")
                     .orElseGet(() -> locationRepository.findFirstByNameAndType(cityName, "LOCALITY")
                     .orElseGet(() -> locationRepository.findFirstByName(cityName)
@@ -247,7 +259,7 @@ public class SolicitudService {
                     })));
 
             if (inputBarrio != null) {
-                // Find or create Neighborhood
+                // Buscar o crear Barrio
                 Location finalCityLocation = cityLocation;
                 Location neighborhood = locationRepository.findFirstByNameAndParentId(inputBarrio, cityLocation.getId())
                         .orElseGet(() -> {
@@ -262,20 +274,20 @@ public class SolicitudService {
                 solicitud.setLocation(cityLocation);
             }
         } else if (solicitud.getLocation() != null) {
-            // Fallback for older approach
+            // Alternativa para enfoques antiguos
             Location l = solicitud.getLocation();
             if (l.getId() == null && l.getName() != null) {
                 final Location locationToSave = l;
                 l = locationRepository.findFirstByName(l.getName())
                         .orElseGet(() -> {
-                            locationToSave.setType("CITY"); // Default for manual
+                            locationToSave.setType("CITY"); // Predeterminado para manual
                             return locationRepository.save(locationToSave);
                         });
             }
             solicitud.setLocation(l);
         }
 
-        // 3. Defaults
+        // 3. Valores predeterminados
         if (solicitud.getStatus() == null) {
             solicitud.setStatus("pendiente");
         }
@@ -283,7 +295,7 @@ public class SolicitudService {
             solicitud.setEntryDate(java.time.LocalDate.now());
         }
 
-        // Set creation tracking
+        // Establecer seguimiento de creación
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated() && !auth.getName().equals("anonymousUser")) {
             userRepository.findByEmail(auth.getName()).ifPresent(solicitud::setCreatedBy);
@@ -291,7 +303,7 @@ public class SolicitudService {
 
         Solicitud saved = solicitudRepository.save(solicitud);
 
-        // Process assignments if present
+        // Procesar asignaciones si están presentes
         processAssignments(saved, solicitud.getAssignments());
 
         // Registrar la creación en el historial
@@ -390,13 +402,11 @@ public class SolicitudService {
         }
 
         // 4. Campos específicos de Subsidio
-        if (existing instanceof com.sgp.backend.entity.Subsidio subsidioExistente) {
-            if (dto.getAmount() != null) {
-                subsidioExistente.setAmount(dto.getAmount());
-            }
-            if (dto.getGrantDate() != null) {
-                subsidioExistente.setGrantDate(dto.getGrantDate());
-            }
+        if (dto.getAmount() != null) {
+            existing.setAmount(dto.getAmount());
+        }
+        if (dto.getGrantDate() != null) {
+            existing.setGrantDate(dto.getGrantDate());
         }
 
         // 5. Flujo de sugerencia de resolución
@@ -458,13 +468,13 @@ public class SolicitudService {
             username = auth.getName();
             User user = userRepository.findByEmail(username).orElse(null);
             if (user != null) {
-                username = user.getEmail(); // Or user.getName() if it exists? Email is safer.
+                username = user.getEmail(); // O user.getName() si existe. El email es más seguro.
             }
         }
 
         AsignacionHistorial history = AsignacionHistorial.builder()
                 .solicitud(solicitud)
-                .responsable(responsable) // Even for UNASSIGNED, records who was unassigned
+                .responsable(responsable) // Incluso para UNASSIGNED, registra quién fue desasignado
                 .actionType(actionType)
                 .assignedByUsername(username)
                 .actionDate(LocalDateTime.now())
@@ -476,7 +486,7 @@ public class SolicitudService {
     private void processAssignments(Solicitud solicitud, List<ResolutorAssignmentDTO> dtos) {
         if (dtos == null) return;
         
-        // Clear existing assignments if any (Sync logic)
+        // Limpiar asignaciones existentes si las hay (lógica de sincronización)
         solicitud.getResolutorAssignments().clear();
         
         for (ResolutorAssignmentDTO dto : dtos) {
@@ -492,8 +502,100 @@ public class SolicitudService {
                         .build();
                 solicitud.getResolutorAssignments().add(assignment);
             }
+
+            // Requisito R1: Procesar la asignación de tipo SUBSIDIO y extraer su monto desde el JSON de detalle
+            if (dto.getTipoResolucion() != null && dto.getTipoResolucion().equalsIgnoreCase("SUBSIDIO")) {
+                if (dto.getDetalle() != null && !dto.getDetalle().trim().isEmpty()) {
+                    try {
+                        JsonNode rootNode = objectMapper.readTree(dto.getDetalle());
+                        JsonNode montoNode = null;
+                        if (rootNode.has("Monto")) {
+                            montoNode = rootNode.get("Monto");
+                        } else if (rootNode.has("monto")) {
+                            montoNode = rootNode.get("monto");
+                        } else if (rootNode.has("Monto en dinero")) {
+                            montoNode = rootNode.get("Monto en dinero");
+                        }
+
+                        if (montoNode != null && !montoNode.isNull()) {
+                            BigDecimal monto = null;
+                            if (montoNode.isNumber()) {
+                                monto = montoNode.decimalValue();
+                            } else {
+                                monto = parseAmountString(montoNode.asText());
+                            }
+                            if (monto != null) {
+                                solicitud.setAmount(monto);
+                            }
+                        }
+                    } catch (Exception e) {
+                        // Ignorar errores de deserialización JSON de forma segura
+                    }
+                }
+            }
         }
         solicitudRepository.save(solicitud);
+    }
+
+    /**
+     * Convierte una cadena de texto que representa un monto numérico a BigDecimal de forma segura.
+     * Soporta números planos ("75000", "75000.50"), formato español ("75.000,00"),
+     * puntos de miles ("75.000") y símbolos de moneda ("$ 75.000,00").
+     */
+    private BigDecimal parseAmountString(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String txt = raw.trim();
+        if (txt.isEmpty()) {
+            return null;
+        }
+
+        // Eliminar símbolos de moneda y caracteres no numéricos excepto '.', ',' y '-'
+        txt = txt.replaceAll("[^0-9.,-]", "").trim();
+        if (txt.isEmpty()) {
+            return null;
+        }
+
+        try {
+            if (txt.contains(",")) {
+                if (txt.contains(".")) {
+                    int lastDot = txt.lastIndexOf('.');
+                    int lastComma = txt.lastIndexOf(',');
+                    if (lastDot < lastComma) {
+                        // Formato español: "75.000,00" -> quitar puntos de miles y reemplazar coma decimal por punto
+                        txt = txt.replace(".", "").replace(",", ".");
+                    } else {
+                        // Formato anglosajón: "75,000.00" -> quitar comas de miles
+                        txt = txt.replace(",", "");
+                    }
+                } else {
+                    // Solo contiene comas: "75000,50" -> reemplazar coma por punto decimal
+                    txt = txt.replace(",", ".");
+                }
+            } else if (txt.contains(".")) {
+                // Solo contiene puntos, sin comas (ej. "75.000" o "75000.50")
+                int countDots = txt.length() - txt.replace(".", "").length();
+                if (countDots > 1) {
+                    // Múltiples puntos de miles: "1.234.567" -> eliminar todos los puntos
+                    txt = txt.replace(".", "");
+                } else {
+                    // Un solo punto: evaluar si es separador de miles o decimal
+                    String[] parts = txt.split("\\.");
+                    if (parts.length == 2) {
+                        String left = parts[0];
+                        String right = parts[1];
+                        if (right.length() == 3 && left.length() >= 1 && left.length() <= 3) {
+                            // Punto de miles: "75.000" -> "75000"
+                            txt = left + right;
+                        }
+                    }
+                }
+            }
+            return new BigDecimal(txt);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public Solicitud updateStatus(Long id, String status) {
@@ -516,12 +618,20 @@ public class SolicitudService {
     }
 
     @org.springframework.transaction.annotation.Transactional
-    public void aprobarAsignacion(Long solicitudId, String emailResolutor, String observaciones) {
+    public void aprobarAsignacion(Long solicitudId, String emailResolutor, String observaciones, String asistencia, java.util.Map<String, String> calendarData) {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
 
         User resolutor = userRepository.findByEmail(emailResolutor)
                 .orElseThrow(() -> new RuntimeException("Resolutor no encontrado"));
+
+        // Validar y registrar la asistencia de forma obligatoria si es de tipo AGENDA
+        if ("AGENDA".equalsIgnoreCase(solicitud.getType())) {
+            if (asistencia == null || asistencia.trim().isEmpty()) {
+                throw new IllegalArgumentException("La selección de asistencia ('con asistencia' o 'sin asistencia') es obligatoria para solicitudes de tipo AGENDA.");
+            }
+            solicitud.setAsistencia(asistencia.trim());
+        }
 
         // Buscar la asignación específica para este resolutor en esta solicitud
         SolicitudResolutorAssignment assignment = solicitud.getResolutorAssignments().stream()
@@ -530,22 +640,117 @@ public class SolicitudService {
                 .orElseThrow(() -> new RuntimeException("Asignación pendiente no encontrada para este resolutor"));
 
         assignment.setApproved(true);
-        assignment.setObservaciones(observaciones);
+        
+        String eventInfo = "";
+        if ("AGENDA".equalsIgnoreCase(assignment.getTipoResolucion()) && calendarData != null) {
+            String date = calendarData.get("date");
+            String time = calendarData.get("time");
+            if (date != null && !date.trim().isEmpty()) {
+                eventInfo = " (📅 Evento agendado para el día: " + date + (time != null && !time.trim().isEmpty() ? " a las " + time + " hs" : "") + ")";
+            }
+        }
+        assignment.setObservaciones(observaciones + eventInfo);
         
         // Registrar en historial
-        logAssignmentChange(solicitud, resolutor, "RESOLUCIÓN APROBADA: " + observaciones);
+        logAssignmentChange(solicitud, resolutor, "RESOLUCIÓN APROBADA: " + observaciones + (asistencia != null ? " | Asistencia: " + asistencia : ""));
 
         // Recalcular estado de la solicitud
         updateSolicitudStatus(solicitud);
         
-        solicitudRepository.save(solicitud);
+        Solicitud saved = solicitudRepository.save(solicitud);
+
+        // Disparar integraciones asíncronas externas tras aprobación exitosa.
+        // Se evalúa el tipo de resolución de la asignación aprobada (assignment.getTipoResolucion()) en lugar del tipo de solicitud (saved.getType())
+        // para ejecutar únicamente la integración correspondiente a esta asignación (Google Calendar para AGENDA, EmailService para SUBSIDIO).
+        if ("AGENDA".equalsIgnoreCase(assignment.getTipoResolucion())) {
+            if (calendarData != null && "true".equals(calendarData.get("createEvent"))) {
+                String calendarId = calendarData.get("calendarId");
+                if (calendarId == null || calendarId.trim().isEmpty()) {
+                    if (saved.getSheetsConfig() != null && saved.getSheetsConfig().getCalendarId() != null && !saved.getSheetsConfig().getCalendarId().trim().isEmpty()) {
+                        calendarId = saved.getSheetsConfig().getCalendarId();
+                    }
+                }
+                if (calendarId == null || calendarId.trim().isEmpty()) {
+                    // Buscar la configuración de Agenda en la base de datos de manera proactiva (comentarios en ESPAÑOL)
+                    java.util.List<com.sgp.backend.entity.SheetsConfig> configs = sheetsConfigRepository.findAll();
+                    for (com.sgp.backend.entity.SheetsConfig config : configs) {
+                        if (config.getCalendarId() != null && !config.getCalendarId().trim().isEmpty()) {
+                            com.sgp.backend.entity.Project project = projectRepository.findBySheetsConfig(config).orElse(null);
+                            String projectName = (project != null) ? project.getName() : config.getSheetName();
+                            if (projectName != null && projectName.toUpperCase().contains("AGENDA")) {
+                                calendarId = config.getCalendarId();
+                                break;
+                            }
+                        }
+                    }
+                    // Respaldo secundario: cualquier configuración que tenga un calendarId no vacío
+                    if (calendarId == null || calendarId.trim().isEmpty()) {
+                        for (com.sgp.backend.entity.SheetsConfig config : configs) {
+                            if (config.getCalendarId() != null && !config.getCalendarId().trim().isEmpty()) {
+                                calendarId = config.getCalendarId();
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (calendarId == null || calendarId.trim().isEmpty()) {
+                    calendarId = emailResolutor; // Respaldo definitivo al correo electrónico del resolutor si no hay configuración
+                }
+                String title = calendarData.get("title");
+                String description = calendarData.get("description");
+                String location = calendarData.get("location");
+                String date = calendarData.get("date");
+                String time = calendarData.get("time");
+                
+                googleCalendarService.createEvent(calendarId, title, description, location, date, time, saved.getId());
+            }
+        } else if ("SUBSIDIO".equalsIgnoreCase(assignment.getTipoResolucion())) {
+            emailService.sendSubsidioApprovedEmail(resolutor.getEmail(), saved.getId());
+        }
+    }
+
+    /**
+     * Pone una solicitud de subsidio en estado de 'CONSIDERACION' para que pueda sincronizarse externamente.
+     * Valida que si el usuario autenticado posee el rol RESOLUTOR, cuente obligatoriamente con la competencia SUBSIDIO.
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public Solicitud ponerEnConsideracion(Long id) {
+        // Obtener el usuario autenticado del contexto de seguridad
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated()) {
+            String email = auth.getName();
+            User currentUser = userRepository.findByEmail(email).orElse(null);
+            if (currentUser != null && currentUser.getRole() != null) {
+                // Verificar si el usuario tiene rol RESOLUTOR
+                if ("RESOLUTOR".equalsIgnoreCase(currentUser.getRole())) {
+                    // Verificar si la colección de tipos de resolución del resolutor contiene la competencia 'SUBSIDIO'
+                    boolean tieneSubsidio = currentUser.getTiposResolucion() != null && currentUser.getTiposResolucion().stream()
+                            .anyMatch(tr -> tr.getTipo() != null && "SUBSIDIO".equalsIgnoreCase(tr.getTipo()));
+                    if (!tieneSubsidio) {
+                        // Lanzar HTTP 403 Forbidden si el resolutor no tiene la competencia SUBSIDIO
+                        throw new org.springframework.web.server.ResponseStatusException(
+                                org.springframework.http.HttpStatus.FORBIDDEN,
+                                "El resolutor no posee la competencia 'SUBSIDIO' necesaria para poner la solicitud en consideración."
+                        );
+                    }
+                }
+            }
+        }
+
+        Solicitud solicitud = solicitudRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
+
+        solicitud.setStatus("consideracion");
+        Solicitud saved = solicitudRepository.save(solicitud);
+
+        logAssignmentChange(saved, null, "PUESTA EN CONSIDERACIÓN");
+        return saved;
     }
 
     private void updateSolicitudStatus(Solicitud solicitud) {
         String currentStatus = solicitud.getStatus();
         
-        // If already completed or rejected, we don't auto-move unless explicitly changed? 
-        // But the user wants auto-transition.
+        // Si la solicitud no tiene responsable, vuelve a estado pendiente.
         
         if (solicitud.getResponsable() == null) {
             solicitud.setStatus("pendiente");

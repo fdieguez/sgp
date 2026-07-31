@@ -203,43 +203,26 @@ export default function SolicitudDetailModal({ isOpen, onClose, solicitud }) {
                                             <div className="text-[10px] text-gray-500 uppercase font-bold">Ingreso</div>
                                             <div className="text-sm font-semibold">{formatDate(solicitud.entryDate)}</div>
                                         </div>
-                                        <div className="bg-gray-900/30 p-3 rounded-xl border border-gray-700/30">
-                                            <div className="text-[10px] text-gray-500 uppercase font-bold">1er Contacto</div>
-                                            <div className="text-sm font-semibold flex items-center gap-2">
-                                                {formatDate(solicitud.contactDate)}
-                                                {solicitud.firstContactControl && (
-                                                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/30">OK</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="bg-gray-900/30 p-3 rounded-xl border border-gray-700/30">
-                                            <div className="text-[10px] text-gray-500 uppercase font-bold">Resolución</div>
-                                            <div className="text-sm font-semibold">{formatDate(solicitud.resolutionDate)}</div>
-                                        </div>
                                         {isSubsidio && (
                                             <div className="bg-gray-900/30 p-3 rounded-xl border border-gray-700/30">
                                                 <div className="text-[10px] text-gray-500 uppercase font-bold">Entrega</div>
                                                 <div className="text-sm font-semibold">{formatDate(solicitud.grantDate)}</div>
                                             </div>
                                         )}
-                                    </div>
-                                </section>
-
-                                <section>
-                                    <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-3 mt-6 flex items-center gap-2">
-                                        <Tag className="h-3 w-3" /> Resultado y Detalle
-                                    </h3>
-                                    {solicitud.resolution && (
-                                        <div className="mb-3">
-                                            <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">Resolución Final</div>
-                                            <div className="bg-gray-900/50 p-3 rounded-xl border border-gray-700/50 text-sm text-white">
-                                                {solicitud.resolution}
+                                        <div className="bg-gray-900/30 p-3 rounded-xl border border-gray-700/30 col-span-2">
+                                            <div className="text-[10px] text-gray-500 uppercase font-bold">1er Contacto</div>
+                                            <div className="text-sm font-semibold flex items-center gap-2 mt-1">
+                                                {solicitud.firstContactControl ? (
+                                                    <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded border border-emerald-500/30 flex items-center gap-1">
+                                                        ✅ Control 1er Contacto Realizado
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs bg-gray-800 text-gray-400 px-2 py-1 rounded border border-gray-700">
+                                                        Pendiente de 1er contacto
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
-                                    )}
-                                    <div className="bg-gray-900/50 p-5 rounded-2xl border border-gray-700/50 leading-relaxed text-gray-300 text-sm">
-                                        <div className="text-[10px] text-gray-500 uppercase font-bold mb-2">Detalle de Gestión</div>
-                                        {solicitud.detail || 'Sin detalle extendido.'}
                                     </div>
                                 </section>
 

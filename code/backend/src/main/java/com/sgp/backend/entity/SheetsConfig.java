@@ -23,6 +23,10 @@ public class SheetsConfig {
     @Column(nullable = false)
     private String sheetName; // The specific tab name (e.g., "Sheet1")
 
+    @Column(nullable = true)
+    private String calendarId; // The ID of the Google Calendar
+
+
     @Column(nullable = false)
     private Integer syncFrequencyMinutes = 60; // Default: every hour
 

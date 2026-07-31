@@ -9,6 +9,8 @@ import OrdersPage from './pages/OrdersPage';
 import SubsidiesPage from './pages/SubsidiesPage';
 import ProjectSettingsPage from './pages/ProjectSettingsPage';
 import HelpPage from './pages/HelpPage';
+import DescargarAdjunto from './pages/DescargarAdjunto';
+import ResolutorSettingsPage from './pages/ResolutorSettingsPage';
 import { Toaster } from 'react-hot-toast';
 
 function ProtectedRoute({ children, adminOnly = false }) {
@@ -36,6 +38,7 @@ function App() {
         <Router>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/descargar-adjunto/:adjuntoId" element={<DescargarAdjunto />} />
 
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
@@ -66,6 +69,12 @@ function App() {
             <Route path="/settings" element={
               <ProtectedRoute adminOnly={true}>
                 <SettingsPage />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/resolutor-settings" element={
+              <ProtectedRoute>
+                <ResolutorSettingsPage />
               </ProtectedRoute>
             } />
 

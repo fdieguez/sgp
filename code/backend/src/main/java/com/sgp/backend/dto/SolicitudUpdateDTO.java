@@ -52,6 +52,16 @@ public class SolicitudUpdateDTO {
     private java.math.BigDecimal amount;
     private java.time.LocalDate grantDate;
 
+    /* ── Agenda y Planilla de Salida (Etapa 8) ───────────────────────── */
+    // Almacena si la reunión de agenda fue "con asistencia" o "sin asistencia"
+    private String asistencia;
+
+    // Identificador del evento creado en Google Calendar
+    private String googleEventId;
+
+    // Canal de resolución externa o medio por el cual se resolvió
+    private String porDonde;
+
     /* ── Asignaciones de resolutores ─────────────────────────────────── */
     private List<ResolutorAssignmentDTO> assignments;
 

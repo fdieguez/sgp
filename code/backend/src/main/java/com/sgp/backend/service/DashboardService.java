@@ -88,8 +88,8 @@ public class DashboardService {
         long rejectedSolicitudes = filteredSolicitudes.stream().filter(s -> s.getStatus() != null && "rechazada".equalsIgnoreCase(s.getStatus().trim())).count();
 
         BigDecimal totalDelivered = filteredSolicitudes.stream()
-                .filter(s -> s instanceof com.sgp.backend.entity.Subsidio && s.getStatus() != null && "completadas".equalsIgnoreCase(s.getStatus().trim()))
-                .map(s -> ((com.sgp.backend.entity.Subsidio) s).getAmount())
+                .filter(s -> "SUBSIDIO".equalsIgnoreCase(s.getType()) && s.getStatus() != null && "completadas".equalsIgnoreCase(s.getStatus().trim()))
+                .map(Solicitud::getAmount)
                 .filter(amount -> amount != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 

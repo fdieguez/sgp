@@ -17,6 +17,8 @@ public class SolicitudController {
 
     private final SolicitudService solicitudService;
     private final com.sgp.backend.repository.AsignacionHistorialRepository asignacionHistorialRepository;
+    private final com.sgp.backend.service.SyncService syncService;
+    private final com.sgp.backend.repository.SheetsConfigRepository sheetsConfigRepository;
 
     @GetMapping
     public ResponseEntity<org.springframework.data.domain.Page<Solicitud>> getAllSolicitudes(
@@ -114,9 +116,43 @@ public class SolicitudController {
     @PostMapping("/{id}/aprobar")
     public ResponseEntity<Void> aprobarSolicitud(@PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
         String observaciones = body.getOrDefault("observaciones", "");
+        String asistencia = body.get("asistencia");
         org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        solicitudService.aprobarAsignacion(id, auth.getName(), observaciones);
+        solicitudService.aprobarAsignacion(id, auth.getName(), observaciones, asistencia, body);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/consideracion")
+    public ResponseEntity<Solicitud> ponerEnConsideracion(@PathVariable Long id) {
+        Solicitud saved = solicitudService.ponerEnConsideracion(id);
+
+        // Auto-exportar inmediatamente la solicitud en consideración a la planilla de salida y releer por consola
+        try {
+            String spreadsheetId = null;
+            if (saved.getSheetsConfig() != null && saved.getSheetsConfig().getSpreadsheetId() != null) {
+                spreadsheetId = saved.getSheetsConfig().getSpreadsheetId();
+            } else {
+                var configOpt = sheetsConfigRepository.findAll().stream()
+                        .filter(c -> c.getSheetName() != null && !c.getSheetName().toUpperCase().contains("AGENDA"))
+                        .findFirst();
+                if (configOpt.isPresent()) {
+                    spreadsheetId = configOpt.get().getSpreadsheetId();
+                }
+            }
+
+            if (spreadsheetId != null) {
+                syncService.exportarPlanillaSalida(spreadsheetId, java.util.List.of(id));
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Error al exportar automáticamente la solicitud #" + id + " a Google Sheets: " + e.getMessage());
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "Error al exportar automáticamente a Google Sheets: " + e.getMessage(),
+                    e
+            );
+        }
+
+        return ResponseEntity.ok(saved);
     }
 
     @GetMapping("/stats")

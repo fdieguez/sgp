@@ -25,6 +25,8 @@ public class DataInitializer implements CommandLineRunner {
     private final com.sgp.backend.repository.LocationRepository locationRepository;
     private final com.sgp.backend.repository.SolicitudRepository solicitudRepository;
     private final com.sgp.backend.repository.AsignacionHistorialRepository asignacionHistorialRepository;
+    private final com.sgp.backend.repository.ProjectRepository projectRepository;
+    private final com.sgp.backend.repository.PersonRepository personRepository;
 
     private final TipoResolucionRepository tipoResolucionRepository;
     private final AtributoResolucionRepository atributoRepository;
@@ -68,13 +70,39 @@ public class DataInitializer implements CommandLineRunner {
                 "matias.ippolito@gmail.com",
                 "sabrivschmidt@gmail.com",
                 "matias.ippolito.responsable@gmail.com",
+                "matias.ippolito.resolutor@gmail.com",
                 "barbarabrancatto@gmail.com",
                 "martinnocioni@gmail.com",
                 "mvgonza79@gmail.com",
-                "ealfaro.51@gmail.com"
+                "ealfaro.51@gmail.com",
+                "auditor.sheets@gmail.com"
             );
 
             try {
+                // Eliminar duplicados de SheetsConfig conservando el primero y reasignando relaciones
+                List<com.sgp.backend.entity.SheetsConfig> configs = sheetsConfigRepository.findAll();
+                java.util.Map<String, com.sgp.backend.entity.SheetsConfig> uniqueConfigs = new java.util.HashMap<>();
+                for (com.sgp.backend.entity.SheetsConfig sc : configs) {
+                    String key = (sc.getSpreadsheetId() != null ? sc.getSpreadsheetId().trim().toLowerCase() : "") 
+                            + "|" + (sc.getSheetName() != null ? sc.getSheetName().trim().toLowerCase() : "");
+                    if (uniqueConfigs.containsKey(key)) {
+                        com.sgp.backend.entity.SheetsConfig original = uniqueConfigs.get(key);
+                        System.out.println("🗑️ Reasignando solicitudes y eliminando planilla duplicada ID: " + sc.getId() + " -> Original ID: " + original.getId());
+                        
+                        // Reasignar solicitudes
+                        entityManager.createNativeQuery("UPDATE solicitudes SET sheets_config_id = :originalId WHERE sheets_config_id = :duplicateId")
+                                     .setParameter("originalId", original.getId())
+                                     .setParameter("duplicateId", sc.getId())
+                                     .executeUpdate();
+                        
+                        // Eliminar proyecto duplicado si existe
+                        projectRepository.findBySheetsConfig(sc).ifPresent(projectRepository::delete);
+                        sheetsConfigRepository.delete(sc);
+                    } else {
+                        uniqueConfigs.put(key, sc);
+                    }
+                }
+
                 // Eliminar relaciones de historial y asignaciones de resolutores anteriores
                 entityManager.createNativeQuery("DELETE FROM asignacion_historial WHERE responsable_user_id NOT IN (SELECT id FROM users WHERE email IN (:emails))")
                              .setParameter("emails", keepEmails).executeUpdate();
@@ -142,6 +170,10 @@ public class DataInitializer implements CommandLineRunner {
             User resMartin = createUserIfNotFound("martinnocioni@gmail.com", "Martin_SGP_2026*", "RESOLUTOR", "Martín", "Nocioni", LocalDate.of(1990, 1, 1), "3426144703", null, "31.111.251");
             User resMaria = createUserIfNotFound("mvgonza79@gmail.com", "Maria_SGP_2026%", "RESOLUTOR", "María Veronica", "Gonzalez", LocalDate.of(1990, 1, 1), "3425119354", null, "27.620.830");
             User resEduardo = createUserIfNotFound("ealfaro.51@gmail.com", "Eduardo_SGP_2026^", "RESOLUTOR", "Eduardo", "Alfaro", LocalDate.of(1990, 1, 1), "3434404035", null, "32.831.230");
+            User resMatiasResol = createUserIfNotFound("matias.ippolito.resolutor@gmail.com", "Matias_Res_SGP_2026!", "RESOLUTOR", "Matías", "Resolutor", LocalDate.of(1990, 1, 1), "3426148609", null, "28.925.931");
+
+            // Sembrar Lector de Planillas
+            createUserIfNotFound("auditor.sheets@gmail.com", "Lector_SGP_2026#", "LECTOR", "Auditor", "Sheets", LocalDate.of(1990, 1, 1), "3420000000", null, "33.444.555");
 
             // 2. Initialize Locations from dataset
             initializeLocations();
@@ -152,37 +184,49 @@ public class DataInitializer implements CommandLineRunner {
             // 4. Vincular Tipos de Resolución a Resolutores en la Base de Datos (ManyToMany)
             System.out.println("⏳ Vinculando tipos de resolución a perfiles de resolutores...");
             
+            // Primero limpiar las relaciones previas para estos usuarios específicos
+            entityManager.createNativeQuery("DELETE FROM user_tipo_resolucion WHERE user_id IN (:ids)")
+                         .setParameter("ids", List.of(resMaria.getId(), resMartin.getId(), resEduardo.getId(), resMatiasResol.getId()))
+                         .executeUpdate();
+            
             tipoResolucionRepository.findByTipoIgnoreCase("AGENDA").ifPresent(tr -> {
                 tr.setResolutor(resMaria);
                 tipoResolucionRepository.save(tr);
                 
-                resMaria.getTiposResolucion().clear();
-                resMaria.getTiposResolucion().add(tr);
-                userRepository.save(resMaria);
+                entityManager.createNativeQuery("INSERT INTO user_tipo_resolucion (user_id, tipo_resolucion_id) VALUES (:userId, :tipoId)")
+                             .setParameter("userId", resMaria.getId())
+                             .setParameter("tipoId", tr.getId())
+                             .executeUpdate();
             });
 
             tipoResolucionRepository.findByTipoIgnoreCase("SUBSIDIO").ifPresent(tr -> {
                 tr.setResolutor(resMartin);
                 tipoResolucionRepository.save(tr);
                 
-                resMartin.getTiposResolucion().clear();
-                resMartin.getTiposResolucion().add(tr);
-                userRepository.save(resMartin);
+                entityManager.createNativeQuery("INSERT INTO user_tipo_resolucion (user_id, tipo_resolucion_id) VALUES (:userId, :tipoId)")
+                             .setParameter("userId", resMartin.getId())
+                             .setParameter("tipoId", tr.getId())
+                             .executeUpdate();
             });
 
             tipoResolucionRepository.findByTipoIgnoreCase("DECLARACION DE INTERES").ifPresent(tr -> {
                 tr.setResolutor(resEduardo);
                 tipoResolucionRepository.save(tr);
                 
-                resEduardo.getTiposResolucion().clear();
-                resEduardo.getTiposResolucion().add(tr);
-                userRepository.save(resEduardo);
+                entityManager.createNativeQuery("INSERT INTO user_tipo_resolucion (user_id, tipo_resolucion_id) VALUES (:userId, :tipoId)")
+                             .setParameter("userId", resEduardo.getId())
+                             .setParameter("tipoId", tr.getId())
+                             .executeUpdate();
             });
 
             tipoResolucionRepository.findByTipoIgnoreCase("OTRA").ifPresent(tr -> {
-                // Queda sin resolutor por defecto momentáneamente
-                tr.setResolutor(null);
+                tr.setResolutor(resMatiasResol);
                 tipoResolucionRepository.save(tr);
+                
+                entityManager.createNativeQuery("INSERT INTO user_tipo_resolucion (user_id, tipo_resolucion_id) VALUES (:userId, :tipoId)")
+                             .setParameter("userId", resMatiasResol.getId())
+                             .setParameter("tipoId", tr.getId())
+                             .executeUpdate();
             });
 
             // Asignar zona por defecto de forma secuencial a los responsables que no tengan una asignada
@@ -198,6 +242,115 @@ public class DataInitializer implements CommandLineRunner {
                         contadorZona++;
                     }
                 }
+            }
+
+            if (projectRepository.count() == 0) {
+                System.out.println("⏳ Sembrando proyectos de prueba por defecto...");
+                
+                // Proyecto 1: Agenda
+                com.sgp.backend.entity.SheetsConfig sc1 = new com.sgp.backend.entity.SheetsConfig();
+                sc1.setSpreadsheetId("spreadsheet-agenda-default-id");
+                sc1.setSheetName("AGENDA");
+                sc1.setStatus("ACTIVE");
+                sc1 = sheetsConfigRepository.save(sc1);
+                
+                com.sgp.backend.entity.Project p1 = new com.sgp.backend.entity.Project();
+                p1.setName("Proyecto de Agenda E2E");
+                p1.setSheetsConfig(sc1);
+                p1.setDataJson("{}");
+                projectRepository.save(p1);
+                
+                // Proyecto 2: Subsidio
+                com.sgp.backend.entity.SheetsConfig sc2 = new com.sgp.backend.entity.SheetsConfig();
+                sc2.setSpreadsheetId("spreadsheet-subsidio-default-id");
+                sc2.setSheetName("Solicitudes Subsidios");
+                sc2.setStatus("ACTIVE");
+                sc2 = sheetsConfigRepository.save(sc2);
+                
+                com.sgp.backend.entity.Project p2 = new com.sgp.backend.entity.Project();
+                p2.setName("Proyecto de Subsidio E2E");
+                p2.setSheetsConfig(sc2);
+                p2.setDataJson("{}");
+                projectRepository.save(p2);
+                
+                System.out.println("✅ Proyectos de prueba sembrados correctamente.");
+            }
+
+            // Sembrar dos solicitudes de prueba de Agenda para resolver
+            long countAgendaSolicitudes = solicitudRepository.findAll().stream()
+                    .filter(s -> s.getDescription() != null && s.getDescription().contains("EJEMPLO AGENDA"))
+                    .count();
+            if (countAgendaSolicitudes == 0) {
+                System.out.println("⏳ Sembrando 2 solicitudes de ejemplo para Agenda...");
+                
+                // Encontrar o buscar resMaria y sc1 de forma robusta (comentarios en ESPAÑOL)
+                User resolutorMaria = userRepository.findByEmail("mvgonza79@gmail.com").orElse(null);
+                com.sgp.backend.entity.SheetsConfig configAgenda = sheetsConfigRepository.findAll().stream()
+                        .filter(c -> c.getSheetName() != null && c.getSheetName().toUpperCase().contains("AGENDA"))
+                        .findFirst()
+                        .orElse(null);
+
+                // Encontrar un responsable
+                User responsable = userRepository.findByEmail("matias.ippolito.responsable@gmail.com").orElse(null);
+                
+                // Encontrar la ciudad de Santa Fe
+                com.sgp.backend.entity.Location santaFe = locationRepository.findFirstByNameAndType("Santa Fe", "CITY").orElse(null);
+                
+                // Crear Person 1
+                com.sgp.backend.entity.Person p1 = new com.sgp.backend.entity.Person();
+                p1.setName("Beneficiario Ejemplo Agenda 1");
+                p1.setType("INDIVIDUAL");
+                p1.setPhone("3424111222");
+                p1 = personRepository.save(p1);
+
+                // Crear Person 2
+                com.sgp.backend.entity.Person p2 = new com.sgp.backend.entity.Person();
+                p2.setName("Beneficiario Ejemplo Agenda 2");
+                p2.setType("INDIVIDUAL");
+                p2.setPhone("3424333444");
+                p2 = personRepository.save(p2);
+
+                // Solicitud 1
+                com.sgp.backend.entity.Solicitud s1 = new com.sgp.backend.entity.Solicitud();
+                s1.setType("PEDIDO");
+                s1.setDescription("EJEMPLO AGENDA 1 - Reunión de coordinación territorial");
+                s1.setStatus("en resolucion");
+                s1.setPerson(p1);
+                s1.setLocation(santaFe);
+                s1.setResponsable(responsable);
+                s1.setEntryDate(LocalDate.now());
+                s1.setSheetsConfig(configAgenda);
+                s1 = solicitudRepository.save(s1);
+
+                com.sgp.backend.entity.SolicitudResolutorAssignment a1 = new com.sgp.backend.entity.SolicitudResolutorAssignment();
+                a1.setSolicitud(s1);
+                a1.setResolutor(resolutorMaria);
+                a1.setTipoResolucion("AGENDA");
+                a1.setApproved(false);
+                a1.setDetalle("{\"Reunión\":\"Coordinación general\",\"Fecha\":\"2026-08-05\",\"Hora\":\"10:00\"}");
+                entityManager.persist(a1);
+
+                // Solicitud 2
+                com.sgp.backend.entity.Solicitud s2 = new com.sgp.backend.entity.Solicitud();
+                s2.setType("PEDIDO");
+                s2.setDescription("EJEMPLO AGENDA 2 - Mesa de trabajo vecinal");
+                s2.setStatus("en resolucion");
+                s2.setPerson(p2);
+                s2.setLocation(santaFe);
+                s2.setResponsable(responsable);
+                s2.setEntryDate(LocalDate.now());
+                s2.setSheetsConfig(configAgenda);
+                s2 = solicitudRepository.save(s2);
+
+                com.sgp.backend.entity.SolicitudResolutorAssignment a2 = new com.sgp.backend.entity.SolicitudResolutorAssignment();
+                a2.setSolicitud(s2);
+                a2.setResolutor(resolutorMaria);
+                a2.setTipoResolucion("AGENDA");
+                a2.setApproved(false);
+                a2.setDetalle("{\"Reunión\":\"Mesa barrial\",\"Fecha\":\"2026-08-07\",\"Hora\":\"18:00\"}");
+                entityManager.persist(a2);
+                
+                System.out.println("✅ 2 solicitudes de ejemplo para Agenda sembradas correctamente.");
             }
 
             System.out.println("✅ DataInitializer finalizado exitosamente.");
@@ -340,6 +493,25 @@ public class DataInitializer implements CommandLineRunner {
         AtributoResolucion attrDecInteres = obtenerOCrearAtributo("Declaración de interés", "SELECT", "si,no");
         AtributoResolucion attrCBU = obtenerOCrearAtributo("Constancia de CBU", "FILE", null);
 
+        // Nuevos atributos específicos de SUBSIDIO para la Etapa 8
+        AtributoResolucion attrTipoPedido = obtenerOCrearAtributo("Tipo de pedido", "SELECT", "Personal,Institucional en dinero,Institucional en especie,Institucional indistinto");
+        AtributoResolucion attrNombreApellido = obtenerOCrearAtributo("Nombre y apellido", "TEXT", null);
+        AtributoResolucion attrDni = obtenerOCrearAtributo("DNI", "TEXT", null);
+        AtributoResolucion attrTelefono = obtenerOCrearAtributo("Teléfono", "TEXT", null);
+        AtributoResolucion attrCompania = obtenerOCrearAtributo("Compañía", "TEXT", null);
+        AtributoResolucion attrDireccionDni = obtenerOCrearAtributo("Dirección de DNI", "TEXT", null);
+        AtributoResolucion attrDniFrente = obtenerOCrearAtributo("DNI frente", "FILE", null);
+        AtributoResolucion attrDniDorso = obtenerOCrearAtributo("DNI dorso", "FILE", null);
+        AtributoResolucion attrDireccionInst = obtenerOCrearAtributo("Dirección de institución", "TEXT", null);
+        AtributoResolucion attrLocalidad = obtenerOCrearAtributo("Localidad", "TEXT", null);
+        AtributoResolucion attrResp1Nombre = obtenerOCrearAtributo("Responsable 1: Nombre", "TEXT", null);
+        AtributoResolucion attrResp1Dni = obtenerOCrearAtributo("Responsable 1: DNI", "TEXT", null);
+        AtributoResolucion attrResp1Cargo = obtenerOCrearAtributo("Responsable 1: Cargo", "TEXT", null);
+        AtributoResolucion attrResp2Nombre = obtenerOCrearAtributo("Responsable 2: Nombre", "TEXT", null);
+        AtributoResolucion attrResp2Dni = obtenerOCrearAtributo("Responsable 2: DNI", "TEXT", null);
+        AtributoResolucion attrResp2Cargo = obtenerOCrearAtributo("Responsable 2: Cargo", "TEXT", null);
+        AtributoResolucion attrNotaPedido = obtenerOCrearAtributo("Nota de pedido", "FILE", null);
+
         // Definición de tipos básicos
         upsertTipoResolucion("AGENDA", resolutorDefault, List.of(
             new AtributoConfig(attrFecha, true, 1),
@@ -348,10 +520,27 @@ public class DataInitializer implements CommandLineRunner {
         ));
 
         upsertTipoResolucion("SUBSIDIO", resolutorDefault, List.of(
-            new AtributoConfig(attrInstitucion, true, 1),
-            new AtributoConfig(attrMonto, false, 2),
-            new AtributoConfig(attrCBU, false, 3),
-            new AtributoConfig(attrDatoObs, false, 4)
+            new AtributoConfig(attrTipoPedido, false, 1),
+            new AtributoConfig(attrNombreApellido, false, 2),
+            new AtributoConfig(attrDni, false, 3),
+            new AtributoConfig(attrTelefono, false, 4),
+            new AtributoConfig(attrCompania, false, 5),
+            new AtributoConfig(attrDireccionDni, false, 6),
+            new AtributoConfig(attrDniFrente, false, 7),
+            new AtributoConfig(attrDniDorso, false, 8),
+            new AtributoConfig(attrCBU, false, 9),
+            new AtributoConfig(attrInstitucion, false, 10),
+            new AtributoConfig(attrDireccionInst, false, 11),
+            new AtributoConfig(attrLocalidad, false, 12),
+            new AtributoConfig(attrResp1Nombre, false, 13),
+            new AtributoConfig(attrResp1Dni, false, 14),
+            new AtributoConfig(attrResp1Cargo, false, 15),
+            new AtributoConfig(attrResp2Nombre, false, 16),
+            new AtributoConfig(attrResp2Dni, false, 17),
+            new AtributoConfig(attrResp2Cargo, false, 18),
+            new AtributoConfig(attrNotaPedido, false, 19),
+            new AtributoConfig(attrMonto, false, 20),
+            new AtributoConfig(attrDatoObs, false, 21)
         ));
 
         upsertTipoResolucion("DECLARACION DE INTERES", resolutorDefault, List.of());
@@ -363,6 +552,7 @@ public class DataInitializer implements CommandLineRunner {
         TipoResolucion tr = tipoResolucionRepository.findByTipoIgnoreCase(tipo).orElse(new TipoResolucion());
         tr.setTipo(tipo);
         tr.setResolutor(resolutor);
+        tr.setActivo(true);
         
         // Si es nuevo o queremos forzar atributos (simplificado: solo si es nuevo o no tiene)
         if (tr.getId() == null || tr.getAtributosConfig().isEmpty()) {
@@ -391,6 +581,15 @@ public class DataInitializer implements CommandLineRunner {
         return atributoRepository.findAll().stream()
                 .filter(a -> a.getNombre().equals(nombre))
                 .findFirst()
+                .map(a -> {
+                    if (!tipoDato.equals(a.getTipoDato()) || 
+                        (opciones != null && !opciones.equals(a.getOpciones()))) {
+                        a.setTipoDato(tipoDato);
+                        a.setOpciones(opciones);
+                        return atributoRepository.save(a);
+                    }
+                    return a;
+                })
                 .orElseGet(() -> {
                     AtributoResolucion attr = new AtributoResolucion();
                     attr.setNombre(nombre);

@@ -61,12 +61,20 @@ public class MaintenanceService {
         }
 
         // 4. Ejecutar eliminaciones en orden secuencial para respetar claves foráneas
+        try {
+            entityManager.createNativeQuery("DELETE FROM pedidos").executeUpdate();
+        } catch (Exception e) {
+            // Ignorar si la tabla no existe en producción
+        }
+        try {
+            entityManager.createNativeQuery("DELETE FROM subsidios").executeUpdate();
+        } catch (Exception e) {
+            // Ignorar si la tabla no existe en producción
+        }
         entityManager.createQuery("DELETE FROM TicketSeguimiento").executeUpdate();
         entityManager.createQuery("DELETE FROM DocumentoAdjunto").executeUpdate();
         entityManager.createQuery("DELETE FROM SolicitudResolutorAssignment").executeUpdate();
         entityManager.createQuery("DELETE FROM AsignacionHistorial").executeUpdate();
-        entityManager.createQuery("DELETE FROM Pedido").executeUpdate();
-        entityManager.createQuery("DELETE FROM Subsidio").executeUpdate();
         entityManager.createQuery("DELETE FROM Solicitud").executeUpdate();
     }
 }

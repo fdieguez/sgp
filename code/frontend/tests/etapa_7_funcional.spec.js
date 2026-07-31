@@ -55,8 +55,7 @@ test.describe('Etapa 7 - Pruebas Funcionales de Zonas, Cascada y Visibilidad', (
         await page.locator('label:has-text("Teléfono") + input').fill('342123456');
 
         // Seleccionar rol Responsable (desmarcando Operador)
-        await page.locator('label:has-text("Responsable") input[type="checkbox"]').check();
-        await page.locator('label:has-text("Operador") input[type="checkbox"]').uncheck();
+        await page.locator('label:has-text("Responsable") input[type="radio"]').check();
 
         // Dejar el campo Zona Territorial vacío e intentar enviar
         await page.locator('label:has-text("Zona Territorial") + input').fill('');

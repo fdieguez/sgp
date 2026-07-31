@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface SheetsConfigRepository extends JpaRepository<SheetsConfig, Long> {
     List<SheetsConfig> findByStatus(String status);
+    List<SheetsConfig> findBySpreadsheetId(String spreadsheetId);
 }

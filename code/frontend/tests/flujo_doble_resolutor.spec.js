@@ -99,8 +99,7 @@ test.describe('Flujo Avanzado: Doble Resolutor y Carga Completa', () => {
       await page.locator('label:has-text("DNI") + input').fill(dniAleatorio);
       
       // Checkbox de rol RESOLUTOR y desmarcar OPERADOR
-      await page.locator('label:has-text("Resolutor") input[type="checkbox"]').check();
-      await page.locator('label:has-text("Operador") input[type="checkbox"]').uncheck();
+      await page.locator('label:has-text("Resolutor") input[type="radio"]').check();
 
       // Guardar pantalla de creación de usuario
       await page.screenshot({ path: path.join(pruebaDir, '1_admin_creacion_resolutor2.png') });
@@ -162,10 +161,6 @@ test.describe('Flujo Avanzado: Doble Resolutor y Carga Completa', () => {
       await page.locator('label:has-text("Ingreso") + input').fill('2026-05-29');
       await page.locator('label:text-is("Zona Territorial") + select').selectOption('Norte');
       await page.locator('label:has-text("Responsable") + select').selectOption({ label: 'Matías Ippolito' });
-      await page.locator('label:has-text("Contacto") + input').fill('2026-05-29');
-      await page.locator('label:has-text("Fecha de Resoluc") + input').fill('2026-05-29');
-      await page.locator('label:has-text("Resoluc") + input[type="text"]').fill('Aprobación Favorable Completa');
-      await page.locator('label:has-text("Detalle") + textarea').fill('Se realizó el análisis de la solicitud y del presupuesto adjunto.');
       await page.locator('input[type="checkbox"]#firstContactControl').check();
 
       // 3.6 Agregar Asignación 1: OTRA (apunta a resolutor@sgp.com)

@@ -1,13 +1,12 @@
 package com.sgp.backend.entity;
 
-import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 import java.time.LocalDate;
+import java.math.BigDecimal;
 
 @Data
 @SuperBuilder
@@ -15,13 +14,23 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Entity
 @Table(name = "solicitudes")
-@Inheritance(strategy = InheritanceType.JOINED)
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
-@JsonSubTypes({
-        @JsonSubTypes.Type(value = Pedido.class, name = "PEDIDO"),
-        @JsonSubTypes.Type(value = Subsidio.class, name = "SUBSIDIO")
-})
-public abstract class Solicitud {
+public class Solicitud {
+
+    // Tipo de solicitud para flujo (ej: "SUBSIDIO", "AGENDA", "PEDIDO")
+    @Column(name = "type", length = 50)
+    private String type;
+
+    // Campos de Subsidio
+    private BigDecimal amount;
+    private LocalDate grantDate;
+
+    // Campos de Agenda
+    private String asistencia;
+    @Column(name = "google_event_id")
+    private String googleEventId;
+
+    @Column(name = "por_donde", length = 255)
+    private String porDonde; // Almacena información de resolución externa o canal de entrega
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

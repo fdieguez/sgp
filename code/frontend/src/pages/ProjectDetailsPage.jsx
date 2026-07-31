@@ -38,10 +38,11 @@ import {
 } from 'recharts';
 
 import SolicitudModal from '../components/SolicitudModal';
+import AsociarPlanillaModal from '../components/AsociarPlanillaModal';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 
-// --- Helpers ---
+// --- Funciones de ayuda ---
 const parseLocalDate = (dateStr) => {
     if (!dateStr) return null;
     if (dateStr.includes('T')) return new Date(dateStr);
@@ -49,13 +50,14 @@ const parseLocalDate = (dateStr) => {
     return new Date(y, m - 1, d);
 };
 
-// --- UI Components ---
+// --- Componentes de interfaz de usuario ---
 const STATUS_MAP = {
     'pendiente': 'Pendiente',
     'en proceso': 'Asignadas',
     'en resolucion': 'En Resolución',
     'completadas': 'Resueltas',
-    'rechazada': 'Rechazado'
+    'rechazada': 'Rechazado',
+    'consideracion': 'Consideración'
 };
 
 const StatusBadge = ({ status }) => {
@@ -65,7 +67,8 @@ const StatusBadge = ({ status }) => {
         pendiente: 'bg-yellow-900/30 text-yellow-400 border-yellow-800',
         'en proceso': 'bg-blue-900/30 text-blue-400 border-blue-800',
         'en resolucion': 'bg-purple-900/30 text-purple-400 border-purple-800',
-        rechazada: 'bg-red-900/30 text-red-400 border-red-800'
+        rechazada: 'bg-red-900/30 text-red-400 border-red-800',
+        consideracion: 'bg-orange-900/30 text-orange-400 border-orange-850'
     };
     return (
         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${styles[s] || 'bg-gray-700 text-gray-300 border-gray-600'}`}>
@@ -82,17 +85,18 @@ export default function ProjectDetailsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Modal States
+    // Estados de modales
     const [isABMOpen, setIsABMOpen] = useState(false);
     const [selectedSolicitud, setSelectedSolicitud] = useState(null);
     const [selectedRows, setSelectedRows] = useState([]);
+    const [isAsociarModalOpen, setIsAsociarModalOpen] = useState(false);
 
-    // UI States
+    // Estados de la interfaz
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
-    const [visColumn, setVisColumn] = useState('status'); // Default chart by status
+    const [visColumn, setVisColumn] = useState('status'); // Gráfico por defecto por estado
     const [filters, setFilters] = useState({});
     const [showFilters, setShowFilters] = useState(false);
     const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -104,8 +108,90 @@ export default function ProjectDetailsPage() {
         enResolucion: 0,
         completadas: 0,
         rechazada: 0,
+        consideracion: 0,
         totalSubsidios: 0
     });
+
+    const SPREADSHEET_ID = config?.spreadsheetId || "1jPw9ni4BW_bRfw_M9ajA7jO5RGX5IFq8w43T3WOXz6g";
+    const isResolutorSubsidio = user?.role === 'RESOLUTOR' && user?.tiposResolucion?.some(t => t.tipo.toUpperCase() === 'SUBSIDIO');
+
+    const handleExportPlanilla = async () => {
+        setLoading(true);
+        try {
+            const res = await api.post('/api/planilla-salida/export', { spreadsheetId: SPREADSHEET_ID });
+            toast.success(res.data.message || "Exportación a planilla de salida finalizada con éxito.");
+            fetchData();
+        } catch (err) {
+            console.error("Error al exportar a planilla:", err);
+            toast.error(err.response?.data?.error || "Error al exportar a la planilla externa.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleImportPlanilla = async () => {
+        setLoading(true);
+        try {
+            const res = await api.post('/api/planilla-salida/import', { spreadsheetId: SPREADSHEET_ID });
+            toast.success(res.data.message || "Importación desde planilla de salida finalizada con éxito.");
+            fetchData();
+        } catch (err) {
+            console.error("Error al importar desde planilla:", err);
+            toast.error(err.response?.data?.error || "Error al importar desde la planilla externa.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBulkExport = async () => {
+        if (selectedRows.length === 0) return;
+        setLoading(true);
+        try {
+            const res = await api.post('/api/planilla-salida/export', { 
+                spreadsheetId: SPREADSHEET_ID, 
+                ids: selectedRows 
+            });
+            toast.success(res.data.message || `Exportación selectiva de ${selectedRows.length} solicitudes finalizada con éxito.`);
+            setSelectedRows([]);
+            fetchData();
+        } catch (err) {
+            console.error("Error al exportar solicitudes seleccionadas:", err);
+            toast.error(err.response?.data?.error || "Error al realizar la exportación selectiva.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBulkImport = async () => {
+        if (selectedRows.length === 0) return;
+        setLoading(true);
+        try {
+            const res = await api.post('/api/planilla-salida/import', { 
+                spreadsheetId: SPREADSHEET_ID, 
+                ids: selectedRows 
+            });
+            toast.success(res.data.message || `Importación selectiva de ${selectedRows.length} solicitudes finalizada con éxito.`);
+            setSelectedRows([]);
+            fetchData();
+        } catch (err) {
+            console.error("Error al importar solicitudes seleccionadas:", err);
+            toast.error(err.response?.data?.error || "Error al realizar la importación selectiva.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleConsideracion = async (id) => {
+        if (!window.confirm("¿Deseas poner esta solicitud en consideración para la planilla externa?")) return;
+        try {
+            await api.post(`/api/solicitudes/${id}/consideracion`);
+            toast.success("Solicitud puesta en consideración correctamente.");
+            fetchData();
+        } catch (err) {
+            console.error("Error al poner en consideración:", err);
+            toast.error("Error al poner la solicitud en consideración.");
+        }
+    };
 
     useEffect(() => {
         fetchResponsables();
@@ -131,9 +217,14 @@ export default function ProjectDetailsPage() {
     };
 
     useEffect(() => {
+        console.log("[DEBUG EFFECT TRIGGERED] configId:", configId, "isResolutorSubsidio:", isResolutorSubsidio, "userEmail:", user ? user.email : "null", "userRole:", user ? user.role : "null", "tiposResolucion:", user && user.tiposResolucion ? JSON.stringify(user.tiposResolucion) : "undefined");
         fetchData();
-        if (configId && (user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN')) fetchConfig();
-    }, [configId, user?.id, user?.role, filters, searchTerm, currentPage, sortConfig, rowsPerPage]);
+        if (configId) {
+            fetchConfig();
+        } else if (isResolutorSubsidio) {
+            fetchConfigForSubsidios();
+        }
+    }, [configId, user?.id, user?.role, isResolutorSubsidio, filters, searchTerm, currentPage, sortConfig, rowsPerPage]);
 
     const fetchConfig = async () => {
         try {
@@ -141,6 +232,23 @@ export default function ProjectDetailsPage() {
             setConfig(res.data);
         } catch (err) {
             console.error("Error fetching config", err);
+        }
+    }
+
+    const fetchConfigForSubsidios = async () => {
+        try {
+            const res = await api.get('/api/config');
+            // Filtrar la configuración que no sea de Agenda ni Declaración de Interés, para obtener la de Subsidios
+            const subsidioConfig = res.data.find(c => c.sheetName && 
+                c.sheetName.toUpperCase() !== 'AGENDA' && 
+                c.sheetName.toUpperCase() !== 'DECLARACION' && 
+                c.sheetName.toUpperCase() !== 'DECLARACIÓN'
+            );
+            if (subsidioConfig) {
+                setConfig(subsidioConfig);
+            }
+        } catch (err) {
+            console.error("Error al obtener la configuración de subsidios:", err);
         }
     }
 
@@ -153,12 +261,12 @@ export default function ProjectDetailsPage() {
                 origin: filters.origin || null,
                 responsableId: filters.responsableId || null,
                 locationId: filters.locationId || null,
-                page: currentPage - 1, // API es 0-indexed
+                page: currentPage - 1, // La API utiliza índice basado en 0
                 size: rowsPerPage,
                 sort: `${sortConfig.key},${sortConfig.direction}`
             };
 
-            // Date Range Logic for Server
+            // Lógica de rango de fechas para el servidor
             if (filters.dateRange) {
                 const today = new Date();
                 let dateFrom = null;
@@ -329,14 +437,14 @@ export default function ProjectDetailsPage() {
         }
     };
 
-    // Data Processing Pipeline
+    // Tubería de procesamiento de datos
     const processedData = useMemo(() => {
         let result = [...solicitudes];
 
-        // 1. Ya no se filtra por search local si se hace por servidor, pero lo dejamos por si acaso
-        // 2. Sort ya no se hace localmente
+        // 1. Ya no se filtra por búsqueda local si se hace por servidor, pero lo dejamos por si acaso
+        // 2. La ordenación ya no se hace localmente
         
-        // 4. Chart Data with Percentages
+        // 4. Datos para el gráfico con porcentajes
         const total = result.length;
         const counts = {};
         result.forEach(s => {
@@ -358,20 +466,21 @@ export default function ProjectDetailsPage() {
             .sort((a, b) => b.value - a.value)
             .slice(0, 10);
 
-        // 5. Totals (always from base list for cards)
+        // 5. Totales (siempre desde la lista base para las tarjetas)
         const stats = {
             pendiente: solicitudes.filter(s => s.status?.trim().toLowerCase() === 'pendiente').length,
             enProceso: solicitudes.filter(s => s.status?.trim().toLowerCase() === 'en proceso').length,
             enResolucion: solicitudes.filter(s => s.status?.trim().toLowerCase() === 'en resolucion').length,
             completadas: solicitudes.filter(s => s.status?.trim().toLowerCase() === 'completadas').length,
             rechazada: solicitudes.filter(s => s.status?.trim().toLowerCase() === 'rechazada').length,
+            consideracion: solicitudes.filter(s => s.status?.trim().toLowerCase() === 'consideracion').length,
             totalSubsidios: solicitudes.reduce((acc, s) => s.status?.trim().toLowerCase() === 'completadas' ? acc + (s.amount || 0) : acc, 0)
         };
 
         return { rows: result, chartData, uniqueResponsables: [], uniqueOrigins: [], uniqueLocations: [], stats };
     }, [solicitudes, visColumn]);
 
-    // Pagination is handled by server now
+    // La paginación ahora es gestionada por el servidor
     const currentRows = processedData.rows;
 
     const handleSort = (key) => {
@@ -402,16 +511,43 @@ export default function ProjectDetailsPage() {
             <Navbar />
             
             <div className="p-8 max-w-7xl mx-auto space-y-8">
-                {/* Top Nav */}
+                {/* Navegación superior */}
                 <div className="flex items-center justify-between">
                     <Link to="/dashboard" className="flex items-center text-gray-400 hover:text-white transition-colors group">
                         <ArrowLeft className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform" />
                         Inicio
                     </Link>
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 text-xs md:text-sm">
+                            {isResolutorSubsidio && (
+                                <>
+                                    <button
+                                        onClick={handleExportPlanilla}
+                                        className="px-4 py-2 bg-orange-600 hover:bg-orange-500 border border-orange-500 rounded-xl text-white font-bold flex items-center gap-2 transition-all shadow-lg shadow-orange-900/20 active:scale-95"
+                                        title="Exportar solicitudes en consideración a planilla de salida"
+                                    >
+                                        <Download className="h-4 w-4" /> Exportar Planilla
+                                    </button>
+                                    <button
+                                        onClick={handleImportPlanilla}
+                                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500 rounded-xl text-white font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-900/20 active:scale-95"
+                                        title="Importar cambios y POR DONDE? desde planilla de salida"
+                                    >
+                                        <Database className="h-4 w-4" /> Importar Planilla
+                                    </button>
+                                </>
+                            )}
+                            {(config && (user?.role === 'RESOLUTOR' || user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN')) && (
+                                <button
+                                    onClick={() => setIsAsociarModalOpen(true)}
+                                    className="px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-white font-bold flex items-center gap-2 transition-all shadow-lg shadow-gray-900/20 active:scale-95"
+                                    title="Asociar planilla de cálculo externa de Google Sheets"
+                                >
+                                    <Settings className="h-4 w-4" /> Asociar Planilla
+                                </button>
+                            )}
                             <button
                                 onClick={handleExportCSV}
-                                className="px-4 py-2 bg-green-600 hover:bg-green-500 border border-green-500 rounded-xl text-white font-bold flex items-center gap-2 transition-all text-sm shadow-lg shadow-green-900/20"
+                                className="px-4 py-2 bg-green-600 hover:bg-green-500 border border-green-500 rounded-xl text-white font-bold flex items-center gap-2 transition-all shadow-lg shadow-green-900/20 active:scale-95"
                             >
                                 <Download className="h-4 w-4" /> Exportar CSV
                             </button>
@@ -421,13 +557,15 @@ export default function ProjectDetailsPage() {
                         >
                             <Filter className="h-5 w-5" />
                         </button>
-                        <button
-                            onClick={() => handleOpenABM()}
-                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
-                        >
-                            <Plus className="h-5 w-5" />
-                            Nueva Solicitud
-                        </button>
+                        {(user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN' || user?.role === 'OPERADOR') && (
+                            <button
+                                onClick={() => handleOpenABM()}
+                                className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
+                            >
+                                <Plus className="h-5 w-5" />
+                                Nueva Solicitud
+                            </button>
+                        )}
                         {(configId && (user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN')) && (
                             <Link
                                 to={`/projects/config/${configId}/settings`}
@@ -440,7 +578,7 @@ export default function ProjectDetailsPage() {
                     </div>
                 </div>
 
-                {/* Filters Panel */}
+                {/* Panel de filtros */}
                 {showFilters && (
                     <div className="bg-gray-800 border border-gray-700 p-6 rounded-3xl shadow-xl animate-in slide-in-from-top-4 mb-8">
                         <div className="flex items-center justify-between mb-4">
@@ -495,6 +633,7 @@ export default function ProjectDetailsPage() {
                                     <option value="en resolucion">En Resolución</option>
                                     <option value="completadas">Resueltas</option>
                                     <option value="rechazada">Rechazado</option>
+                                    <option value="consideracion">Consideración</option>
                                 </select>
                             </div>
                             <div>
@@ -537,7 +676,7 @@ export default function ProjectDetailsPage() {
                     </div>
                 )}
 
-                {/* Header Info & Stats */}
+                {/* Información de encabezado y estadísticas */}
                 <div className="flex flex-col gap-6">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div>
@@ -561,7 +700,7 @@ export default function ProjectDetailsPage() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
                         <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'pendiente' ? '' : 'pendiente' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'pendiente' ? 'bg-yellow-900/40 border-2 border-yellow-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
                             <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]"></div> Pendiente
@@ -602,10 +741,18 @@ export default function ProjectDetailsPage() {
                                 {stats.rechazada}
                             </div>
                         </button>
+                        <button onClick={() => setFilters(prev => ({ ...prev, status: prev.status === 'consideracion' ? '' : 'consideracion' }))} className={`text-left p-4 rounded-2xl flex flex-col justify-center shadow-lg transition-all ${filters.status === 'consideracion' ? 'bg-orange-900/40 border-2 border-orange-500 scale-105' : 'bg-gray-800/50 border border-gray-700 hover:bg-gray-700/50'}`}>
+                            <div className="text-[10px] uppercase font-black text-gray-400 mb-1 flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)]"></div> Consideración
+                            </div>
+                            <div className="text-3xl font-black text-white">
+                                {stats.consideracion || 0}
+                            </div>
+                        </button>
                     </div>
                 </div>
 
-                {/* Chart Section */}
+                {/* Sección de gráficos */}
                 <div className="grid grid-cols-1 gap-6">
                     <div className="bg-gray-800/40 p-6 rounded-3xl border border-gray-700/50 backdrop-blur-sm shadow-xl">
                         <div className="flex items-center justify-between mb-8">
@@ -656,25 +803,37 @@ export default function ProjectDetailsPage() {
                     </div>
                 </div>
 
-                {/* Main Table Section */}
+                {/* Sección principal de la tabla */}
                 <div className="bg-gray-800/50 rounded-[2rem] border border-gray-700/50 overflow-hidden shadow-2xl backdrop-blur-xl relative">
-                    {/* Floating Action Bar */}
+                    {/* Barra de acciones flotante */}
                     {selectedRows.length > 0 && (
                         <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-indigo-600 border border-indigo-500 p-2 px-4 rounded-full shadow-2xl z-[50] flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300">
                             <span className="text-white font-bold text-xs">{selectedRows.length} seleccionadas</span>
                             <div className="h-4 w-px bg-indigo-400"></div>
-                            <select 
-                                className="bg-indigo-700 border-none text-xs rounded-full px-3 py-1 text-white outline-none cursor-pointer hover:bg-indigo-800 transition-colors"
-                                onChange={(e) => {
-                                    handleBulkAssign(e.target.value);
-                                    e.target.value = "";
-                                }}
-                                defaultValue=""
-                            >
-                                <option value="" disabled>Asignar Responsable...</option>
-                                <option value="0">(Quitar Asignación)</option>
-                                {responsablesList.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                            </select>
+                            {user?.role !== 'RESOLUTOR' && (
+                                <select 
+                                    className="bg-indigo-700 border-none text-xs rounded-full px-3 py-1 text-white outline-none cursor-pointer hover:bg-indigo-800 transition-colors"
+                                    onChange={(e) => {
+                                        handleBulkAssign(e.target.value);
+                                        e.target.value = "";
+                                    }}
+                                    defaultValue=""
+                                >
+                                    <option value="" disabled>Asignar Responsable...</option>
+                                    <option value="0">(Quitar Asignación)</option>
+                                    {responsablesList.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                </select>
+                            )}
+                            {(user?.role === 'ADMINISTRADOR' || isResolutorSubsidio) && (
+                                <>
+                                    <button onClick={handleBulkExport} className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded-full text-xs font-bold transition-colors shadow-sm">
+                                        Exportar
+                                    </button>
+                                    <button onClick={handleBulkImport} className="bg-indigo-800 hover:bg-indigo-900 text-white px-3 py-1 rounded-full text-xs font-bold transition-colors shadow-sm">
+                                        Importar
+                                    </button>
+                                </>
+                            )}
                             {user?.role === 'ADMINISTRADOR' && (
                                 <button onClick={handleBulkDelete} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold transition-colors shadow-sm">
                                     Eliminar
@@ -685,41 +844,84 @@ export default function ProjectDetailsPage() {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse">
                             <thead>
-                                <tr className="bg-gray-900/80 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                                    <th className="p-3 w-10 text-center">
-                                        <input 
-                                            type="checkbox" 
-                                            className="rounded border-gray-600 text-indigo-500 focus:ring-indigo-500 bg-gray-800"
-                                            onChange={handleSelectAll}
-                                            checked={currentRows.length > 0 && selectedRows.length === currentRows.length}
-                                        />
-                                    </th>
-                                    <th className="p-3">N° Orden</th>
-                                    <th onClick={() => handleSort('entryDate')} className="p-3 cursor-pointer hover:text-white transition-colors">
-                                        Fecha {sortConfig.key === 'entryDate' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
-                                    </th>
-                                    <th onClick={() => handleSort('origin')} className="p-3 cursor-pointer hover:text-white transition-colors">
-                                        Origen {sortConfig.key === 'origin' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
-                                    </th>
-                                    <th onClick={() => handleSort('person')} className="p-3 cursor-pointer hover:text-white transition-colors">
-                                        Beneficiario {sortConfig.key === 'person' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
-                                    </th>
-                                    <th className="p-3">Ubicación</th>
-                                    <th className="p-3 min-w-[200px]">Solicitud</th>
-                                    <th className="p-3">RESPONSABLE</th>
-                                    <th onClick={() => handleSort('status')} className="p-3 cursor-pointer hover:text-white transition-colors min-w-[120px]">
-                                        Estado {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
-                                    </th>
-                                    <th className="p-3 min-w-[250px]">Detalles de Resolución</th>
-                                    <th className="p-3 text-right sticky right-0 bg-gray-900/90 shadow-xl">Acciones</th>
-                                </tr>
+                                {isResolutorSubsidio ? (
+                                    <tr className="bg-gray-900/80 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">
+                                        <th className="p-3 w-10 text-center">
+                                            <input 
+                                                type="checkbox" 
+                                                className="rounded border-gray-600 text-indigo-500 focus:ring-indigo-500 bg-gray-800"
+                                                onChange={handleSelectAll}
+                                                checked={currentRows.length > 0 && selectedRows.length === currentRows.length}
+                                            />
+                                        </th>
+                                        <th className="p-3">ID</th>
+                                        <th className="p-3">Fecha Ingreso</th>
+                                        <th className="p-3">Origen</th>
+                                        <th className="p-3">Solicitante Nombre</th>
+                                        <th className="p-3">Solicitante Teléfono</th>
+                                        <th className="p-3">Localidad</th>
+                                        <th className="p-3">Barrio</th>
+                                        <th className="p-3">Descripción</th>
+                                        <th className="p-3">Responsable</th>
+                                        <th className="p-3">Monto Solicitado</th>
+                                        <th className="p-3">Fecha Otorgamiento</th>
+                                        <th className="p-3">Estado</th>
+                                        <th className="p-3">Tipo Pedido</th>
+                                        <th className="p-3">Nombre y Apellido</th>
+                                        <th className="p-3">DNI</th>
+                                        <th className="p-3">Dirección de DNI</th>
+                                        <th className="p-3">DNI Frente</th>
+                                        <th className="p-3">DNI Dorso</th>
+                                        <th className="p-3">Constancia CBU</th>
+                                        <th className="p-3">Nombre Inst.</th>
+                                        <th className="p-3">Dirección Inst.</th>
+                                        <th className="p-3">Localidad Inst.</th>
+                                        <th className="p-3">Resp 1: Nombre</th>
+                                        <th className="p-3">Resp 1: DNI</th>
+                                        <th className="p-3">Resp 1: Cargo</th>
+                                        <th className="p-3">Resp 2: Nombre</th>
+                                        <th className="p-3">Resp 2: DNI</th>
+                                        <th className="p-3">Resp 2: Cargo</th>
+                                        <th className="p-3">Nota Pedido</th>
+                                        <th className="p-3">¿Por Donde?</th>
+                                        <th className="p-3 text-right sticky right-0 bg-gray-900/90 shadow-xl">Acciones</th>
+                                    </tr>
+                                ) : (
+                                    <tr className="bg-gray-900/80 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                        <th className="p-3 w-10 text-center">
+                                            <input 
+                                                type="checkbox" 
+                                                className="rounded border-gray-600 text-indigo-500 focus:ring-indigo-500 bg-gray-800"
+                                                onChange={handleSelectAll}
+                                                checked={currentRows.length > 0 && selectedRows.length === currentRows.length}
+                                            />
+                                        </th>
+                                        <th className="p-3">N° Orden</th>
+                                        <th onClick={() => handleSort('entryDate')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                            Fecha {sortConfig.key === 'entryDate' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        </th>
+                                        <th onClick={() => handleSort('origin')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                            Origen {sortConfig.key === 'origin' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        </th>
+                                        <th onClick={() => handleSort('person')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                            Beneficiario {sortConfig.key === 'person' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        </th>
+                                        <th className="p-3">Ubicación</th>
+                                        <th className="p-3 min-w-[200px]">Solicitud</th>
+                                        <th className="p-3">RESPONSABLE</th>
+                                        <th onClick={() => handleSort('status')} className="p-3 cursor-pointer hover:text-white transition-colors min-w-[120px]">
+                                            Estado {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        </th>
+                                        <th className="p-3 min-w-[250px]">Detalles de Resolución</th>
+                                        <th className="p-3 text-right sticky right-0 bg-gray-900/90 shadow-xl">Acciones</th>
+                                    </tr>
+                                )}
                             </thead>
                             <tbody className="divide-y divide-gray-700/50">
                                 {currentRows.map((s) => {
                                     const entryDate = parseLocalDate(s.entryDate);
-                                    const monthName = entryDate ? entryDate.toLocaleString('es-ES', { month: 'long' }) : '-';
 
-                                    // Location Logic
+                                    // Lógica para la ubicación
                                     let localidad = '-';
                                     let barrio = '-';
                                     if (s.location) {
@@ -731,7 +933,7 @@ export default function ProjectDetailsPage() {
                                         }
                                     }
 
-                                    // Renderizar detalles de resolucion
+                                    // Renderizar detalles de resolución
                                     let resolucionContent = '-';
                                     let hasPendingApproval = false;
 
@@ -758,68 +960,191 @@ export default function ProjectDetailsPage() {
                                         });
                                     }
 
-                                    return (
-                                        <tr key={s.id} className={`group transition-all text-xs border-b border-gray-800 ${selectedRows.includes(s.id) ? 'bg-indigo-900/20' : 'hover:bg-gray-700/20'}`}>
-                                            <td className="p-3 text-center">
-                                                <input 
-                                                    type="checkbox" 
-                                                    className="rounded border-gray-600 text-indigo-500 focus:ring-indigo-500 bg-gray-800"
-                                                    checked={selectedRows.includes(s.id)}
-                                                    onChange={() => handleSelectRow(s.id)}
-                                                />
-                                            </td>
-                                            <td className="p-3 font-mono text-gray-500">#{s.id}</td>
-                                            <td className="p-3 text-gray-300 whitespace-nowrap">
-                                                {entryDate ? entryDate.toLocaleDateString() : '-'}
-                                            </td>
-                                            <td className="p-3 text-gray-400">{s.origin || '-'}</td>
-                                            <td className="p-3 font-bold text-white whitespace-nowrap">
-                                                {s.person?.name || '-'}<br/>
-                                                <span className="font-mono text-gray-500 text-[10px]">{s.person?.phone || ''}</span>
-                                            </td>
-                                            <td className="p-3 text-gray-400">
-                                                {localidad}<br/>
-                                                <span className="text-gray-500 text-[10px]">{barrio}</span>
-                                            </td>
-                                            <td className="p-3 text-gray-300 font-medium leading-snug">
-                                                <div className="line-clamp-2" title={s.description}>{s.description}</div>
-                                            </td>
-                                            <td className="p-3 text-indigo-300 font-bold uppercase whitespace-nowrap">
-                                                {s.responsable?.name || '-'}<br/>
-                                                <span className="text-indigo-500/50 text-[10px]">{s.zone || ''}</span>
-                                            </td>
-                                            <td className="p-3 text-gray-300">
-                                                <StatusBadge status={s.status} />
-                                            </td>
-                                            <td className="p-3 text-gray-300 text-[11px] leading-tight">
-                                                {resolucionContent}
-                                            </td>
-                                            <td className="p-3 sticky right-0 bg-gray-900/90 shadow-xl group-hover:bg-gray-800 transition-colors">
-                                                <div className="flex justify-end gap-1 opacity-60 group-hover:opacity-100">
-                                                    {hasPendingApproval && (
-                                                        <button onClick={() => handleAprobarRapido(s.id)} title="Aprobar Rápidamente" className="p-1.5 hover:bg-emerald-600 bg-emerald-900/30 rounded text-emerald-400 hover:text-white transition-colors">
-                                                            <Check className="h-4 w-4" />
+                                    if (isResolutorSubsidio) {
+                                        const assignmentSubsidio = s.resolutorAssignments?.find(a => a.tipoResolucion?.toUpperCase() === 'SUBSIDIO');
+                                        let subsidioMap = {};
+                                        if (assignmentSubsidio && assignmentSubsidio.detalle) {
+                                            try {
+                                                subsidioMap = JSON.parse(assignmentSubsidio.detalle);
+                                            } catch (e) {
+                                                console.error("Error al parsear detalle de resolucion SUBSIDIO", e);
+                                            }
+                                        }
+
+                                        const renderAttachmentLink = (val) => {
+                                            if (!val) return <span className="text-gray-600">-</span>;
+                                            let valStr = val.toString().trim();
+                                            if (valStr === '' || valStr === '-') return <span className="text-gray-600">-</span>;
+                                            
+                                            // Extraer el ID del adjunto con regex si es una URL completa
+                                            const match = valStr.match(/\/api\/solicitudes\/adjuntos\/(\d+)\/download/);
+                                            if (match) {
+                                                valStr = match[1];
+                                            }
+
+                                            return (
+                                                <a 
+                                                    href={`/descargar-adjunto/${valStr}`} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer" 
+                                                    className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 font-bold transition-colors"
+                                                >
+                                                    <Download className="h-3 w-3" /> Descargar
+                                                </a>
+                                            );
+                                        };
+
+                                        const getVal = (key) => {
+                                            const val = subsidioMap[key];
+                                            return val !== undefined && val !== null ? val.toString().trim() : '-';
+                                        };
+
+                                        return (
+                                            <tr key={s.id} className={`group transition-all text-xs border-b border-gray-800 whitespace-nowrap ${selectedRows.includes(s.id) ? 'bg-indigo-900/20' : 'hover:bg-gray-700/20'}`}>
+                                                <td className="p-3 text-center">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="rounded border-gray-600 text-indigo-500 focus:ring-indigo-500 bg-gray-800"
+                                                        checked={selectedRows.includes(s.id)}
+                                                        onChange={() => handleSelectRow(s.id)}
+                                                    />
+                                                </td>
+                                                <td className="p-3 font-mono text-gray-500">#{s.id}</td>
+                                                <td className="p-3 text-gray-300">
+                                                    {entryDate ? entryDate.toLocaleDateString() : '-'}
+                                                </td>
+                                                <td className="p-3 text-gray-400">{s.origin || '-'}</td>
+                                                <td className="p-3 font-bold text-white">
+                                                    {s.person?.name || '-'}
+                                                </td>
+                                                <td className="p-3 text-gray-500">
+                                                    {s.person?.phone || '-'}
+                                                </td>
+                                                <td className="p-3 text-gray-400">{localidad}</td>
+                                                <td className="p-3 text-gray-400">{barrio}</td>
+                                                <td className="p-3 text-gray-300 max-w-[200px] truncate" title={s.description}>
+                                                    {s.description || '-'}
+                                                </td>
+                                                <td className="p-3 text-indigo-300 font-bold uppercase">
+                                                    {s.responsable?.name || '-'}
+                                                </td>
+                                                <td className="p-3 text-emerald-400 font-bold">
+                                                    ${s.amount || '0'}
+                                                </td>
+                                                <td className="p-3 text-gray-300">
+                                                    {s.grantDate ? parseLocalDate(s.grantDate)?.toLocaleDateString() : '-'}
+                                                </td>
+                                                <td className="p-3 text-gray-300">
+                                                    <StatusBadge status={s.status} />
+                                                </td>
+                                                <td className="p-3 text-gray-300">{getVal("Tipo de pedido")}</td>
+                                                <td className="p-3 text-gray-300">{getVal("Nombre y apellido")}</td>
+                                                <td className="p-3 text-gray-300">{getVal("DNI")}</td>
+                                                <td className="p-3 text-gray-300">{getVal("Dirección de DNI")}</td>
+                                                <td className="p-3">{renderAttachmentLink(subsidioMap["DNI frente"])}</td>
+                                                <td className="p-3">{renderAttachmentLink(subsidioMap["DNI dorso"])}</td>
+                                                <td className="p-3">{renderAttachmentLink(subsidioMap["Constancia de CBU"])}</td>
+                                                <td className="p-3 text-gray-300">{getVal("Nombre de institución")}</td>
+                                                <td className="p-3 text-gray-300">{getVal("Dirección de institución")}</td>
+                                                <td className="p-3 text-gray-300">{getVal("Localidad")}</td>
+                                                <td className="p-3 text-gray-300">{getVal("Responsable 1: Nombre")}</td>
+                                                <td className="p-3 text-gray-300">{getVal("Responsable 1: DNI")}</td>
+                                                <td className="p-3 text-gray-300">{getVal("Responsable 1: Cargo")}</td>
+                                                <td className="p-3 text-gray-300">{getVal("Responsable 2: Nombre")}</td>
+                                                <td className="p-3 text-gray-300">{getVal("Responsable 2: DNI")}</td>
+                                                <td className="p-3 text-gray-300">{getVal("Responsable 2: Cargo")}</td>
+                                                <td className="p-3">{renderAttachmentLink(subsidioMap["Nota de pedido"])}</td>
+                                                <td className="p-3 text-indigo-300 font-mono font-bold">{s.porDonde || '-'}</td>
+                                                <td className="p-3 sticky right-0 bg-gray-900/90 shadow-xl group-hover:bg-gray-800 transition-colors">
+                                                    <div className="flex justify-end gap-1 opacity-60 group-hover:opacity-100">
+                                                        {/* Botón Poner en Consideración: se muestra únicamente si el usuario es Administrador (ADMINISTRADOR o ADMIN), Responsable (RESPONSABLE) o Resolutor de Subsidio (isResolutorSubsidio === true) */}
+                                                        {s.type === 'SUBSIDIO' && (user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN' || user?.role === 'RESPONSABLE' || isResolutorSubsidio === true) && s.status !== 'completadas' && s.status !== 'rechazada' && (
+                                                            <button onClick={() => handleConsideracion(s.id)} title="Poner en Consideración" className="p-1.5 hover:bg-orange-600 bg-orange-900/30 rounded text-orange-400 hover:text-white transition-colors">
+                                                                <ArrowUpDown className="h-4 w-4" />
+                                                            </button>
+                                                        )}
+                                                        <button onClick={() => handleOpenABM(s)} title="Ver / Editar Detalles" className="p-1.5 hover:bg-indigo-600 bg-gray-800 rounded text-indigo-400 hover:text-white transition-colors">
+                                                            <Edit3 className="h-4 w-4" />
                                                         </button>
-                                                    )}
-                                                    <button onClick={() => handleOpenABM(s)} title="Ver / Editar Detalles" className="p-1.5 hover:bg-indigo-600 bg-gray-800 rounded text-indigo-400 hover:text-white transition-colors">
-                                                        <Edit3 className="h-4 w-4" />
-                                                    </button>
-                                                    {user?.role === 'ADMINISTRADOR' && (
-                                                        <button onClick={() => handleDelete(s.id)} title="Eliminar" className="p-1.5 hover:bg-red-600 rounded text-gray-400 hover:text-white transition-colors">
-                                                            <Trash2 className="h-4 w-4" />
+                                                        {user?.role === 'ADMINISTRADOR' && (
+                                                            <button onClick={() => handleDelete(s.id)} title="Eliminar" className="p-1.5 hover:bg-red-600 rounded text-gray-400 hover:text-white transition-colors">
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    } else {
+                                        return (
+                                            <tr key={s.id} className={`group transition-all text-xs border-b border-gray-800 ${selectedRows.includes(s.id) ? 'bg-indigo-900/20' : 'hover:bg-gray-700/20'}`}>
+                                                <td className="p-3 text-center">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="rounded border-gray-600 text-indigo-500 focus:ring-indigo-500 bg-gray-800"
+                                                        checked={selectedRows.includes(s.id)}
+                                                        onChange={() => handleSelectRow(s.id)}
+                                                    />
+                                                </td>
+                                                <td className="p-3 font-mono text-gray-500">#{s.id}</td>
+                                                <td className="p-3 text-gray-300 whitespace-nowrap">
+                                                    {entryDate ? entryDate.toLocaleDateString() : '-'}
+                                                </td>
+                                                <td className="p-3 text-gray-400">{s.origin || '-'}</td>
+                                                <td className="p-3 font-bold text-white whitespace-nowrap">
+                                                    {s.person?.name || '-'}<br/>
+                                                    <span className="font-mono text-gray-500 text-[10px]">{s.person?.phone || ''}</span>
+                                                </td>
+                                                <td className="p-3 text-gray-400">
+                                                    {localidad}<br/>
+                                                    <span className="text-gray-500 text-[10px]">{barrio}</span>
+                                                </td>
+                                                <td className="p-3 text-gray-300 font-medium leading-snug">
+                                                    <div className="line-clamp-2" title={s.description}>{s.description}</div>
+                                                </td>
+                                                <td className="p-3 text-indigo-300 font-bold uppercase whitespace-nowrap">
+                                                    {s.responsable?.name || '-'}<br/>
+                                                    <span className="text-indigo-500/50 text-[10px]">{s.zone || ''}</span>
+                                                </td>
+                                                <td className="p-3 text-gray-300">
+                                                    <StatusBadge status={s.status} />
+                                                </td>
+                                                <td className="p-3 text-gray-300 text-[11px] leading-tight">
+                                                    {resolucionContent}
+                                                </td>
+                                                <td className="p-3 sticky right-0 bg-gray-900/90 shadow-xl group-hover:bg-gray-800 transition-colors">
+                                                    <div className="flex justify-end gap-1 opacity-60 group-hover:opacity-100">
+                                                        {hasPendingApproval && (
+                                                            <button onClick={() => handleAprobarRapido(s.id)} title="Aprobar Rápidamente" className="p-1.5 hover:bg-emerald-600 bg-emerald-900/30 rounded text-emerald-400 hover:text-white transition-colors">
+                                                                <Check className="h-4 w-4" />
+                                                            </button>
+                                                        )}
+                                                        {/* Botón Poner en Consideración: se muestra únicamente si el usuario es Administrador (ADMINISTRADOR o ADMIN), Responsable (RESPONSABLE) o Resolutor de Subsidio (isResolutorSubsidio === true) */}
+                                                        {s.type === 'SUBSIDIO' && (user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN' || user?.role === 'RESPONSABLE' || isResolutorSubsidio === true) && s.status !== 'completadas' && s.status !== 'rechazada' && (
+                                                            <button onClick={() => handleConsideracion(s.id)} title="Poner en Consideración" className="p-1.5 hover:bg-orange-600 bg-orange-900/30 rounded text-orange-400 hover:text-white transition-colors">
+                                                                <ArrowUpDown className="h-4 w-4" />
+                                                            </button>
+                                                        )}
+                                                        <button onClick={() => handleOpenABM(s)} title="Ver / Editar Detalles" className="p-1.5 hover:bg-indigo-600 bg-gray-800 rounded text-indigo-400 hover:text-white transition-colors">
+                                                            <Edit3 className="h-4 w-4" />
                                                         </button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
+                                                        {user?.role === 'ADMINISTRADOR' && (
+                                                            <button onClick={() => handleDelete(s.id)} title="Eliminar" className="p-1.5 hover:bg-red-600 rounded text-gray-400 hover:text-white transition-colors">
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    }
                                 })}
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                {/* Pagination Controls */}
+                {/* Controles de paginación */}
                 <div className="flex items-center justify-between px-4 pb-8 text-sm text-gray-500 font-black uppercase tracking-widest">
                     <div>Página {currentPage} de {totalPages || 1}</div>
                     <div className="flex gap-2">
@@ -841,13 +1166,22 @@ export default function ProjectDetailsPage() {
                 </div>
             </div>
 
-            {/* Modals */}
+            {/* Modales */}
             <SolicitudModal
                 isOpen={isABMOpen}
                 onClose={() => setIsABMOpen(false)}
                 onSuccess={fetchData}
                 initialData={selectedSolicitud}
                 configId={configId}
+            />
+            <AsociarPlanillaModal
+                isOpen={isAsociarModalOpen}
+                onClose={() => setIsAsociarModalOpen(false)}
+                onSuccess={() => {
+                    fetchConfig();
+                    fetchData();
+                }}
+                config={config}
             />
         </div>
     );

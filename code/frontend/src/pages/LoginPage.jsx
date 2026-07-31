@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Lock, Mail, Loader2, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
@@ -11,6 +11,11 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const { login } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // Capturar la URL de redirección si existe
+    const queryParams = new URLSearchParams(location.search);
+    const redirectTo = queryParams.get('redirectTo');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -18,7 +23,9 @@ export default function LoginPage() {
         setLoading(true);
         try {
             const loggedInUser = await login(email, password);
-            if (loggedInUser && loggedInUser.role === 'ADMINISTRADOR') {
+            if (redirectTo) {
+                navigate(redirectTo);
+            } else if (loggedInUser && loggedInUser.role === 'ADMINISTRADOR') {
                 navigate('/dashboard');
             } else {
                 navigate('/mis-solicitudes');

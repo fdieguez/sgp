@@ -62,6 +62,7 @@ public class DocumentoAdjuntoController {
     }
 
     @GetMapping("/adjuntos/{adjuntoId}/download")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMINISTRADOR', 'RESOLUTOR', 'RESPONSABLE', 'LECTOR', 'OPERADOR')")
     public ResponseEntity<Resource> downloadFile(@PathVariable Long adjuntoId) {
         DocumentoAdjunto adjunto = documentoAdjuntoRepository.findById(adjuntoId)
                 .orElseThrow(() -> new RuntimeException("Documento no encontrado"));

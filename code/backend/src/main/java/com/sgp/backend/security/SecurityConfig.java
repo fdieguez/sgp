@@ -19,6 +19,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
+@org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -33,7 +34,7 @@ public class SecurityConfig {
                                 .headers(headers -> headers.frameOptions(
                                                 org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig::disable))
                                 .authorizeHttpRequests(auth -> auth
-                                                // Public Endpoints
+                                                // Endpoints Públicos
                                                 .requestMatchers(
                                                                 new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
                                                                                 "/api/auth/**"))
@@ -44,18 +45,35 @@ public class SecurityConfig {
                                                 .permitAll()
                                                 .requestMatchers(
                                                                 new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
+                                                                                "/api/test-helper/**"))
+                                                .permitAll()
+                                                .requestMatchers(
+                                                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
                                                                                 "/h2-console/**"))
                                                 .permitAll()
-                                                // Admin Only Endpoints
+                                                // Endpoints de Sincronización de Planilla de Salida (Accesible para ADMIN y RESOLUTOR)
+                                                .requestMatchers(
+                                                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
+                                                                                "/api/planilla-salida/**"))
+                                                .hasAnyRole("ADMINISTRADOR", "RESOLUTOR")
+                                                // Endpoints Exclusivos de Admin
                                                 .requestMatchers(
                                                                 new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
                                                                                 "/api/sync/**"))
                                                 .hasRole("ADMINISTRADOR")
                                                 .requestMatchers(
                                                                 new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
+                                                                                "/api/config/**", "GET"))
+                                                .hasAnyRole("ADMINISTRADOR", "RESOLUTOR")
+                                                .requestMatchers(
+                                                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
+                                                                                "/api/config/**", "PUT"))
+                                                .hasAnyRole("ADMINISTRADOR", "RESOLUTOR")
+                                                .requestMatchers(
+                                                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
                                                                                 "/api/config/**"))
                                                 .hasRole("ADMINISTRADOR")
-                                                // Secured Endpoints (everything else)
+                                                // Endpoints Asegurados (Cualquier otra solicitud autenticada)
                                                 .anyRequest().authenticated())
                                 .sessionManagement(session -> session
                                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))

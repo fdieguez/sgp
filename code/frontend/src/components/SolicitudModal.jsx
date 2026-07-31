@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar, Users, Plus, Trash2, History, FileText, UploadCloud, Download, ArrowRight, MessageSquare } from 'lucide-react';
+import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar, Users, Plus, Trash2, History, FileText, UploadCloud, Download, ArrowRight, MessageSquare, Check } from 'lucide-react';
 import api from '../config/axios';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -10,6 +10,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const isResponsable = user?.role === 'RESPONSABLE' || user?.role === 'RESOLUTOR';
     const canSuggestResolutor = user?.role === 'RESPONSABLE';
     const isResolutor = user?.role === 'RESOLUTOR';
+    // Determinar si el usuario actual es un Resolutor con la competencia 'SUBSIDIO'
+    const isResolutorSubsidio = user?.role === 'RESOLUTOR' && user?.tiposResolucion?.some(t => t?.tipo?.toUpperCase() === 'SUBSIDIO');
     const [formData, setFormData] = useState({
         type: 'PEDIDO',
         description: '',
@@ -23,8 +25,14 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         amount: '',
         grantDate: '',
         resolutionApproved: false,
-        assignments: []
+        assignments: [],
+        asistencia: '',
+        porDonde: '',
+        googleEventId: ''
     });
+    // Condición de autorización para seleccionar/ver la opción 'Consideración' (Administrador, Responsable o Resolutor de Subsidio, o si ya está en consideración).
+    // Se desplaza esta declaración después de formData para evitar ReferenceError por acceso previo a la inicialización de formData.
+    const canPonerConsideracion = user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN' || user?.role === 'RESPONSABLE' || isResolutorSubsidio === true || formData.status === 'consideracion';
 
     const [responsables, setResponsables] = useState([]);
     const [selectedZone, setSelectedZone] = useState('');
@@ -33,14 +41,29 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const [loading, setLoading] = useState(false);
     const [showApproveConfirm, setShowApproveConfirm] = useState(false);
     const [approveObservations, setApproveObservations] = useState('');
+    const [asistencia, setAsistencia] = useState('');
+    
+    // Estados para eventos de calendario
+    const [createCalendarEvent, setCreateCalendarEvent] = useState(false);
+    const [calendarTitle, setCalendarTitle] = useState('');
+    const [calendarDate, setCalendarDate] = useState('');
+    const [calendarTime, setCalendarTime] = useState('');
+    const [calendarLocation, setCalendarLocation] = useState('');
+    const [calendarDescription, setCalendarDescription] = useState('');
 
-    // Tabs & extra states
+    // Pestañas y estados adicionales
     const [activeTab, setActiveTab] = useState('detalles');
     const [historial, setHistorial] = useState([]);
     const [adjuntos, setAdjuntos] = useState([]);
     const [isDragging, setIsDragging] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadingFields, setUploadingFields] = useState({});
+
+    // Verificar si el usuario actual tiene una asignación pendiente o aprobada (declaradas de forma temprana)
+    const myAssignment = formData.assignments?.find(a => a.resolutorEmail === user?.email && !a.approved);
+    const myApprovedAssignment = formData.assignments?.find(a => a.resolutorEmail === user?.email && a.approved);
+    const isPendingResolutor = isResolutor && myAssignment && !myAssignment.approved;
+    const isApproveDisabled = loading || (myAssignment?.tipoResolucion === 'AGENDA' && !asistencia);
 
     const fetchAdjuntos = useCallback(async () => {
         if (!formData.id) return;
@@ -236,14 +259,16 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             
             // Solo resetear el formulario si cambian los datos iniciales o si es una nueva apertura
             if (initialData) {
+                const normStatus = initialData.status ? initialData.status.toLowerCase() : 'pendiente';
                 // Evitar re-setear si el ID es el mismo para no romper la experiencia del usuario si el padre re-renderiza
                 setFormData(prev => {
-                    if (prev.id === initialData.id && prev.status === initialData.status) {
+                    if (prev.id === initialData.id && prev.status === normStatus) {
                          return prev;
                     }
                     return {
                         ...initialData,
-                        type: initialData.amount !== undefined ? 'SUBSIDIO' : 'PEDIDO',
+                        status: normStatus,
+                        type: initialData.type || ((initialData.amount !== undefined && initialData.amount !== null) ? 'SUBSIDIO' : ((initialData.asistencia !== undefined && initialData.asistencia !== null) ? 'AGENDA' : (configId ? 'SUBSIDIO' : 'PEDIDO'))),
                         person: initialData.person || { name: '', phone: '' },
                         locationName: initialData.location?.type === 'NEIGHBORHOOD' ? (initialData.location?.parent?.name || '') : (initialData.location?.name || ''),
                         barrio: initialData.location?.type === 'NEIGHBORHOOD' ? (initialData.location?.name || '') : '',
@@ -261,6 +286,9 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         detail: initialData.detail || '',
                         firstContactControl: initialData.firstContactControl || false,
                         origin: initialData.origin || 'MANUAL',
+                        asistencia: initialData.asistencia || '',
+                        porDonde: initialData.porDonde || '',
+                        googleEventId: initialData.googleEventId || '',
                         assignments: initialData.resolutorAssignments?.map(a => {
                             let parsedDetalle = a.detalle || '';
                             try {
@@ -271,12 +299,15 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             return {
                                 resolutorEmail: a.resolutor?.email || '',
                                 tipoResolucion: a.tipoResolucion || '',
-                                detalle: parsedDetalle
+                                detalle: parsedDetalle,
+                                approved: a.approved || false,
+                                observaciones: a.observaciones || ''
                             };
                         }) || []
                     };
                 });
                 setSelectedZone(initialData.responsable?.zone || '');
+                setAsistencia(initialData.asistencia || '');
             } else {
                 setFormData({
                     type: 'PEDIDO',
@@ -299,9 +330,13 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     resolutionApproved: false,
                     detail: '',
                     firstContactControl: false,
+                    asistencia: '',
+                    porDonde: '',
+                    googleEventId: '',
                     assignments: []
                 });
                 setSelectedZone('');
+                setAsistencia('');
                 setActiveTab('detalles');
             }
         } else {
@@ -385,7 +420,16 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const handleAprobar = async () => {
         setLoading(true);
         try {
-            await api.post(`/api/solicitudes/${formData.id}/aprobar`, { observaciones: approveObservations });
+            await api.post(`/api/solicitudes/${formData.id}/aprobar`, { 
+                observaciones: approveObservations,
+                asistencia: myAssignment?.tipoResolucion === 'AGENDA' ? asistencia : undefined,
+                createEvent: createCalendarEvent ? 'true' : 'false',
+                title: calendarTitle,
+                date: calendarDate,
+                time: calendarTime,
+                location: calendarLocation,
+                description: calendarDescription
+            });
             toast.success("Resolución aprobada");
             onSuccess();
             onClose();
@@ -398,6 +442,24 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         }
     };
 
+    useEffect(() => {
+        if (showApproveConfirm && (myAssignment?.tipoResolucion === 'AGENDA' || formData.type === 'AGENDA')) {
+            const beneficiario = formData.person?.name || "Sin Beneficiario";
+            setCalendarTitle(`SGP Agenda #${formData.id} - ${beneficiario}`);
+            setCalendarDate(formData.resolutionDate || new Date().toISOString().split('T')[0]);
+            setCalendarTime('');
+            
+            let loc = formData.locationName || '';
+            if (formData.barrio) {
+                loc += (loc ? ', ' : '') + `Barrio: ${formData.barrio}`;
+            }
+            setCalendarLocation(loc);
+            
+            const desc = `Detalle del Caso: ${formData.description || 'Sin descripción'}\nObservaciones de la Resolución: ${approveObservations || 'Sin observaciones'}\nAsistencia Registrada: ${asistencia || 'No especificada'}`;
+            setCalendarDescription(desc);
+        }
+    }, [showApproveConfirm, myAssignment?.tipoResolucion, formData.type, formData.id, formData.person, formData.resolutionDate, formData.locationName, formData.barrio, formData.description, approveObservations, asistencia]);
+
     // Computar zonas únicas de responsables
     const uniqueZones = [...new Set(responsables.map(r => r.zone).filter(Boolean))].sort();
 
@@ -408,9 +470,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
 
     if (!isOpen) return null;
 
-    // Verificar si el usuario actual tiene una asignación pendiente en esta solicitud
-    const myAssignment = formData.assignments?.find(a => a.resolutorEmail === user?.email);
-    const isPendingResolutor = isResolutor && myAssignment && !myAssignment.approved;
+    // Las declaraciones de myAssignment, myApprovedAssignment, isPendingResolutor e isApproveDisabled fueron movidas al inicio del componente para evitar ReferenceError.
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -482,7 +542,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     📢 <strong>Nota:</strong> Guarde la solicitud primero para poder agregar adjuntos, notas de seguimiento o consultar el historial de auditoría.
                                 </div>
                             )}
-                            {/* Type and Status */}
+                            {/* Tipo y Estado */}
                             <div className="grid grid-cols-2 gap-4">
                                 {user?.role !== 'DISTRIBUIDOR' && (
                                     <div>
@@ -495,6 +555,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                         >
                                             <option value="PEDIDO">Pedido</option>
                                             <option value="SUBSIDIO">Subsidio</option>
+                                            <option value="AGENDA">Agenda</option>
                                         </select>
                                     </div>
                                 )}
@@ -511,12 +572,16 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     <option value="en resolucion">En Resolución</option>
                                     <option value="completadas">Resueltas</option>
                                     <option value="rechazada">Rechazado</option>
+                                    {/* Renderizar la opción 'Consideración' solo para usuarios autorizados (Administrador, Responsable o Resolutor de Subsidio) o si el estado actual ya es 'consideracion' */}
+                                    {canPonerConsideracion && (
+                                        <option value="consideracion">Consideración</option>
+                                    )}
                                 </select>
                             </div>
                         )}
                     </div>
 
-                    {/* Person Data */}
+                    {/* Datos de la Persona */}
                     <div className="space-y-4 p-4 bg-gray-900/40 rounded-xl border border-gray-700">
                         <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
                             <UserIcon className="h-4 w-4 text-indigo-400" /> Solicitante
@@ -578,7 +643,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         </div>
                     </div>
 
-                    {/* Location Data */}
+                    {/* Datos de Ubicación */}
                     <div className="space-y-4 p-4 bg-gray-900/40 rounded-xl border border-gray-700">
                         <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
                             <MapPin className="h-4 w-4 text-indigo-400" /> Ubicación
@@ -635,7 +700,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         </div>
                     </div>
 
-                    {/* Request Description */}
+                    {/* Descripción de la Solicitud */}
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">Descripción / Pedido</label>
                         <textarea
@@ -657,7 +722,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         />
                     </div>
 
-                    {/* Origin Field */}
+                    {/* Campo de Origen */}
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">Origen</label>
                         <select
@@ -676,7 +741,18 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         </select>
                     </div>
 
-                    {/* Subsidio specific fields */}
+                    {/* Campos específicos de Agenda para visualización de solo lectura */}
+                    {formData.type === 'AGENDA' && formData.asistencia && (
+                        <div className="p-4 bg-indigo-950/40 border border-indigo-850 rounded-xl animate-in slide-in-from-top-2">
+                            <span className="text-xs font-semibold text-indigo-400 uppercase tracking-widest block mb-1">Asistencia de la Agenda</span>
+                            <div className="text-sm font-bold text-white uppercase flex items-center gap-2">
+                                <Check className="h-4 w-4 text-emerald-500" />
+                                {formData.asistencia}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Campos específicos de Subsidio */}
                     {formData.type === 'SUBSIDIO' && (
                         <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 p-4 bg-emerald-900/20 rounded-xl border border-emerald-800/50">
                             <div>
@@ -705,7 +781,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         </div>
                     )}
 
-                    {/* Dates and Tracking */}
+                    {/* Fechas y Seguimiento */}
                     <div className={`grid gap-4 ${user?.role !== 'OPERADOR' ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
                         <div>
                             <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Ingreso</label>
@@ -770,61 +846,17 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     {user?.role !== 'OPERADOR' && user?.role !== 'DISTRIBUIDOR' && (
                         <div className="p-4 bg-gray-900/40 rounded-xl border border-gray-700 space-y-4">
                             <h3 className="text-sm font-semibold text-gray-300">Seguimiento</h3>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Contacto</label>
-                                    <input
-                                        type="date"
-                                        className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                                        value={formData.contactDate}
-                                        onChange={(e) => setFormData({ ...formData, contactDate: e.target.value })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Resolución</label>
-                                    <input
-                                        type="date"
-                                        className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                                        value={formData.resolutionDate}
-                                        onChange={(e) => setFormData({ ...formData, resolutionDate: e.target.value })}
-                                    />
-                                </div>
-                            </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Resolución</label>
-                                <input
-                                    type="text"
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                                    value={formData.resolution}
-                                    onChange={(e) => setFormData({ ...formData, resolution: e.target.value })}
-                                    placeholder="Resultado breve..."
-                                />
-                            </div>
-
-
-
-                            {isResolutor && myAssignment?.approved && (
+                            {myApprovedAssignment && (
                                 <div className="bg-emerald-900/40 p-4 rounded-xl border border-emerald-700/50 flex flex-col gap-1">
                                     <span className="text-sm font-bold text-emerald-400">✅ Resolución Finalizada</span>
-                                    {myAssignment.observaciones && (
-                                        <p className="text-xs text-emerald-200 italic">"{myAssignment.observaciones}"</p>
+                                    {myApprovedAssignment.observaciones && (
+                                        <p className="text-xs text-emerald-200 italic">"{myApprovedAssignment.observaciones}"</p>
                                     )}
                                 </div>
                             )}
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Detalle</label>
-                                <textarea
-                                    rows="2"
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                    value={formData.detail}
-                                    onChange={(e) => setFormData({ ...formData, detail: e.target.value })}
-                                    placeholder="Detalle extendido del seguimiento..."
-                                />
-                            </div>
-
-                            <div className="flex items-center gap-2 pt-2">
+                            <div className="flex items-center gap-2 pt-1">
                                 <input
                                     type="checkbox"
                                     id="firstContactControl"
@@ -839,7 +871,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         </div>
                     )}
 
-                    {/* Multi-Resolutor Assignments Section */}
+                    {/* Sección de Asignaciones Múltiples (Resolutores) */}
                     {(user?.role === 'RESPONSABLE' || user?.role === 'ADMINISTRADOR' || formData.assignments.length > 0) && (
                     <div className="p-4 bg-indigo-900/10 rounded-xl border border-indigo-700/30 space-y-4">
                         <div className="flex items-center justify-between">
@@ -1088,6 +1120,16 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                     Asignado a: <span className="font-semibold text-gray-300">{assignment.resolutorEmail}</span>
                                                 </span>
                                             )}
+                                            {assignment.approved && (
+                                                <div className="mt-2 p-2.5 bg-emerald-950/30 rounded-lg border border-emerald-800/40 text-xs text-emerald-200">
+                                                    <span className="font-bold text-emerald-400 flex items-center gap-1.5 mb-1">
+                                                        ✔️ Aprobado y Agendado
+                                                    </span>
+                                                    {assignment.observaciones && (
+                                                        <p className="text-[11px] text-emerald-100 italic">"{assignment.observaciones}"</p>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
@@ -1303,6 +1345,104 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     onChange={(e) => setApproveObservations(e.target.value)}
                                 />
                             </div>
+                            {myAssignment?.tipoResolucion === 'AGENDA' && (
+                                <div className="space-y-2 bg-gray-900/50 p-3 rounded-xl border border-gray-700">
+                                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Asistencia Obligatoria</label>
+                                    <div className="flex gap-4">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                name="asistencia"
+                                                value="con asistencia"
+                                                checked={asistencia === 'con asistencia'}
+                                                onChange={(e) => setAsistencia(e.target.value)}
+                                                className="text-emerald-500 focus:ring-emerald-500 bg-gray-900 border-gray-700"
+                                            />
+                                            <span className="text-sm text-gray-300">Con Asistencia</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                name="asistencia"
+                                                value="sin asistencia"
+                                                checked={asistencia === 'sin asistencia'}
+                                                onChange={(e) => setAsistencia(e.target.value)}
+                                                className="text-emerald-500 focus:ring-emerald-500 bg-gray-900 border-gray-700"
+                                            />
+                                            <span className="text-sm text-gray-300">Sin Asistencia</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            )}
+
+                            {myAssignment?.tipoResolucion === 'AGENDA' && (
+                                <div className="space-y-3 bg-blue-950/30 p-4 rounded-xl border border-blue-500/30">
+                                    <label className="flex items-center gap-2 cursor-pointer mb-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={createCalendarEvent}
+                                            onChange={(e) => setCreateCalendarEvent(e.target.checked)}
+                                            className="w-4 h-4 text-blue-500 bg-gray-900 border-gray-600 rounded focus:ring-blue-500"
+                                        />
+                                        <span className="text-sm font-bold text-blue-300 flex items-center gap-1">
+                                            <Calendar className="h-4 w-4" /> Crear evento en Google Calendar
+                                        </span>
+                                    </label>
+
+                                    {createCalendarEvent && (
+                                        <div className="space-y-3 animate-in slide-in-from-top-2 duration-200 pl-6 border-l-2 border-blue-500/30">
+                                            <div>
+                                                <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Título</label>
+                                                <input
+                                                    type="text"
+                                                    value={calendarTitle}
+                                                    onChange={(e) => setCalendarTitle(e.target.value)}
+                                                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Fecha</label>
+                                                    <input
+                                                        type="date"
+                                                        value={calendarDate}
+                                                        onChange={(e) => setCalendarDate(e.target.value)}
+                                                        className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Hora (Opcional)</label>
+                                                    <input
+                                                        type="time"
+                                                        value={calendarTime}
+                                                        onChange={(e) => setCalendarTime(e.target.value)}
+                                                        className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Ubicación</label>
+                                                <input
+                                                    type="text"
+                                                    value={calendarLocation}
+                                                    onChange={(e) => setCalendarLocation(e.target.value)}
+                                                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] text-gray-400 uppercase font-bold mb-1">Descripción</label>
+                                                <textarea
+                                                    rows="3"
+                                                    value={calendarDescription}
+                                                    onChange={(e) => setCalendarDescription(e.target.value)}
+                                                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="flex justify-end gap-3 pt-2">
                                 <button
                                     onClick={() => setShowApproveConfirm(false)}
@@ -1312,8 +1452,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 </button>
                                 <button
                                     onClick={handleAprobar}
-                                    disabled={loading}
-                                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg"
+                                    disabled={isApproveDisabled}
+                                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {loading ? 'Confirmando...' : 'Confirmar y Finalizar'}
                                 </button>

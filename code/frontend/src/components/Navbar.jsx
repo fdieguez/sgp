@@ -27,7 +27,15 @@ export default function Navbar() {
                         {user && (
                             <div className="hidden md:flex flex-col items-end mr-2 text-right">
                                 <span className="text-sm font-bold text-white uppercase">{user.firstName} {user.lastName}</span>
-                                <span className="text-[10px] tracking-widest uppercase text-indigo-400 font-black">{user.role}</span>
+                                <span className="text-[10px] tracking-widest uppercase text-indigo-400 font-black">
+                                    {user.role === 'RESPONSABLE' 
+                                        ? `RESPONSABLE - ZONA ${user.zone ? user.zone.toUpperCase() : 'SIN ZONA'}` 
+                                        : user.role === 'RESOLUTOR' 
+                                            ? `RESOLUTOR - ${user.tiposResolucion && user.tiposResolucion.length > 0 
+                                                ? user.tiposResolucion.map(t => t.tipo.toUpperCase()).join(', ') 
+                                                : 'SIN ESPECIFICIDAD'}` 
+                                            : user.role}
+                                </span>
                             </div>
                         )}
                         <button
@@ -38,9 +46,9 @@ export default function Navbar() {
                             {theme === 'dark' ? <Sun className="h-5 w-5 text-yellow-400" /> : <Moon className="h-5 w-5 text-indigo-600" />}
                             <span className="hidden sm:inline">{theme === 'dark' ? 'Claro' : 'Oscuro'}</span>
                         </button>
-                        {user?.role === 'ADMINISTRADOR' && (
+                        {(user?.role === 'ADMINISTRADOR' || user?.role === 'RESOLUTOR') && (
                             <button
-                                onClick={() => navigate('/settings')}
+                                onClick={() => navigate(user?.role === 'RESOLUTOR' ? '/resolutor-settings' : '/settings')}
                                 className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
                             >
                                 <Settings className="h-5 w-5" />

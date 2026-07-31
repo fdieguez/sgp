@@ -148,6 +148,20 @@ export default function ProjectSettingsPage() {
 
                                 <div className="h-px bg-gray-700 my-6"></div>
 
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-400 mb-2">Google Calendar ID</label>
+                                    <input
+                                        type="text"
+                                        value={config.calendarId || ''}
+                                        onChange={(e) => setConfig({ ...config, calendarId: e.target.value })}
+                                        className="w-full bg-gray-900 border border-gray-600 rounded-xl px-4 py-3 text-sm text-gray-300 font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        placeholder="Ej: tu-correo@gmail.com"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-2">El ID de tu calendario para la generación automática de eventos de Agenda.</p>
+                                </div>
+
+                                <div className="h-px bg-gray-700 my-6"></div>
+
                                 <div className="grid grid-cols-2 gap-6">
                                     <div>
                                         <label className="block text-sm font-bold text-gray-400 mb-2 flex items-center gap-2">
