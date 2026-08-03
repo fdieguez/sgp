@@ -155,6 +155,46 @@ public class SolicitudController {
         return ResponseEntity.ok(saved);
     }
 
+    @PostMapping("/consideracion/batch")
+    public ResponseEntity<java.util.List<Solicitud>> ponerEnConsideracionBatch(@RequestBody java.util.Map<String, java.util.List<Long>> payload) {
+        java.util.List<Long> ids = payload.get("ids");
+        if (ids == null || ids.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        
+        java.util.List<Solicitud> savedList = solicitudService.ponerEnConsideracionBatch(ids);
+
+        try {
+            if (!savedList.isEmpty()) {
+                Solicitud first = savedList.get(0);
+                String spreadsheetId = null;
+                if (first.getSheetsConfig() != null && first.getSheetsConfig().getSpreadsheetId() != null) {
+                    spreadsheetId = first.getSheetsConfig().getSpreadsheetId();
+                } else {
+                    var configOpt = sheetsConfigRepository.findAll().stream()
+                            .filter(c -> c.getSheetName() != null && !c.getSheetName().toUpperCase().contains("AGENDA"))
+                            .findFirst();
+                    if (configOpt.isPresent()) {
+                        spreadsheetId = configOpt.get().getSpreadsheetId();
+                    }
+                }
+
+                if (spreadsheetId != null) {
+                    syncService.exportarPlanillaSalida(spreadsheetId, ids);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Error al exportar automáticamente el lote de solicitudes a Google Sheets: " + e.getMessage());
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "Error al exportar automáticamente el lote a Google Sheets: " + e.getMessage(),
+                    e
+            );
+        }
+
+        return ResponseEntity.ok(savedList);
+    }
+
     @GetMapping("/stats")
     public ResponseEntity<java.util.Map<String, Object>> getSolicitudStats(
             @RequestParam(required = false) String search,

@@ -45,6 +45,8 @@ public class SyncService {
     // EntityManager for session management
     private final jakarta.persistence.EntityManager entityManager;
 
+    private final EmailService emailService;
+
     // URL del frontend para armar los links seguros de descarga de adjuntos
     @org.springframework.beans.factory.annotation.Value("${sgp.frontend.url:http://localhost:5173}")
     private String sgpFrontendUrl;
@@ -494,8 +496,7 @@ public class SyncService {
         log.info("Iniciando exportación de solicitudes en CONSIDERACION a la planilla de salida (selectiva: {}): {}", isSelective, spreadsheetId);
         
         List<Solicitud> solicitudes = solicitudRepository.findAll().stream()
-                .filter(s -> "CONSIDERACION".equalsIgnoreCase(s.getStatus()))
-                .filter(s -> !isSelective || ids.contains(s.getId()))
+                .filter(s -> isSelective ? ids.contains(s.getId()) : "CONSIDERACION".equalsIgnoreCase(s.getStatus()))
                 .toList();
 
         if (solicitudes.isEmpty()) {
@@ -724,6 +725,11 @@ public class SyncService {
             }
 
             Solicitud solicitud = optSolicitud.get();
+            if (!"consideracion".equalsIgnoreCase(solicitud.getStatus())) {
+                log.info("Solicitud con ID {} no está en estado CONSIDERACION (actual: {}). Omitiendo importación.", id, solicitud.getStatus());
+                continue;
+            }
+
             boolean isModified = false;
 
             // 0. Sincronizar descripción (description)
@@ -748,7 +754,7 @@ public class SyncService {
                 }
             }
 
-            // 2. Si es de tipo Subsidio, sincronizar diferencias
+            // 2. Si es de tipo Subsidio, sincronizar diferencias e importar estado por importe
             if ("SUBSIDIO".equalsIgnoreCase(solicitud.getType())) {
                 // Sincronizar Monto
                 if (columnMapping.containsKey("monto_solicitado")) {
@@ -759,6 +765,59 @@ public class SyncService {
                         solicitud.setAmount(amountFromSheet);
                         logAssignmentChange(solicitud, null, "Monto actualizado desde planilla externa a: " + amountFromSheet);
                         isModified = true;
+                    }
+
+                    if (amountFromSheet != null) {
+                        SolicitudResolutorAssignment assignment = solicitud.getResolutorAssignments().stream()
+                                .filter(a -> "SUBSIDIO".equalsIgnoreCase(a.getTipoResolucion()))
+                                .findFirst()
+                                .orElse(null);
+
+                        if (amountFromSheet.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                            // APROBADA (importe > 0)
+                            if (!"completadas".equalsIgnoreCase(solicitud.getStatus())) {
+                                solicitud.setStatus("completadas");
+                                solicitud.setResolutionApproved(true);
+                                isModified = true;
+                                if (assignment != null) {
+                                    assignment.setApproved(true);
+                                    assignment.setObservaciones("Aprobado automáticamente por importación de planilla (Importe > 0)");
+                                }
+                                logAssignmentChange(solicitud, null, "Solicitud APROBADA por importación de planilla con monto: " + amountFromSheet);
+                                // Disparar envío de correo
+                                try {
+                                    String resolutorEmail = (assignment != null && assignment.getResolutor() != null) 
+                                            ? assignment.getResolutor().getEmail() 
+                                            : "martinnocioni@gmail.com";
+                                    emailService.sendSubsidioApprovedEmail(resolutorEmail, solicitud.getId());
+                                } catch (Exception ex) {
+                                    log.error("Error al enviar correo de subsidio aprobado en importación para solicitud #{}", solicitud.getId(), ex);
+                                }
+                            }
+                        } else if (amountFromSheet.compareTo(java.math.BigDecimal.ZERO) == 0) {
+                            // DESAPROBADA (importe == 0)
+                            if (!"rechazada".equalsIgnoreCase(solicitud.getStatus())) {
+                                solicitud.setStatus("rechazada");
+                                solicitud.setResolutionApproved(false);
+                                isModified = true;
+                                if (assignment != null) {
+                                    assignment.setApproved(true);
+                                    assignment.setObservaciones("Desaprobado automáticamente por importación de planilla (Importe = 0)");
+                                }
+                                logAssignmentChange(solicitud, null, "Solicitud DESAPROBADA por importación de planilla (Importe = 0)");
+                            }
+                        } else {
+                            // PENDIENTE / AÚN NO DEFINIDO (importe < 0)
+                            if (!"consideracion".equalsIgnoreCase(solicitud.getStatus())) {
+                                solicitud.setStatus("consideracion");
+                                isModified = true;
+                            }
+                            if (assignment != null && assignment.getApproved()) {
+                                assignment.setApproved(false);
+                                isModified = true;
+                                logAssignmentChange(solicitud, null, "Resolución revertida a PENDIENTE por importación de planilla (Importe < 0)");
+                            }
+                        }
                     }
                 }
 
@@ -905,7 +964,7 @@ public class SyncService {
             else if (containsAny(val1, "descripcion", "detalle") || containsAny(val2, "descripcion", "detalle")) {
                 mapping.put("descripcion", j);
             }
-            else if (containsAny(val1, "monto") || containsAny(val2, "monto")) {
+            else if (containsAny(val1, "monto", "importe") || containsAny(val2, "monto", "importe")) {
                 mapping.put("monto_solicitado", j);
             }
             else if (containsAny(val1, "fecha") || containsAny(val2, "fecha")) {

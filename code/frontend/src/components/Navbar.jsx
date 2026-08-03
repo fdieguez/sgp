@@ -1,10 +1,10 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Briefcase, Settings, HelpCircle, LogOut, Sun, Moon } from 'lucide-react';
+import { Briefcase, Settings, HelpCircle, LogOut, Sun, Moon, Users } from 'lucide-react';
 
 export default function Navbar() {
-    const { user, logout } = useAuth();
+    const { user, logout, allRoles } = useAuth();
     const navigate = useNavigate();
     const { theme, setTheme } = useTheme();
 
@@ -46,6 +46,16 @@ export default function Navbar() {
                             {theme === 'dark' ? <Sun className="h-5 w-5 text-yellow-400" /> : <Moon className="h-5 w-5 text-indigo-600" />}
                             <span className="hidden sm:inline">{theme === 'dark' ? 'Claro' : 'Oscuro'}</span>
                         </button>
+                        {allRoles && allRoles.length > 1 && (
+                            <button
+                                onClick={() => navigate('/select-rol')}
+                                className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
+                                title="Cambiar perfil activo"
+                            >
+                                <Users className="h-5 w-5 text-indigo-400" />
+                                <span className="hidden sm:inline">Cambiar Rol</span>
+                            </button>
+                        )}
                         {(user?.role === 'ADMINISTRADOR' || user?.role === 'RESOLUTOR') && (
                             <button
                                 onClick={() => navigate(user?.role === 'RESOLUTOR' ? '/resolutor-settings' : '/settings')}

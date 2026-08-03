@@ -11,21 +11,31 @@ import ProjectSettingsPage from './pages/ProjectSettingsPage';
 import HelpPage from './pages/HelpPage';
 import DescargarAdjunto from './pages/DescargarAdjunto';
 import ResolutorSettingsPage from './pages/ResolutorSettingsPage';
+import SelectRolPage from './pages/SelectRolPage';
 import { Toaster } from 'react-hot-toast';
 
 function ProtectedRoute({ children, adminOnly = false }) {
-  const { isAuthenticated, loading, user } = useAuth();
+  const { isAuthenticated, loading, user, activeRole, allRoles } = useAuth();
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Cargando...</div>;
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+      </div>
+    );
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" />;
+    return <Navigate to="/login" replace />;
+  }
+
+  // Redirigir a selección de rol si tiene múltiples y no seleccionó ninguno
+  if (allRoles && allRoles.length > 1 && !activeRole) {
+    return <Navigate to="/select-rol" replace />;
   }
 
   if (adminOnly && user?.role !== 'ADMINISTRADOR') {
-    return <div className="p-4 text-red-600">Acceso denegado. Se requieren permisos de administrador.</div>;
+    return <div className="p-4 text-red-600 bg-gray-950 min-h-screen">Acceso denegado. Se requieren permisos de administrador.</div>;
   }
 
   return <ErrorBoundary>{children}</ErrorBoundary>;
@@ -38,6 +48,7 @@ function App() {
         <Router>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/select-rol" element={<SelectRolPage />} />
             <Route path="/descargar-adjunto/:adjuntoId" element={<DescargarAdjunto />} />
 
             <Route path="/" element={<Navigate to="/dashboard" replace />} />

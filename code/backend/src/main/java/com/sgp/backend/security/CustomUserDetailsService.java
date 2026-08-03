@@ -26,6 +26,13 @@ public class CustomUserDetailsService implements UserDetailsService {
             throw new org.springframework.security.authentication.DisabledException("El usuario está inactivo o deshabilitado");
         }
 
+        java.util.List<SimpleGrantedAuthority> authorities = new java.util.ArrayList<>();
+        if (user.getRole() != null) {
+            for (String r : user.getRole().split(",")) {
+                authorities.add(new SimpleGrantedAuthority("ROLE_" + r.trim()));
+            }
+        }
+
         return new org.springframework.security.core.userdetails.User(
                 user.getEmail(),
                 user.getPassword(),
@@ -33,6 +40,6 @@ public class CustomUserDetailsService implements UserDetailsService {
                 true,
                 true,
                 true,
-                Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole())));
+                authorities);
     }
 }

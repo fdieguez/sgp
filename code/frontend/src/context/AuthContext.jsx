@@ -12,10 +12,11 @@ export const AuthProvider = ({ children }) => {
         return savedUser ? JSON.parse(savedUser) : null;
     });
 
+    const [activeRole, setActiveRole] = useState(localStorage.getItem('activeRole'));
+
     useEffect(() => {
         if (token) {
             localStorage.setItem('token', token);
-            // Interceptor handles the header
         } else {
             localStorage.removeItem('token');
         }
@@ -28,6 +29,15 @@ export const AuthProvider = ({ children }) => {
             localStorage.removeItem('user');
         }
     }, [user]);
+
+    const selectRole = (role) => {
+        setActiveRole(role);
+        if (role) {
+            localStorage.setItem('activeRole', role);
+        } else {
+            localStorage.removeItem('activeRole');
+        }
+    };
 
     const login = async (email, password) => {
         try {
@@ -49,6 +59,15 @@ export const AuthProvider = ({ children }) => {
                     ...profileRes.data.user,
                     responsable: profileRes.data.responsable
                 };
+                
+                // Si el usuario tiene un solo rol, lo seleccionamos por defecto
+                const roles = finalUser.role ? finalUser.role.split(',') : [];
+                if (roles.length === 1) {
+                    selectRole(roles[0].trim());
+                } else {
+                    selectRole(null); // Obliga a elegir
+                }
+                
                 setUser(finalUser);
                 return finalUser;
             } catch (err) {
@@ -58,6 +77,14 @@ export const AuthProvider = ({ children }) => {
                     email: response.data.email,
                     role: response.data.role
                 };
+                
+                const roles = fallbackUser.role ? fallbackUser.role.split(',') : [];
+                if (roles.length === 1) {
+                    selectRole(roles[0].trim());
+                } else {
+                    selectRole(null);
+                }
+                
                 setUser(fallbackUser);
                 return fallbackUser;
             }
@@ -70,8 +97,10 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         setToken(null);
         setUser(null);
+        setActiveRole(null);
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        localStorage.removeItem('activeRole');
     };
 
     const [loading, setLoading] = useState(false);
@@ -109,14 +138,30 @@ export const AuthProvider = ({ children }) => {
         }
     }, [token, user?.id, user?.role, user?.responsable]); // Dependencias más específicas
 
+    const virtualUser = useMemo(() => {
+        if (!user) return null;
+        return {
+            ...user,
+            role: activeRole || user.role
+        };
+    }, [user, activeRole]);
+
+    const allRoles = useMemo(() => {
+        if (!user || !user.role) return [];
+        return user.role.split(',').map(r => r.trim());
+    }, [user]);
+
     const contextValue = useMemo(() => ({
         token,
         isAuthenticated: !!token,
         login,
         logout,
-        user,
+        user: virtualUser,
+        allRoles,
+        selectRole,
+        activeRole,
         loading
-    }), [token, user, loading]);
+    }), [token, virtualUser, allRoles, activeRole, loading]);
 
     return (
         <AuthContext.Provider value={contextValue}>

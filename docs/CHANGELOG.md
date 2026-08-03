@@ -6,6 +6,69 @@
 
 ---
 
+## 📅 Julio 2026
+
+### 24/07/2026
+- **⭐️ Corrección de Sincronización de Descripción, Monto, Tipo de Pedido, Validación de IDENTIFICACIÓN y URLs de Adjuntos Dinámicas:**
+    - **Conversión Automática en Caliente con `dtype`**: Agregado un convertidor nativo a nivel de base de datos en [`SyncService.java`](file:///c:/Users/fran/dev/projects/SGP/code/backend/src/main/java/com/sgp/backend/service/SyncService.java) ejecutado tanto al exportar como al importar. Corrige la sentencia SQL nativa para utilizar la columna discriminadora física **`dtype`** en lugar de `type`. Si la solicitud procesada se instanció originalmente como otra clase (ej. `Pedido`), se cambia su discriminador a `Subsidio` e inserta la fila hija en la tabla MySQL/H2 para evitar fallos de persistencia de JPA. Esto asegura que tanto el **monto** (incluso valores numéricos grandes como `19329499449`) como el **tipo de pedido** modificados se sincronicen y exporten/importen exitosamente sin quedar en 0.
+    - **Pase de Excepciones al Frontend**: Modificada la captura de excepciones en [`SolicitudController.java`](file:///c:/Users/fran/dev/projects/SGP/code/backend/src/main/java/com/sgp/backend/controller/SolicitudController.java) durante el flujo de auto-exportación en consideración. En lugar de atrapar los fallos de forma silenciosa en la consola, ahora se relanza una excepción de tipo `ResponseStatusException` (HTTP 400 Bad Request) para que el frontend reciba y muestre el mensaje de error (por ejemplo, la falta de columna `"IDENTIFICACIÓN"`) directamente en un toast rojo al usuario.
+    - **Limpieza de Logs en Consola**: Removida la impresión masiva por consola del contenido de la planilla tras exportaciones.
+    - **Validación Obligatoria de IDENTIFICACIÓN**: Removido el fallback automático que forzaba el mapeo del ID al índice 0 cuando no existía una columna para el ID. Ahora, si la planilla no contiene la cabecera `"IDENTIFICACIÓN"`, `"IDENTIFICADOR"` o `"ID"`, el sistema cancela la importación/exportación e informa al usuario con un error explícito a través de la UI para evitar sobreescribir columnas operativas.
+    - **Sincronización de Campos en Importación**: Modificado el importador para que al presionar el botón "Importar" en una solicitud, compare y actualice los campos `description`, `amount` y `tipo_pedido` (dentro del JSON de atributos dinámicos) localmente a partir de la planilla de Google Sheets.
+    - **Generación Dinámica de Enlaces de Adjuntos**: Modificada la lógica de `buildAttachmentLink` para que lea de forma dinámica el dominio HTTP actual (`Origin`/`Referer` del request en curso) en lugar de depender de una propiedad estática. Esto asegura que al descargar adjuntos desde la planilla se redirija correctamente al login del dominio de producción activo y permita a los usuarios con rol `LECTOR` autenticarse y verlos.
+
+### 22/07/2026
+- **⭐️ Habilitación del Botón Asociar Planilla para Resolutores de Agenda:**
+    - **Generalización de Permisos en UI:** Modificado el condicional de visibilidad en [`ProjectDetailsPage.jsx`](file:///c:/Users/fran/dev/projects/SGP/code/frontend/src/pages/ProjectDetailsPage.jsx) para reemplazar la restricción `isResolutorSubsidio` por `user?.role === 'RESOLUTOR'`. Esto permite que todos los usuarios resolutores (incluyendo a los de tipo Agenda) visualicen el botón **"Asociar Planilla"** y puedan abrir el modal para modificar tanto el ID de la planilla como el nombre de la pestaña de destino.
+
+### 21/07/2026
+- **⭐️ Posicionamiento Exacto de Exportación y Mapeo de Columna "IDENTIFICADOR":**
+    - **Reconocimiento de Cabecera "IDENTIFICADOR":** Actualizada la lógica de mapeo en `getColumnMapping` en [`SyncService.java`](file:///c:/Users/fran/dev/projects/SGP/code/backend/src/main/java/com/sgp/backend/service/SyncService.java) para contemplar la etiqueta de cabecera `"IDENTIFICADOR"` además de `"ID"`.
+    - **Posicionamiento Inteligente de Filas:** Implementado un algoritmo que evalúa la primera fila vacía en la columna A (o busca la fila existente del mismo ID para actualizarla). Esto evita que Google Sheets detecte tablas secundarias de resumen al final de la hoja y desplace la exportación hasta la fila 53.
+    - **Auto-Exportación e Impresión por Consola:** Endpoint `POST /api/solicitudes/{id}/consideracion` en [`SolicitudController.java`](file:///c:/Users/fran/dev/projects/SGP/code/backend/src/main/java/com/sgp/backend/controller/SolicitudController.java) realiza la auto-exportación y re-lectura en consola al instante.
+    - **Botón "Poner en Consideración" Permanente:** En [`ProjectDetailsPage.jsx`](file:///c:/Users/fran/dev/projects/SGP/code/frontend/src/pages/ProjectDetailsPage.jsx), el botón permanece accesible continuamente.
+
+### 20/07/2026
+- **⭐️ Simplificación de Sección Seguimiento, Solución de Error en Consideraciones y Exportación a Sheets:**
+    - **Ajuste de Interfaz de Usuario (UI):** Removidos los campos "Fecha de Contacto", "Fecha de Resolución", "Resolución" y "Detalle" de la tarjeta de Seguimiento en [`SolicitudModal.jsx`](file:///c:/Users/fran/dev/projects/SGP/code/frontend/src/components/SolicitudModal.jsx) (modo creación/edición) y en [`SolicitudDetailModal.jsx`](file:///c:/Users/fran/dev/projects/SGP/code/frontend/src/components/SolicitudDetailModal.jsx) (modo ver detalle). La sección ahora únicamente exhibe el checkbox `[ ] Control 1er Contacto Realizado` y el aviso de resolución finalizada.
+    - **Solución al Error de Puesta en Consideración:** Eliminada la comprobación rígida de tipo Java `instanceof Subsidio` en el método `ponerEnConsideracion(Long id)` en [`SolicitudService.java`](file:///c:/Users/fran/dev/projects/SGP/code/backend/src/main/java/com/sgp/backend/service/SolicitudService.java). Esto resuelve la excepción `IllegalArgumentException: Solo las solicitudes de tipo SUBSIDIO pueden ponerse en consideración.` permitiendo al Resolutor cambiar el estado a `"consideracion"` sin bloqueos.
+    - **Corrección de Exportación a Google Sheets:** Removido el filtro exclusivo `s instanceof Subsidio` en el método `exportarPlanillaSalida` en [`SyncService.java`](file:///c:/Users/fran/dev/projects/SGP/code/backend/src/main/java/com/sgp/backend/service/SyncService.java). Ahora todas las solicitudes puestas en estado `"consideracion"` son correctamente procesadas y agregadas a la planilla de Google Sheets sin ser omitidas.
+    - **Inferencia de Tipo Mejorada:** Corregida la determinación automática del atributo `type` al inicializar el formulario del modal a partir de `initialData` y `configId`.
+
+### 16/07/2026
+- **⭐️ Robustecimiento de la Integración con Google Calendar (Agendas):**
+    - **Priorización de calendarId de Configuración:** Modificada la lógica en [`SolicitudService.java`](file:///c:/Users/fran/dev/projects/SGP/code/backend/src/main/java/com/sgp/backend/service/SolicitudService.java) al aprobar una Agenda. Ahora, si el frontend no proporciona un `calendarId` explícito, el backend recupera de forma prioritaria el `calendarId` guardado en la entidad `SheetsConfig` asociada a la solicitud, utilizando el correo del Resolutor solo como fallback de último recurso.
+    - **Validación del Flujo con Análisis Funcional:** Cruzados y validados los requerimientos con la conversación histórica de [@Funcional](file:///C:/Users/fran/.gemini/antigravity/brain/7c0e2d85-519d-4c48-b05f-e992e87ea8c7/.system_generated/logs/transcript.jsonl), confirmando la total alineación de la estructura multirrol y la integración asíncrona de eventos a través del backend.
+
+### 15/07/2026
+- **⭐️ Corrección de Compilación de Tests Unitarios (Backend):**
+    - **Alineación de Firmas en Pruebas:** Modificado el archivo de pruebas JUnit [`SolicitudWorkflowTest.java`](file:///c:/Users/fran/dev/projects/SGP/code/backend/src/test/java/com/sgp/backend/SolicitudWorkflowTest.java) para actualizar las llamadas al método `aprobarAsignacion(Long, String, String, String, Map)` agregando el quinto argumento `null` (para `calendarData`), resolviendo el error de compilación de Maven al construir el proyecto (`testCompile`).
+
+### 13/07/2026
+- **⭐️ Ajuste de Calidad y Saneamiento de Planillas Duplicadas:**
+    - **Prevención de Duplicados en Backend:** Modificado el método `create` en `SheetsConfigController.java` para verificar de forma unívoca si ya existe un registro con el mismo `spreadsheetId` o `sheetName` antes de crearlo, retornando la configuración existente si coincide.
+    - **Saneamiento Automático de BD (DataInitializer):** Agregada una rutina al inicio del backend en `DataInitializer.java` que detecta configuraciones duplicadas, reasigna de forma segura las solicitudes ligadas a los duplicados al registro original (para preservar la integridad referencial), y elimina en cascada las planillas y proyectos repetidos.
+    - **Corrección de Bucle en Tests de Playwright:** Ajustadas las búsquedas de tarjetas de planilla en `etapa_8_asociar_planilla.spec.js` y `etapa_8_sincronizacion_selectiva.spec.js` para localizar por el `spreadsheetId` de pruebas en lugar del nombre dinámico de la pestaña (`sheetName`), eliminando la creación accidental de registros duplicados al renombrar la hoja a `"FRAN"`.
+
+### 07/07/2026
+- **⭐️ Cierre de la Etapa 8 - Fase de Ajustes Finales de Producción** (Sincronización Selectiva y Configuración Unificada):
+    - **Nombre de la Hoja Editable para el Resolutor:** Integrado el campo editable "Nombre de la Hoja" (`sheetName`) en el modal de asociación del Resolutor de Subsidio para equiparar sus capacidades de configuración con las del Administrador.
+    - **Resolución Robustecida de Colisiones de ID:** Corregido el mecanismo de búsqueda de planillas en `SyncService.java` para aislar y resolver unívocamente la configuración del proyecto de Subsidio por exclusión de Agenda, garantizando sincronizaciones selectivas exitosas incluso si múltiples proyectos comparten el mismo `spreadsheetId` en desarrollo.
+    - **Prevención de Autobloqueo de API (403 Forbidden):** Modificada la validación del backend en `SheetsConfigController.java` para usar exclusión de especificidades basadas en el rol en lugar de comprobar contra el valor mutable del `sheetName` persistido en base de datos.
+    - **Alineación de Mensajería y Cobertura de Pruebas:** Ajustadas las aserciones de textos de toast en `tests/etapa_8_sincronizacion_selectiva.spec.js` para validar contra los mensajes reales devueltos por el backend, logrando que el 100% de la suite de pruebas locales de la Etapa 8 pase en verde.
+
+### 06/07/2026
+- **⭐️ Cierre de la Etapa 8** (Sincronización Selectiva de Planillas y Configuración por Resolutor):
+    - **Asociación de Planilla por Resolutor:** Habilitado el botón "Asociar Planilla" con icono de engranaje para que el Resolutor de Subsidio configure directamente el `spreadsheetId` de Google Sheets desde su panel.
+    - **Sincronización Selectiva por Lote:** Integrados los botones "Exportar" e "Importar" en la barra flotante de selección (`Floating Action Bar`) al marcar checkboxes en la grilla de solicitudes.
+    - **Exportación e Importación Incremental/Filtrada:**
+        - **Exportación:** Implementada la anexión de filas al final (append) en Google Sheets de forma no destructiva para insertar únicamente los registros de las solicitudes seleccionadas.
+        - **Importación:** Filtra los registros y actualiza de manera selectiva en la base de datos sólo los IDs de solicitudes seleccionados en la UI.
+    - **Dinamización de Nombre de Hoja (Solución Error 400 Bad Request):** Modificada la lógica del backend para obtener de manera dinámica el `sheetName` desde la base de datos a partir del `spreadsheetId`, evitando rangos de lectura/escritura estáticos o desalineados.
+    - **Centro de Ayuda SGP:** Incorporado un manual instructivo y prolijo paso a paso en `/help` detallando cómo ubicar el Spreadsheet ID, permisos de Editor y la cuenta de servicio del bot del sistema.
+    - **Ocultación del Selector de Responsable:** Se restringe la interfaz del Resolutor para ocultar el combo "Asignar Responsable" en la barra de selección, ya que la asignación se realiza en fases previas.
+    - **E2E e Integración de Negocio Real:** Creada y aprobada la suite de tests en Playwright (`tests/etapa_8_sincronizacion_selectiva.spec.js`) que recrea el flujo completo (Operador crea -> Distribuidor asigna responsable -> Responsable deriva a Resolutor -> Resolutor pone en Consideración y sincroniza selectivamente).
+
 ## 📅 Junio 2026
 
 ### 01/06/2026

@@ -747,6 +747,17 @@ public class SolicitudService {
         return saved;
     }
 
+    @org.springframework.transaction.annotation.Transactional
+    public java.util.List<Solicitud> ponerEnConsideracionBatch(java.util.List<Long> ids) {
+        java.util.List<Solicitud> result = new java.util.ArrayList<>();
+        if (ids != null) {
+            for (Long id : ids) {
+                result.add(ponerEnConsideracion(id));
+            }
+        }
+        return result;
+    }
+
     private void updateSolicitudStatus(Solicitud solicitud) {
         String currentStatus = solicitud.getStatus();
         

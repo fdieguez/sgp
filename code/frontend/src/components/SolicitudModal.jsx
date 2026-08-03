@@ -353,7 +353,48 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         : [];
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
+
+        // Validaciones estrictas de campos obligatorios (Etapa 9)
+        if (!formData.description || !formData.description.trim()) {
+            toast.error("El detalle/descripción de la solicitud es obligatorio.");
+            return;
+        }
+        if (!formData.type || !formData.type.trim()) {
+            toast.error("El tipo de solicitud es obligatorio.");
+            return;
+        }
+        if (!formData.person || !formData.person.name || !formData.person.name.trim()) {
+            toast.error("El nombre del beneficiario/solicitante es obligatorio.");
+            return;
+        }
+        if (!formData.person || !formData.person.phone || !formData.person.phone.trim()) {
+            toast.error("El teléfono del beneficiario/solicitante es obligatorio.");
+            return;
+        }
+        if (!formData.locationName || !formData.locationName.trim()) {
+            toast.error("La localidad es obligatoria.");
+            return;
+        }
+        if (!formData.barrio || !formData.barrio.trim()) {
+            toast.error("El barrio es obligatorio.");
+            return;
+        }
+        if (!formData.responsableId) {
+            toast.error("El responsable de la solicitud es obligatorio.");
+            return;
+        }
+        if (formData.type === 'SUBSIDIO') {
+            if (!formData.amount || Number(formData.amount) <= 0) {
+                toast.error("El monto solicitado es obligatorio y debe ser mayor que cero.");
+                return;
+            }
+            if (!formData.grantDate) {
+                toast.error("La fecha de otorgamiento es obligatoria.");
+                return;
+            }
+        }
+
         setLoading(true);
         try {
             // Limpiar asignaciones: filtrar vacías y serializar el detalle
@@ -418,6 +459,28 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     };
 
     const handleAprobar = async () => {
+        // Validaciones estrictas de campos nuevos al resolver como AGENDA
+        if (myAssignment?.tipoResolucion === 'AGENDA') {
+            if (!asistencia || !asistencia.trim()) {
+                toast.error("La selección de asistencia es obligatoria.");
+                return;
+            }
+            if (createCalendarEvent) {
+                if (!calendarTitle || !calendarTitle.trim()) {
+                    toast.error("El título del evento en el calendario es obligatorio.");
+                    return;
+                }
+                if (!calendarDate) {
+                    toast.error("La fecha del evento en el calendario es obligatoria.");
+                    return;
+                }
+                if (!calendarLocation || !calendarLocation.trim()) {
+                    toast.error("La ubicación del evento en el calendario es obligatoria.");
+                    return;
+                }
+            }
+        }
+
         setLoading(true);
         try {
             await api.post(`/api/solicitudes/${formData.id}/aprobar`, { 

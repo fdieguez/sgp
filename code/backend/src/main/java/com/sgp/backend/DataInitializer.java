@@ -175,6 +175,9 @@ public class DataInitializer implements CommandLineRunner {
             // Sembrar Lector de Planillas
             createUserIfNotFound("auditor.sheets@gmail.com", "Lector_SGP_2026#", "LECTOR", "Auditor", "Sheets", LocalDate.of(1990, 1, 1), "3420000000", null, "33.444.555");
 
+            // Sembrar Usuario Multi-Rol de Prueba
+            createUserIfNotFound("test.multirol@gmail.com", "MultiRol_SGP_2026!", "OPERADOR,RESOLUTOR", "Multi", "Rol", LocalDate.of(1990, 1, 1), "3425555555", null, "35.555.555");
+
             // 2. Initialize Locations from dataset
             initializeLocations();
 
