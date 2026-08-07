@@ -144,12 +144,7 @@ public class SolicitudController {
                 syncService.exportarPlanillaSalida(spreadsheetId, java.util.List.of(id));
             }
         } catch (Exception e) {
-            System.err.println("⚠️ Error al exportar automáticamente la solicitud #" + id + " a Google Sheets: " + e.getMessage());
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.BAD_REQUEST,
-                    "Error al exportar automáticamente a Google Sheets: " + e.getMessage(),
-                    e
-            );
+            System.err.println("⚠️ Error al exportar automáticamente la solicitud #" + id + " a Google Sheets: " + e.getMessage() + ". Continuando transicion de estado local.");
         }
 
         return ResponseEntity.ok(saved);
@@ -184,12 +179,7 @@ public class SolicitudController {
                 }
             }
         } catch (Exception e) {
-            System.err.println("⚠️ Error al exportar automáticamente el lote de solicitudes a Google Sheets: " + e.getMessage());
-            throw new org.springframework.web.server.ResponseStatusException(
-                    org.springframework.http.HttpStatus.BAD_REQUEST,
-                    "Error al exportar automáticamente el lote a Google Sheets: " + e.getMessage(),
-                    e
-            );
+            System.err.println("⚠️ Error al exportar automáticamente el lote de solicitudes a Google Sheets: " + e.getMessage() + ". Continuando transicion de estado local.");
         }
 
         return ResponseEntity.ok(savedList);
