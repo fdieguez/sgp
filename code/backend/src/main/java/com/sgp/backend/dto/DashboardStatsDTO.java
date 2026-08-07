@@ -16,4 +16,11 @@ public class DashboardStatsDTO {
     private long rejectedSolicitudes;
     private BigDecimal totalSubsidiesDelivered;
     private Map<String, Long> solicitudesByOrigin;
+
+    // Campos estadísticos extendidos para la Etapa 10
+    private java.util.List<Map<String, Object>> solicitudesMensuales;
+    private java.util.List<Map<String, Object>> montosMensualesSubsidios;
+    private Map<String, Long> solicitudesPorLocalidad;
+    private Map<String, Long> solicitudesPorBarrioSantaFe;
+    private java.util.List<Map<String, Object>> estadisticasPorTipoSubsidio;
 }

@@ -138,8 +138,8 @@ public class SolicitudService {
             User user = userRepository.findByEmail(email).orElse(null);
             if (user != null) {
                 String userRole = user.getRole();
-                // Si es ADMIN o DISTRIBUIDOR, tiene acceso completo a todas las solicitudes sin filtrado
-                if (userRole != null && !userRole.contains("ADMIN") && !userRole.contains("DISTRIBUIDOR")) {
+                // Si es ADMIN o DISTRIBUIDOR o AUDITOR, tiene acceso completo a todas las solicitudes sin filtrado
+                if (userRole != null && !userRole.contains("ADMIN") && !userRole.contains("DISTRIBUIDOR") && !userRole.contains("AUDITOR")) {
                     spec = spec.and((root, query, cb) -> {
                         query.distinct(true);
                         jakarta.persistence.criteria.Join<Solicitud, SolicitudResolutorAssignment> assignments = root.join("resolutorAssignments", jakarta.persistence.criteria.JoinType.LEFT);

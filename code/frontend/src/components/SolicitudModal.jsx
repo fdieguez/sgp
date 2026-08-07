@@ -1,13 +1,36 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar, Users, Plus, Trash2, History, FileText, UploadCloud, Download, ArrowRight, MessageSquare, Check } from 'lucide-react';
+import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar, Users, Plus, Trash2, History, FileText, UploadCloud, Download, ArrowRight, MessageSquare, Check, Eye, LayoutDashboard } from 'lucide-react';
 import api from '../config/axios';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import TicketSeguimiento from './TicketSeguimiento';
 
+// Función de ayuda para formatear cualquier tipo de fecha a "yyyy-MM-dd" de forma segura
+const formatDateISO = (dateVal) => {
+    if (!dateVal) return '';
+    if (Array.isArray(dateVal)) {
+        const [y, m, d] = dateVal;
+        const mm = m < 10 ? `0${m}` : m;
+        const dd = d < 10 ? `0${d}` : d;
+        return `${y}-${mm}-${dd}`;
+    }
+    if (typeof dateVal === 'string') {
+        return dateVal.split('T')[0];
+    }
+    if (dateVal instanceof Date) {
+        return dateVal.toISOString().split('T')[0];
+    }
+    try {
+        return new Date(dateVal).toISOString().split('T')[0];
+    } catch (e) {
+        return '';
+    }
+};
+
 export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData, configId }) {
     const { user } = useAuth();
     const isResponsable = user?.role === 'RESPONSABLE' || user?.role === 'RESOLUTOR';
+    const isReadOnly = user?.role === 'AUDITOR';
     const canSuggestResolutor = user?.role === 'RESPONSABLE';
     const isResolutor = user?.role === 'RESOLUTOR';
     // Determinar si el usuario actual es un Resolutor con la competencia 'SUBSIDIO'
@@ -24,6 +47,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         responsableId: '',
         amount: '',
         grantDate: '',
+        subsidioType: '',
         resolutionApproved: false,
         assignments: [],
         asistencia: '',
@@ -112,8 +136,35 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             await handleFileUpload(e.dataTransfer.files[0]);
         }
     };
+    // Límite de tamaño: 10 MB. Extensiones permitidas.
+    const MAX_FILE_SIZE_MB = 10;
+    const ALLOWED_EXTENSIONS = ['pdf', 'png', 'jpg', 'jpeg', 'xls', 'xlsx', 'csv', 'doc', 'docx', 'txt'];
+
+    const validateFile = (file) => {
+        if (!file) return false;
+        
+        // Validar tamaño
+        const sizeMb = file.size / (1024 * 1024);
+        if (sizeMb > MAX_FILE_SIZE_MB) {
+            toast.error(`El archivo supera el límite de tamaño permitido de ${MAX_FILE_SIZE_MB} MB.`);
+            return false;
+        }
+
+        // Validar extensión
+        const name = file.name || '';
+        const ext = name.substring(name.lastIndexOf('.') + 1).toLowerCase();
+        if (!ALLOWED_EXTENSIONS.includes(ext)) {
+            toast.error(`Extensión de archivo no permitida. Las permitidas son: ${ALLOWED_EXTENSIONS.join(', ')}`);
+            return false;
+        }
+
+        return true;
+    };
+
     const handleFileUpload = async (file) => {
         if (!file) return;
+        if (!validateFile(file)) return;
+        
         setIsUploading(true);
         const uploadData = new FormData();
         uploadData.append('file', file);
@@ -125,11 +176,33 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             toast.success("Archivo subido con éxito");
         } catch (err) {
             console.error("Error subiendo archivo", err);
-            toast.error("Error al subir archivo");
+            const errMsg = err.response?.data || "Error al subir archivo";
+            toast.error(typeof errMsg === 'string' ? errMsg : "Error al subir archivo");
         } finally {
             setIsUploading(false);
         }
     };
+
+    const handleViewInline = async (adjunto) => {
+        try {
+            const res = await api.get(`/api/solicitudes/adjuntos/${adjunto.id}/view`, { 
+                responseType: 'blob' 
+            });
+            const contentType = res.headers['content-type'] || 'application/pdf';
+            const fileBlob = new Blob([res.data], { type: contentType });
+            const url = window.URL.createObjectURL(fileBlob);
+            
+            // Abrir en una pestaña nueva
+            window.open(url, '_blank');
+            
+            // Revocar el object url después de un delay
+            setTimeout(() => window.URL.revokeObjectURL(url), 2000);
+        } catch (err) {
+            console.error("Error visualizando archivo", err);
+            toast.error("Error al abrir el archivo. Es posible que el archivo físico no exista.");
+        }
+    };
+
     const handleDownload = async (adjunto) => {
         try {
             const res = await api.get(`/api/solicitudes/adjuntos/${adjunto.id}/download`, { responseType: 'blob' });
@@ -143,7 +216,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             setTimeout(() => window.URL.revokeObjectURL(url), 100);
         } catch (err) {
             console.error("Error descargando archivo", err);
-            toast.error("Error al descargar");
+            toast.error("Error al descargar el archivo. Es posible que el archivo físico no exista.");
         }
     };
     const handleDeleteAdjunto = async (adjuntoId) => {
@@ -159,6 +232,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     };
     const handleDynamicFileUpload = async (assignmentIndex, campoNombre, file) => {
         if (!file) return;
+        if (!validateFile(file)) return;
         if (!formData.id) {
             toast.error("Guarde la solicitud antes de subir archivos en la resolución");
             return;
@@ -274,11 +348,12 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         barrio: initialData.location?.type === 'NEIGHBORHOOD' ? (initialData.location?.name || '') : '',
                         responsableId: initialData.responsable?.id || '',
                         amount: initialData.amount || '',
-                        grantDate: initialData.grantDate ? initialData.grantDate.split('T')[0] : '',
+                        grantDate: formatDateISO(initialData.grantDate),
+                        subsidioType: initialData.subsidioType || '',
                         zone: initialData.zone || '',
-                        contactDate: initialData.contactDate ? initialData.contactDate.split('T')[0] : '',
-                        resolutionDate: initialData.resolutionDate ? initialData.resolutionDate.split('T')[0] : '',
-                        entryDate: initialData.entryDate ? initialData.entryDate.split('T')[0] : '',
+                        contactDate: formatDateISO(initialData.contactDate),
+                        resolutionDate: formatDateISO(initialData.resolutionDate),
+                        entryDate: formatDateISO(initialData.entryDate),
                         observation: initialData.observation || '',
                         resolution: initialData.resolution || '',
                         suggestedResolutionType: initialData.suggestedResolutionType || '',
@@ -321,6 +396,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     responsableId: (isResponsable && user?.responsable?.id) ? user.responsable.id : '',
                     amount: '',
                     grantDate: '',
+                    subsidioType: '',
                     zone: (isResponsable && user?.responsable?.zone) ? user.responsable.zone : '',
                     contactDate: '',
                     resolutionDate: '',
@@ -372,12 +448,24 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             toast.error("El teléfono del beneficiario/solicitante es obligatorio.");
             return;
         }
+        if (!formData.person || !formData.person.type || !formData.person.type.trim()) {
+            toast.error("El tipo de solicitante es obligatorio.");
+            return;
+        }
+        if (formData.person.type === 'Personal' && (!formData.person.subType || !formData.person.subType.trim())) {
+            toast.error("El subtipo de solicitante es obligatorio para el tipo Personal.");
+            return;
+        }
         if (!formData.locationName || !formData.locationName.trim()) {
             toast.error("La localidad es obligatoria.");
             return;
         }
         if (!formData.barrio || !formData.barrio.trim()) {
             toast.error("El barrio es obligatorio.");
+            return;
+        }
+        if (user?.role !== 'OPERADOR' && user?.role !== 'DISTRIBUIDOR' && (!formData.zone || !formData.zone.trim())) {
+            toast.error("La zona / eje de la solicitud es obligatoria.");
             return;
         }
         if (!formData.responsableId) {
@@ -391,6 +479,10 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             }
             if (!formData.grantDate) {
                 toast.error("La fecha de otorgamiento es obligatoria.");
+                return;
+            }
+            if (!formData.subsidioType || !formData.subsidioType.trim()) {
+                toast.error("El tipo de subsidio es obligatorio.");
                 return;
             }
         }
@@ -434,6 +526,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     // Campos de Subsidio
                     amount: formData.amount ? Number(formData.amount) : null,
                     grantDate: formData.grantDate || null,
+                    subsidioType: formData.subsidioType || null,
                     assignments
                 };
                 await api.put(`/api/solicitudes/${formData.id}`, updatePayload);
@@ -479,6 +572,11 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     return;
                 }
             }
+        }
+
+        if (!approveObservations || !approveObservations.trim()) {
+            toast.error("Las observaciones de la resolución son obligatorias.");
+            return;
         }
 
         setLoading(true);
@@ -541,7 +639,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 <div className="flex items-center justify-between p-6 border-b border-gray-700 bg-gray-800/50">
                     <h2 className="text-xl font-bold flex items-center gap-2">
                         <Clipboard className="text-indigo-500" />
-                        {formData.id ? `Editar Solicitud #${formData.id}` : 'Nueva Solicitud'}
+                        {isReadOnly ? `Detalle de la Solicitud #${formData.id} (Solo Lectura)` : (formData.id ? `Editar Solicitud #${formData.id}` : 'Nueva Solicitud')}
                     </h2>
                     <button onClick={onClose} title="Cerrar" className="text-gray-400 hover:text-white transition-colors">
                         <X className="h-6 w-6" />
@@ -599,7 +697,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
 
                 <div className="max-h-[70vh] overflow-y-auto custom-scrollbar">
                     {activeTab === 'detalles' && (
-                        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                        <form onSubmit={handleSubmit} className="p-6">
+                            <fieldset disabled={isReadOnly} className="space-y-6">
                             {!formData.id && (
                                 <div className="bg-indigo-950/40 border border-indigo-800 rounded-xl p-3 text-xs text-indigo-300 text-center animate-in fade-in duration-300">
                                     📢 <strong>Nota:</strong> Guarde la solicitud primero para poder agregar adjuntos, notas de seguimiento o consultar el historial de auditoría.
@@ -817,7 +916,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
 
                     {/* Campos específicos de Subsidio */}
                     {formData.type === 'SUBSIDIO' && (
-                        <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 p-4 bg-emerald-900/20 rounded-xl border border-emerald-800/50">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-top-2 p-4 bg-emerald-900/20 rounded-xl border border-emerald-800/50">
                             <div>
                                 <label className="block text-sm font-medium text-emerald-400 mb-1 flex items-center gap-1">
                                     <DollarSign className="h-3 w-3" /> Monto
@@ -825,7 +924,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 <input
                                     type="number"
                                     step="0.01"
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-emerald-500"
                                     value={formData.amount}
                                     onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                                 />
@@ -836,10 +935,28 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 </label>
                                 <input
                                     type="date"
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-emerald-500"
                                     value={formData.grantDate}
                                     onChange={(e) => setFormData({ ...formData, grantDate: e.target.value })}
                                 />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-emerald-400 mb-1 flex items-center gap-1">
+                                    <LayoutDashboard className="h-3 w-3" /> Tipo Subsidio
+                                </label>
+                                <select
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                                    value={formData.subsidioType || ''}
+                                    onChange={(e) => setFormData({ ...formData, subsidioType: e.target.value })}
+                                >
+                                    <option value="">Seleccionar...</option>
+                                    <option value="Culturales">Culturales</option>
+                                    <option value="Deportes">Deportes</option>
+                                    <option value="Viajes">Viajes</option>
+                                    <option value="Emprendimientos">Emprendimientos</option>
+                                    <option value="Subsistencia">Subsistencia</option>
+                                    <option value="Otros">Otros</option>
+                                </select>
                             </div>
                         </div>
                     )}
@@ -1219,6 +1336,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             </div>
                         </div>
                     )}
+                            </fieldset>
                         </form>
                     )}
 
@@ -1340,6 +1458,9 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
+                                                    <button type="button" onClick={() => handleViewInline(adj)} className="p-2 text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors" title="Visualizar">
+                                                        <Eye className="h-4 w-4" />
+                                                    </button>
                                                     <button type="button" onClick={() => handleDownload(adj)} className="p-2 text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors" title="Descargar">
                                                         <Download className="h-4 w-4" />
                                                     </button>
@@ -1358,7 +1479,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
 
                 <div className="p-6 border-t border-gray-700 bg-gray-800/50 flex justify-between items-center gap-3">
                     <div>
-                        {isPendingResolutor && (
+                        {!isReadOnly && isPendingResolutor && (
                             <button
                                 type="button"
                                 onClick={() => setShowApproveConfirm(true)}
@@ -1375,16 +1496,18 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             onClick={onClose}
                             className="px-4 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
                         >
-                            Cancelar
+                            {isReadOnly ? 'Cerrar' : 'Cancelar'}
                         </button>
-                        <button
-                            onClick={handleSubmit}
-                            disabled={loading}
-                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold transition-all shadow-lg flex items-center gap-2 disabled:opacity-50"
-                        >
-                            <Save className="h-4 w-4" />
-                            {loading ? 'Guardando...' : 'Guardar Solicitud'}
-                        </button>
+                        {!isReadOnly && (
+                            <button
+                                onClick={handleSubmit}
+                                disabled={loading}
+                                className="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold transition-all shadow-lg flex items-center gap-2 disabled:opacity-50"
+                            >
+                                <Save className="h-4 w-4" />
+                                {loading ? 'Guardando...' : 'Guardar Solicitud'}
+                            </button>
+                        )}
                     </div>
                 </div>
 

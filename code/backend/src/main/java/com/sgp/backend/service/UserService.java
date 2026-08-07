@@ -18,6 +18,9 @@ public class UserService {
     private final com.sgp.backend.repository.TipoResolucionRepository tipoResolucionRepository;
     private final jakarta.persistence.EntityManager entityManager;
 
+    @org.springframework.beans.factory.annotation.Value("${sgp.max.roles.per.user:2}")
+    private int maxRolesPerUser;
+
     public List<User> getAllUsers() {
         return userRepository.findAll();
     }
@@ -40,6 +43,12 @@ public class UserService {
         }
 
         String finalRole = role != null ? role.toUpperCase() : "OPERADOR";
+        if (finalRole != null) {
+            String[] roles = finalRole.split(",");
+            if (roles.length > maxRolesPerUser) {
+                throw new IllegalArgumentException("El usuario no puede tener más de " + maxRolesPerUser + " roles asignados.");
+            }
+        }
         if (finalRole.contains("RESPONSABLE")) {
             if (zone == null || zone.trim().isEmpty()) {
                 throw new IllegalArgumentException("La zona es obligatoria para el rol Responsable");
@@ -87,6 +96,10 @@ public class UserService {
         }
 
         if (role != null) {
+            String[] roles = role.split(",");
+            if (roles.length > maxRolesPerUser) {
+                throw new IllegalArgumentException("El usuario no puede tener más de " + maxRolesPerUser + " roles asignados.");
+            }
             user.setRole(role.toUpperCase());
         }
 

@@ -302,21 +302,13 @@ public class SyncService {
 
     private java.math.BigDecimal parseAmount(String amountStr) {
         if (amountStr == null || amountStr.trim().isEmpty())
-            return java.math.BigDecimal.ZERO;
+            return null;
         try {
-            // Remove $ and spaces, replace comma with dot if needed?
-            // Ideally localized parsing, but simple cleanup for now:
+            // Remove $ and spaces, replace comma with dot if needed
             String clean = amountStr.replace("$", "").replace(".", "").replace(",", ".").trim();
-            // CAUTION: Removing all dots assuming they are thousand separators and comma is
-            // decimal?
-            // Or standard US format?
-            // If "1.000,00" -> remove dot -> "1000,00" -> replace comma -> "1000.00" ->
-            // Correct.
-            // If "1000" -> "1000".
-            // If "100,50" -> "100.50".
             return new java.math.BigDecimal(clean);
         } catch (Exception e) {
-            return java.math.BigDecimal.ZERO;
+            return null;
         }
     }
 
@@ -760,14 +752,31 @@ public class SyncService {
                 if (columnMapping.containsKey("monto_solicitado")) {
                     String montoStr = getValue(row, columnMapping.get("monto_solicitado"));
                     java.math.BigDecimal amountFromSheet = parseAmount(montoStr);
-                    java.math.BigDecimal currentAmount = solicitud.getAmount() != null ? solicitud.getAmount() : java.math.BigDecimal.ZERO;
-                    if (amountFromSheet != null && amountFromSheet.compareTo(currentAmount) != 0) {
-                        solicitud.setAmount(amountFromSheet);
-                        logAssignmentChange(solicitud, null, "Monto actualizado desde planilla externa a: " + amountFromSheet);
-                        isModified = true;
-                    }
 
-                    if (amountFromSheet != null) {
+                    if (amountFromSheet == null) {
+                        // POSTERGADO / PENDIENTE (celda vacía o valor no parseable) -> queda en consideración
+                        if (!"consideracion".equalsIgnoreCase(solicitud.getStatus())) {
+                            solicitud.setStatus("consideracion");
+                            isModified = true;
+                        }
+                        SolicitudResolutorAssignment assignment = solicitud.getResolutorAssignments().stream()
+                                .filter(a -> "SUBSIDIO".equalsIgnoreCase(a.getTipoResolucion()))
+                                .findFirst()
+                                .orElse(null);
+                        if (assignment != null && (assignment.getApproved() == null || assignment.getApproved())) {
+                            assignment.setApproved(false);
+                            isModified = true;
+                            logAssignmentChange(solicitud, null, "Resolución revertida a PENDIENTE por importación de planilla (Importe vacío)");
+                        }
+                    } else {
+                        // Sincronizar el monto numérico
+                        java.math.BigDecimal currentAmount = solicitud.getAmount() != null ? solicitud.getAmount() : java.math.BigDecimal.ZERO;
+                        if (amountFromSheet.compareTo(currentAmount) != 0) {
+                            solicitud.setAmount(amountFromSheet);
+                            logAssignmentChange(solicitud, null, "Monto actualizado desde planilla externa a: " + amountFromSheet);
+                            isModified = true;
+                        }
+
                         SolicitudResolutorAssignment assignment = solicitud.getResolutorAssignments().stream()
                                 .filter(a -> "SUBSIDIO".equalsIgnoreCase(a.getTipoResolucion()))
                                 .findFirst()
@@ -807,12 +816,12 @@ public class SyncService {
                                 logAssignmentChange(solicitud, null, "Solicitud DESAPROBADA por importación de planilla (Importe = 0)");
                             }
                         } else {
-                            // PENDIENTE / AÚN NO DEFINIDO (importe < 0)
+                            // POSTERGADA / EN CONSIDERACIÓN (importe < 0)
                             if (!"consideracion".equalsIgnoreCase(solicitud.getStatus())) {
                                 solicitud.setStatus("consideracion");
                                 isModified = true;
                             }
-                            if (assignment != null && assignment.getApproved()) {
+                            if (assignment != null && (assignment.getApproved() == null || assignment.getApproved())) {
                                 assignment.setApproved(false);
                                 isModified = true;
                                 logAssignmentChange(solicitud, null, "Resolución revertida a PENDIENTE por importación de planilla (Importe < 0)");

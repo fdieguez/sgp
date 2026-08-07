@@ -34,7 +34,9 @@ export default function Navbar() {
                                             ? `RESOLUTOR - ${user.tiposResolucion && user.tiposResolucion.length > 0 
                                                 ? user.tiposResolucion.map(t => t.tipo.toUpperCase()).join(', ') 
                                                 : 'SIN ESPECIFICIDAD'}` 
-                                            : user.role}
+                                            : user.role === 'AUDITOR'
+                                                ? 'AUDITORÍA Y SEGUIMIENTO'
+                                                : user.role}
                                 </span>
                             </div>
                         )}

@@ -178,6 +178,9 @@ public class DataInitializer implements CommandLineRunner {
             // Sembrar Usuario Multi-Rol de Prueba
             createUserIfNotFound("test.multirol@gmail.com", "MultiRol_SGP_2026!", "OPERADOR,RESOLUTOR", "Multi", "Rol", LocalDate.of(1990, 1, 1), "3425555555", null, "35.555.555");
 
+            // Sembrar Usuario Auditor de Prueba (Etapa 10)
+            createUserIfNotFound("test.auditor@gmail.com", "Auditor_SGP_2026!", "AUDITOR", "Auditor", "Seguimiento", LocalDate.of(1990, 1, 1), "3424444444", null, "36.666.666");
+
             // 2. Initialize Locations from dataset
             initializeLocations();
 
@@ -254,6 +257,7 @@ public class DataInitializer implements CommandLineRunner {
                 com.sgp.backend.entity.SheetsConfig sc1 = new com.sgp.backend.entity.SheetsConfig();
                 sc1.setSpreadsheetId("spreadsheet-agenda-default-id");
                 sc1.setSheetName("AGENDA");
+                sc1.setCalendarId("mvgonza79@gmail.com");
                 sc1.setStatus("ACTIVE");
                 sc1 = sheetsConfigRepository.save(sc1);
                 
@@ -353,7 +357,84 @@ public class DataInitializer implements CommandLineRunner {
                 a2.setDetalle("{\"Reunión\":\"Mesa barrial\",\"Fecha\":\"2026-08-07\",\"Hora\":\"18:00\"}");
                 entityManager.persist(a2);
                 
-                System.out.println("✅ 2 solicitudes de ejemplo para Agenda sembradas correctamente.");
+                // Sembrar Solicitudes de Subsidios para Gráficos de Auditoría
+                com.sgp.backend.entity.SheetsConfig configSubsidio = sheetsConfigRepository.findAll().stream()
+                        .filter(c -> c.getSheetName() != null && c.getSheetName().toUpperCase().contains("SUBSIDIO"))
+                        .findFirst()
+                        .orElse(null);
+
+                // Crear Person 3, 4, 5
+                com.sgp.backend.entity.Person p3 = new com.sgp.backend.entity.Person();
+                p3.setName("Carlos Benítez (Subsidio)");
+                p3.setType("INDIVIDUAL");
+                p3.setPhone("3424666777");
+                p3 = personRepository.save(p3);
+
+                com.sgp.backend.entity.Person p4 = new com.sgp.backend.entity.Person();
+                p4.setName("Asociación Civil Vecinal Juana Azurduy");
+                p4.setType("ORGANIZACION");
+                p4.setPhone("3424888999");
+                p4 = personRepository.save(p4);
+
+                com.sgp.backend.entity.Person p5 = new com.sgp.backend.entity.Person();
+                p5.setName("María Luz Gómez");
+                p5.setType("INDIVIDUAL");
+                p5.setPhone("3424123456");
+                p5 = personRepository.save(p5);
+
+                // Subsidio 1: Completado (Enero 2026)
+                com.sgp.backend.entity.Solicitud s3 = new com.sgp.backend.entity.Solicitud();
+                s3.setType("SUBSIDIO");
+                s3.setDescription("Subsidio de refacción edilicia comunitaria");
+                s3.setStatus("completadas");
+                s3.setPerson(p3);
+                s3.setLocation(santaFe);
+                s3.setResponsable(responsable);
+                s3.setEntryDate(LocalDate.of(2026, 1, 15));
+                s3.setAmount(new java.math.BigDecimal("350000.00"));
+                s3.setSheetsConfig(configSubsidio);
+                solicitudRepository.save(s3);
+
+                // Subsidio 2: Completado (Marzo 2026)
+                com.sgp.backend.entity.Solicitud s4 = new com.sgp.backend.entity.Solicitud();
+                s4.setType("SUBSIDIO");
+                s4.setDescription("Subsidio para compra de equipamiento deportivo");
+                s4.setStatus("completadas");
+                s4.setPerson(p4);
+                s4.setLocation(santaFe);
+                s4.setResponsable(responsable);
+                s4.setEntryDate(LocalDate.of(2026, 3, 10));
+                s4.setAmount(new java.math.BigDecimal("600000.00"));
+                s4.setSheetsConfig(configSubsidio);
+                solicitudRepository.save(s4);
+
+                // Subsidio 3: Rechazada (Abril 2026)
+                com.sgp.backend.entity.Solicitud s5 = new com.sgp.backend.entity.Solicitud();
+                s5.setType("SUBSIDIO");
+                s5.setDescription("Subsidio de gastos operativos");
+                s5.setStatus("rechazada");
+                s5.setPerson(p5);
+                s5.setLocation(santaFe);
+                s5.setResponsable(responsable);
+                s5.setEntryDate(LocalDate.of(2026, 4, 5));
+                s5.setAmount(new java.math.BigDecimal("0.00"));
+                s5.setSheetsConfig(configSubsidio);
+                solicitudRepository.save(s5);
+
+                // Subsidio 4: En Consideración (Mayo 2026)
+                com.sgp.backend.entity.Solicitud s6 = new com.sgp.backend.entity.Solicitud();
+                s6.setType("SUBSIDIO");
+                s6.setDescription("Subsidio de fomento productivo regional");
+                s6.setStatus("consideracion");
+                s6.setPerson(p5);
+                s6.setLocation(santaFe);
+                s6.setResponsable(responsable);
+                s6.setEntryDate(LocalDate.of(2026, 5, 20));
+                s6.setAmount(new java.math.BigDecimal("1200000.00"));
+                s6.setSheetsConfig(configSubsidio);
+                solicitudRepository.save(s6);
+                
+                System.out.println("✅ Solicitudes de subsidios y agenda de ejemplo sembradas correctamente.");
             }
 
             System.out.println("✅ DataInitializer finalizado exitosamente.");

@@ -27,7 +27,7 @@ public class DashboardService {
     private final SolicitudRepository solicitudRepository;
     private final UserRepository userRepository;
 
-    public DashboardStatsDTO getStats() {
+    public DashboardStatsDTO getStats(String type, Integer year) {
         Specification<Solicitud> spec = Specification.where(null);
 
         // Aplicar filtrado basado en roles (alineado con SolicitudService)
@@ -37,8 +37,8 @@ public class DashboardService {
             User user = userRepository.findByEmail(email).orElse(null);
             if (user != null) {
                 String userRole = user.getRole();
-                // Si es ADMIN o DISTRIBUIDOR, tiene acceso completo a todas las estadísticas sin filtrar
-                if (userRole != null && !userRole.contains("ADMIN") && !userRole.contains("DISTRIBUIDOR")) {
+                // Si es ADMIN, DISTRIBUIDOR o AUDITOR, tiene acceso completo a todas las estadísticas sin filtrar
+                if (userRole != null && !userRole.contains("ADMIN") && !userRole.contains("DISTRIBUIDOR") && !userRole.contains("AUDITOR")) {
                     spec = spec.and((root, query, cb) -> {
                         List<jakarta.persistence.criteria.Predicate> orPredicates = new java.util.ArrayList<>();
                         
@@ -78,6 +78,14 @@ public class DashboardService {
             }
         }
 
+        // Aplicar filtros dinámicos (Etapa 10)
+        if (type != null && !type.trim().isEmpty() && !"ALL".equalsIgnoreCase(type.trim())) {
+            spec = spec.and((root, query, cb) -> cb.equal(cb.upper(root.get("type")), type.trim().toUpperCase()));
+        }
+        if (year != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(cb.function("YEAR", Integer.class, root.get("entryDate")), year));
+        }
+
         List<Solicitud> filteredSolicitudes = solicitudRepository.findAll(spec);
 
         long totalSolicitudes = filteredSolicitudes.size();
@@ -101,6 +109,85 @@ public class DashboardService {
             solicitudesByOrigin.put(origin, solicitudesByOrigin.getOrDefault(origin, 0L) + 1);
         }
 
+        // 1. Serie Temporal Mensual de Cantidades
+        Map<String, Long> monthlyCounts = new HashMap<>();
+        for (Solicitud s : filteredSolicitudes) {
+            if (s.getEntryDate() != null) {
+                String key = s.getEntryDate().getYear() + "-" + String.format("%02d", s.getEntryDate().getMonthValue());
+                monthlyCounts.put(key, monthlyCounts.getOrDefault(key, 0L) + 1);
+            }
+        }
+        java.util.List<Map<String, Object>> solicitudesMensuales = monthlyCounts.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("mes", entry.getKey());
+                    map.put("cantidad", entry.getValue());
+                    return map;
+                })
+                .collect(java.util.stream.Collectors.toList());
+
+        // 2. Serie Temporal Mensual de Montos (Solo Subsidios)
+        Map<String, BigDecimal> monthlyAmounts = new HashMap<>();
+        for (Solicitud s : filteredSolicitudes) {
+            if ("SUBSIDIO".equalsIgnoreCase(s.getType()) && s.getEntryDate() != null && s.getAmount() != null) {
+                String key = s.getEntryDate().getYear() + "-" + String.format("%02d", s.getEntryDate().getMonthValue());
+                monthlyAmounts.put(key, monthlyAmounts.getOrDefault(key, BigDecimal.ZERO).add(s.getAmount()));
+            }
+        }
+        java.util.List<Map<String, Object>> montosMensualesSubsidios = monthlyAmounts.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("mes", entry.getKey());
+                    map.put("monto", entry.getValue());
+                    return map;
+                })
+                .collect(java.util.stream.Collectors.toList());
+
+        // 3. Distribución por Localidad
+        Map<String, Long> solicitudesPorLocalidad = new HashMap<>();
+        for (Solicitud s : filteredSolicitudes) {
+            String loc = (s.getLocation() != null) ? s.getLocation().getName() : s.getLocationName();
+            if (loc == null || loc.trim().isEmpty()) loc = "Sin Localidad";
+            solicitudesPorLocalidad.put(loc.trim(), solicitudesPorLocalidad.getOrDefault(loc.trim(), 0L) + 1);
+        }
+
+        // 4. Distribución por Barrio / Zona dentro de Santa Fe
+        Map<String, Long> solicitudesPorBarrioSantaFe = new HashMap<>();
+        for (Solicitud s : filteredSolicitudes) {
+            String loc = (s.getLocation() != null) ? s.getLocation().getName() : s.getLocationName();
+            if (loc != null && loc.trim().equalsIgnoreCase("santa fe")) {
+                String barrio = s.getBarrio();
+                if (barrio == null || barrio.trim().isEmpty()) {
+                    barrio = s.getZone();
+                }
+                if (barrio == null || barrio.trim().isEmpty()) {
+                    barrio = "Sin Zona/Barrio";
+                }
+                solicitudesPorBarrioSantaFe.put(barrio.trim(), solicitudesPorBarrioSantaFe.getOrDefault(barrio.trim(), 0L) + 1);
+            }
+        }
+
+        // 5. Estadísticas de Subsidios agrupados por subsidioType
+        Map<String, Map<String, Object>> typeStats = new HashMap<>();
+        for (Solicitud s : filteredSolicitudes) {
+            if ("SUBSIDIO".equalsIgnoreCase(s.getType())) {
+                String subType = s.getSubsidioType();
+                if (subType == null || subType.trim().isEmpty()) subType = "Otros";
+                
+                Map<String, Object> stats = typeStats.getOrDefault(subType, new HashMap<>());
+                long count = (long) stats.getOrDefault("cantidad", 0L) + 1;
+                BigDecimal amount = ((BigDecimal) stats.getOrDefault("monto", BigDecimal.ZERO)).add(s.getAmount() != null ? s.getAmount() : BigDecimal.ZERO);
+                
+                stats.put("tipo", subType);
+                stats.put("cantidad", count);
+                stats.put("monto", amount);
+                typeStats.put(subType, stats);
+            }
+        }
+        java.util.List<Map<String, Object>> estadisticasPorTipoSubsidio = new java.util.ArrayList<>(typeStats.values());
+
         return DashboardStatsDTO.builder()
                 .totalSolicitudes(totalSolicitudes)
                 .pendingSolicitudes(pendingSolicitudes)
@@ -110,6 +197,11 @@ public class DashboardService {
                 .rejectedSolicitudes(rejectedSolicitudes)
                 .totalSubsidiesDelivered(totalDelivered)
                 .solicitudesByOrigin(solicitudesByOrigin)
+                .solicitudesMensuales(solicitudesMensuales)
+                .montosMensualesSubsidios(montosMensualesSubsidios)
+                .solicitudesPorLocalidad(solicitudesPorLocalidad)
+                .solicitudesPorBarrioSantaFe(solicitudesPorBarrioSantaFe)
+                .estadisticasPorTipoSubsidio(estadisticasPorTipoSubsidio)
                 .build();
     }
 }

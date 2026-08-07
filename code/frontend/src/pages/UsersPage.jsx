@@ -58,7 +58,13 @@ export default function UsersPage({ isEmbedded = false }) {
     const handleUserSubmit = async (e) => {
         e.preventDefault();
         
-        if (userFormData.role === 'RESPONSABLE' && (!userFormData.zone || !userFormData.zone.trim())) {
+        const userRoles = userFormData.role ? userFormData.role.split(',').map(x => x.trim()).filter(Boolean) : [];
+        if (userRoles.length === 0) {
+            alert('Debe seleccionar al menos 1 rol para el usuario.');
+            return;
+        }
+
+        if (userRoles.includes('RESPONSABLE') && (!userFormData.zone || !userFormData.zone.trim())) {
             alert('La zona es obligatoria para el rol Responsable');
             return;
         }
@@ -67,7 +73,7 @@ export default function UsersPage({ isEmbedded = false }) {
             // Asegurarse de que tipoResolucionIds solo se envíe si el rol contiene RESOLUTOR
             const payload = {
                 ...userFormData,
-                tipoResolucionIds: userFormData.role === 'RESOLUTOR' ? userFormData.tipoResolucionIds : []
+                tipoResolucionIds: userRoles.includes('RESOLUTOR') ? userFormData.tipoResolucionIds : []
             };
             if (editingUser) {
                 await api.put(`/api/users/${editingUser.id}`, payload);
@@ -185,8 +191,8 @@ export default function UsersPage({ isEmbedded = false }) {
                                             <span className="text-sm text-gray-400">{user.email}</span>
                                         </td>
                                         <td className="p-4">
-                                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${user.role === 'ADMINISTRADOR' ? 'bg-purple-900/30 text-purple-400 border-purple-700' : 'bg-gray-700 text-gray-300 border-gray-600'}`}>
-                                                {user.role === 'ADMINISTRADOR' && <Shield className="h-3 w-3" />}
+                                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border ${user.role && user.role.includes('ADMINISTRADOR') ? 'bg-purple-900/30 text-purple-400 border-purple-700' : 'bg-gray-700 text-gray-300 border-gray-600'}`}>
+                                                {user.role && user.role.includes('ADMINISTRADOR') && <Shield className="h-3 w-3" />}
                                                 {user.role}
                                             </span>
                                         </td>
@@ -262,22 +268,39 @@ export default function UsersPage({ isEmbedded = false }) {
                                         { val: 'DISTRIBUIDOR', lbl: 'Distribuidor' },
                                         { val: 'RESPONSABLE', lbl: 'Responsable' },
                                         { val: 'RESOLUTOR', lbl: 'Resolutor' },
-                                        { val: 'ADMINISTRADOR', lbl: 'Administrador' }
-                                    ].map(r => (
-                                        <label key={r.val} className="flex items-center gap-2 cursor-pointer">
-                                            <input
-                                                type="radio"
-                                                name="userRole"
-                                                value={r.val}
-                                                checked={userFormData.role === r.val}
-                                                onChange={() => {
-                                                    setUserFormData({ ...userFormData, role: r.val });
-                                                }}
-                                                className="border-gray-600 text-indigo-600 focus:ring-indigo-500 bg-gray-800"
-                                            />
-                                            <span className="text-sm text-gray-300">{r.lbl}</span>
-                                        </label>
-                                    ))}
+                                        { val: 'ADMINISTRADOR', lbl: 'Administrador' },
+                                        { val: 'AUDITOR', lbl: 'Auditor' }
+                                    ].map(r => {
+                                        const currentRoles = userFormData.role ? userFormData.role.split(',').map(x => x.trim()).filter(Boolean) : [];
+                                        const isChecked = currentRoles.includes(r.val);
+                                        return (
+                                            <label key={r.val} className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    value={r.val}
+                                                    checked={isChecked}
+                                                    onChange={(e) => {
+                                                        const checked = e.target.checked;
+                                                        let newRoles = [...currentRoles];
+                                                        if (checked) {
+                                                            if (newRoles.length >= 2) {
+                                                                alert('Solo se pueden seleccionar hasta 2 roles como máximo.');
+                                                                return;
+                                                            }
+                                                            if (!newRoles.includes(r.val)) {
+                                                                newRoles.push(r.val);
+                                                            }
+                                                        } else {
+                                                            newRoles = newRoles.filter(roleVal => roleVal !== r.val);
+                                                        }
+                                                        setUserFormData({ ...userFormData, role: newRoles.join(',') });
+                                                    }}
+                                                    className="rounded border-gray-600 text-indigo-600 focus:ring-indigo-500 bg-gray-800"
+                                                />
+                                                <span className="text-sm text-gray-300">{r.lbl}</span>
+                                            </label>
+                                        );
+                                    })}
                                 </div>
                             </div>
 
@@ -292,14 +315,14 @@ export default function UsersPage({ isEmbedded = false }) {
                                 </div>
                             </div>
 
-                            {userFormData.role === 'RESPONSABLE' && (
+                            {(userFormData.role && userFormData.role.split(',').map(x => x.trim()).includes('RESPONSABLE')) && (
                                 <div className="animate-in fade-in slide-in-from-top-2">
                                     <label className="block text-xs font-bold text-emerald-500 uppercase mb-1">Zona Territorial</label>
                                     <input type="text" placeholder="Ej: Norte, Sur..." required value={userFormData.zone} onChange={(e) => setUserFormData({ ...userFormData, zone: e.target.value })} className="w-full px-4 py-2 bg-gray-900 border border-emerald-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                                 </div>
                             )}
 
-                            {userFormData.role === 'RESOLUTOR' && (
+                            {(userFormData.role && userFormData.role.split(',').map(x => x.trim()).includes('RESOLUTOR')) && (
                                 <div className="animate-in fade-in slide-in-from-top-2 space-y-2">
                                     <label className="block text-xs font-bold text-indigo-400 uppercase mb-1">Tipos de Resolución Asignados</label>
                                     <div className="grid grid-cols-2 gap-2 bg-gray-900 p-3 rounded-xl border border-gray-600">

@@ -17,12 +17,23 @@ import org.springframework.http.HttpStatus;
 
 @RestController
 @RequestMapping("/api/config")
-@RequiredArgsConstructor
 public class SheetsConfigController {
 
     private final SheetsConfigRepository repository;
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
+    private final com.sgp.backend.service.GoogleCalendarService googleCalendarService;
+
+    public SheetsConfigController(
+            SheetsConfigRepository repository,
+            ProjectRepository projectRepository,
+            UserRepository userRepository,
+            com.sgp.backend.service.GoogleCalendarService googleCalendarService) {
+        this.repository = repository;
+        this.projectRepository = projectRepository;
+        this.userRepository = userRepository;
+        this.googleCalendarService = googleCalendarService;
+    }
 
     @GetMapping
     public List<SheetsConfig> getAll() {
@@ -116,6 +127,27 @@ public class SheetsConfigController {
             projectRepository.findBySheetsConfig(config).ifPresent(projectRepository::delete);
             repository.delete(config);
             return ResponseEntity.ok().<Void>build();
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{id}/check-calendar")
+    public ResponseEntity<?> checkCalendarAccess(@PathVariable Long id) {
+        return repository.findById(id).map(config -> {
+            String calendarId = config.getCalendarId();
+            if (calendarId == null || calendarId.trim().isEmpty()) {
+                return ResponseEntity.ok(java.util.Map.of("active", false, "error", "El ID de Google Calendar se encuentra vacío."));
+            }
+            try {
+                googleCalendarService.checkAccess(calendarId);
+                return ResponseEntity.ok(java.util.Map.of("active", true));
+            } catch (Exception e) {
+                // Capturar errores de autenticación o calendarios no compartidos
+                String msg = e.getMessage() != null ? e.getMessage() : "Error desconocido al validar acceso.";
+                if (msg.contains("403") || msg.contains("forbidden") || msg.contains("not found")) {
+                    msg = "No compartido. Asegúrate de compartir el calendario con la Cuenta de Servicio del sistema con permisos de edición.";
+                }
+                return ResponseEntity.ok(java.util.Map.of("active", false, "error", msg));
+            }
         }).orElse(ResponseEntity.notFound().build());
     }
 }

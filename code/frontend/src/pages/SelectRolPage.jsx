@@ -1,6 +1,6 @@
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Shield, ClipboardList, Briefcase, FileCheck, LogOut } from 'lucide-react';
+import { Shield, ClipboardList, Briefcase, FileCheck, LogOut, BarChart } from 'lucide-react';
 
 export default function SelectRolPage() {
     const { allRoles, selectRole, logout, user } = useAuth();
@@ -41,6 +41,13 @@ export default function SelectRolPage() {
             icon: FileCheck,
             color: 'from-emerald-500 to-teal-600',
             glow: 'shadow-emerald-500/20'
+        },
+        'AUDITOR': {
+            title: 'Control y Seguimiento',
+            description: 'Auditoría y visualización de reportes estadísticos, gráficos globales y consulta de solicitudes.',
+            icon: BarChart,
+            color: 'from-violet-500 to-fuchsia-600',
+            glow: 'shadow-fuchsia-500/20'
         }
     };
 
@@ -62,7 +69,10 @@ export default function SelectRolPage() {
                     <span className="text-gray-400 font-bold text-sm tracking-widest uppercase">Sistema de Gestión</span>
                 </div>
                 <button
-                    onClick={logout}
+                    onClick={() => {
+                        logout();
+                        navigate('/login');
+                    }}
                     className="flex items-center gap-2 text-gray-400 hover:text-rose-400 font-bold text-xs uppercase tracking-wider transition-colors bg-gray-900/50 border border-gray-800 p-2 px-4 rounded-full backdrop-blur-md active:scale-95"
                 >
                     <LogOut className="h-4 w-4" /> Cerrar Sesión
@@ -107,8 +117,18 @@ export default function SelectRolPage() {
                                     </div>
                                 </div>
                                 <div className="space-y-2 mt-6">
-                                    <h3 className="text-xl font-bold text-white group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-gray-300">
-                                        {details.title}
+                                    <h3 className="text-xl font-bold text-white group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-gray-300 flex flex-col">
+                                        <span>{details.title}</span>
+                                        {role.toUpperCase() === 'RESOLUTOR' && (
+                                            <span className="text-xs text-indigo-400 font-bold mt-1 tracking-wide">
+                                                ({user?.tiposResolucion && user.tiposResolucion.length > 0 
+                                                    ? user.tiposResolucion.map(t => {
+                                                        const name = t.tipo || '';
+                                                        return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+                                                      }).join(', ')
+                                                    : 'Sin competencias'})
+                                            </span>
+                                        )}
                                     </h3>
                                     <p className="text-xs text-gray-400 leading-relaxed font-medium">
                                         {details.description}

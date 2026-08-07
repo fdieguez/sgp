@@ -23,6 +23,8 @@ public class Solicitud {
     // Campos de Subsidio
     private BigDecimal amount;
     private LocalDate grantDate;
+    @Column(name = "subsidio_type", length = 100)
+    private String subsidioType;
 
     // Campos de Agenda
     private String asistencia;

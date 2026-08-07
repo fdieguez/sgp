@@ -14,7 +14,7 @@ const CREDENTIALS = {
 };
 
 const BASE_URL = 'https://solicitudes.ultrasoft.website';
-const ARTIFACT_DIR = 'C:\\Users\\fran\\.gemini\\antigravity\\brain\\1cfe87da-126c-4c0b-b829-a3af7fad37e7';
+const ARTIFACT_DIR = 'C:\\Users\\fran\\.gemini\\antigravity\\brain\\e33690fd-2c0b-4185-9371-fcfeef966bf2';
 const REPORT_PATH = path.join(ARTIFACT_DIR, 'resultados_regresion.md');
 
 // Crear archivos de prueba temporales

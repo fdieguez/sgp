@@ -45,9 +45,38 @@ import toast from 'react-hot-toast';
 // --- Funciones de ayuda ---
 const parseLocalDate = (dateStr) => {
     if (!dateStr) return null;
-    if (dateStr.includes('T')) return new Date(dateStr);
-    const [y, m, d] = dateStr.split('-');
-    return new Date(y, m - 1, d);
+    let dVal = null;
+    if (dateStr instanceof Date) {
+        dVal = dateStr;
+    } else if (Array.isArray(dateStr)) {
+        const [y, m, d] = dateStr;
+        dVal = new Date(y, m - 1, d);
+    } else if (typeof dateStr === 'string') {
+        if (dateStr.includes('T')) {
+            dVal = new Date(dateStr);
+        } else {
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                const [y, m, d] = parts;
+                dVal = new Date(y, m - 1, d);
+            } else {
+                dVal = new Date(dateStr);
+            }
+        }
+    } else if (typeof dateStr === 'object') {
+        // Por si Jackson serializa como objeto { year, monthValue, dayOfMonth } o similar
+        const y = dateStr.year || dateStr.yearValue;
+        const m = dateStr.monthValue || dateStr.month;
+        const d = dateStr.dayOfMonth || dateStr.day;
+        if (y && m && d) {
+            dVal = new Date(y, m - 1, d);
+        }
+    }
+    
+    if (dVal && dVal instanceof Date && !isNaN(dVal.getTime())) {
+        return dVal;
+    }
+    return null;
 };
 
 // --- Componentes de interfaz de usuario ---
@@ -842,7 +871,7 @@ export default function ProjectDetailsPage() {
                 {/* Sección principal de la tabla */}
                 <div className="bg-gray-800/50 rounded-[2rem] border border-gray-700/50 overflow-hidden shadow-2xl backdrop-blur-xl relative">
                     {/* Barra de acciones flotante */}
-                    {selectedRows.length > 0 && (
+                    {selectedRows.length > 0 && user?.role !== 'AUDITOR' && (
                         <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-indigo-600 border border-indigo-500 p-2 px-4 rounded-full shadow-2xl z-[50] flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300">
                             <span className="text-white font-bold text-xs">{selectedRows.length} seleccionadas</span>
                             <div className="h-4 w-px bg-indigo-400"></div>
@@ -887,14 +916,16 @@ export default function ProjectDetailsPage() {
                             <thead>
                                 {isResolutorSubsidio ? (
                                     <tr className="bg-gray-900/80 text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">
-                                        <th className="p-3 w-10 text-center">
-                                            <input 
-                                                type="checkbox" 
-                                                className="rounded border-gray-600 text-indigo-500 focus:ring-indigo-500 bg-gray-800"
-                                                onChange={handleSelectAll}
-                                                checked={currentRows.length > 0 && selectedRows.length === currentRows.length}
-                                            />
-                                        </th>
+                                        {user?.role !== 'AUDITOR' && (
+                                            <th className="p-3 w-10 text-center">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="rounded border-gray-600 text-indigo-500 focus:ring-indigo-500 bg-gray-800"
+                                                    onChange={handleSelectAll}
+                                                    checked={currentRows.length > 0 && selectedRows.length === currentRows.length}
+                                                />
+                                            </th>
+                                        )}
                                         <th className="p-3">ID</th>
                                         <th className="p-3">Fecha Ingreso</th>
                                         <th className="p-3">Origen</th>
@@ -929,14 +960,16 @@ export default function ProjectDetailsPage() {
                                     </tr>
                                 ) : (
                                     <tr className="bg-gray-900/80 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                                        <th className="p-3 w-10 text-center">
-                                            <input 
-                                                type="checkbox" 
-                                                className="rounded border-gray-600 text-indigo-500 focus:ring-indigo-500 bg-gray-800"
-                                                onChange={handleSelectAll}
-                                                checked={currentRows.length > 0 && selectedRows.length === currentRows.length}
-                                            />
-                                        </th>
+                                        {user?.role !== 'AUDITOR' && (
+                                            <th className="p-3 w-10 text-center">
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="rounded border-gray-600 text-indigo-500 focus:ring-indigo-500 bg-gray-800"
+                                                    onChange={handleSelectAll}
+                                                    checked={currentRows.length > 0 && selectedRows.length === currentRows.length}
+                                                />
+                                            </th>
+                                        )}
                                         <th className="p-3">N° Orden</th>
                                         <th onClick={() => handleSort('entryDate')} className="p-3 cursor-pointer hover:text-white transition-colors">
                                             Fecha {sortConfig.key === 'entryDate' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
@@ -1042,14 +1075,16 @@ export default function ProjectDetailsPage() {
 
                                         return (
                                             <tr key={s.id} className={`group transition-all text-xs border-b border-gray-800 whitespace-nowrap ${selectedRows.includes(s.id) ? 'bg-indigo-900/20' : 'hover:bg-gray-700/20'}`}>
-                                                <td className="p-3 text-center">
-                                                    <input 
-                                                        type="checkbox" 
-                                                        className="rounded border-gray-600 text-indigo-500 focus:ring-indigo-500 bg-gray-800"
-                                                        checked={selectedRows.includes(s.id)}
-                                                        onChange={() => handleSelectRow(s.id)}
-                                                    />
-                                                </td>
+                                                {user?.role !== 'AUDITOR' && (
+                                                    <td className="p-3 text-center">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            className="rounded border-gray-600 text-indigo-500 focus:ring-indigo-500 bg-gray-800"
+                                                            checked={selectedRows.includes(s.id)}
+                                                            onChange={() => handleSelectRow(s.id)}
+                                                        />
+                                                    </td>
+                                                )}
                                                 <td className="p-3 font-mono text-gray-500">#{s.id}</td>
                                                 <td className="p-3 text-gray-300">
                                                     {entryDate ? entryDate.toLocaleDateString() : '-'}
@@ -1119,14 +1154,16 @@ export default function ProjectDetailsPage() {
                                     } else {
                                         return (
                                             <tr key={s.id} className={`group transition-all text-xs border-b border-gray-800 ${selectedRows.includes(s.id) ? 'bg-indigo-900/20' : 'hover:bg-gray-700/20'}`}>
-                                                <td className="p-3 text-center">
-                                                    <input 
-                                                        type="checkbox" 
-                                                        className="rounded border-gray-600 text-indigo-500 focus:ring-indigo-500 bg-gray-800"
-                                                        checked={selectedRows.includes(s.id)}
-                                                        onChange={() => handleSelectRow(s.id)}
-                                                    />
-                                                </td>
+                                                {user?.role !== 'AUDITOR' && (
+                                                    <td className="p-3 text-center">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            className="rounded border-gray-600 text-indigo-500 focus:ring-indigo-500 bg-gray-800"
+                                                            checked={selectedRows.includes(s.id)}
+                                                            onChange={() => handleSelectRow(s.id)}
+                                                        />
+                                                    </td>
+                                                )}
                                                 <td className="p-3 font-mono text-gray-500">#{s.id}</td>
                                                 <td className="p-3 text-gray-300 whitespace-nowrap">
                                                     {entryDate ? entryDate.toLocaleDateString() : '-'}

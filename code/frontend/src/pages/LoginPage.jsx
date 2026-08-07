@@ -25,7 +25,7 @@ export default function LoginPage() {
             const loggedInUser = await login(email, password);
             if (redirectTo) {
                 navigate(redirectTo);
-            } else if (loggedInUser && loggedInUser.role === 'ADMINISTRADOR') {
+            } else if (loggedInUser && (loggedInUser.role === 'ADMINISTRADOR' || loggedInUser.role === 'AUDITOR')) {
                 navigate('/dashboard');
             } else {
                 navigate('/mis-solicitudes');

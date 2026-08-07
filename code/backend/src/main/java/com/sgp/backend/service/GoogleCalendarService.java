@@ -116,4 +116,17 @@ public class GoogleCalendarService {
             e.printStackTrace();
         }
     }
+
+    /**
+     * Comprueba si la cuenta de servicio tiene acceso al calendario especificado.
+     */
+    public boolean checkAccess(String calendarId) throws Exception {
+        if (calendarId == null || calendarId.trim().isEmpty()) {
+            throw new IllegalArgumentException("El ID de Google Calendar no puede estar vacío.");
+        }
+        Calendar calendarService = getCalendarService();
+        // Intentar recuperar los metadatos básicos del calendario
+        calendarService.calendars().get(calendarId).execute();
+        return true;
+    }
 }
