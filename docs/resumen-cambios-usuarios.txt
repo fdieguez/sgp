@@ -1,0 +1,131 @@
+================================================================================
+          SGP - RESUMEN DE CAMBIOS Y GUÍA DE USUARIOS (ETAPA 9.1)
+================================================================================
+
+Este documento resume las últimas actualizaciones técnicas y funcionales aplicadas 
+al Sistema de Gestión de Proyectos (SGP), junto con el catálogo de usuarios 
+configurados y sus respectivos roles de negocio.
+
+--------------------------------------------------------------------------------
+PARTE 1: LOS ÚLTIMOS 10 CAMBIOS AGREGADOS
+--------------------------------------------------------------------------------
+
+1. FORMALIZACIÓN DEL ROL AUDITOR:
+   Se creó y habilitó formalmente el rol de AUDITOR (`AUDITOR`) para permitir un 
+   perfil de control y monitoreo global de solicitudes, sin restricciones 
+   territoriales ni de autoría.
+
+2. EXCLUSIVIDAD DE GRÁFICOS INTERACTIVOS (RECHARTS):
+   Los gráficos interactivos de barras y líneas de Recharts con métricas de 
+   montos y cantidades acumuladas se configuraron de acceso exclusivo para el 
+   Auditor en su Dashboard, ocultándose del Dashboard general del Administrador.
+
+3. INTERFAZ ADAPTADA DE SOLO LECTURA:
+   Cuando el Auditor accede al listado de solicitudes, el sistema deshabilita 
+   la selección masiva (checkboxes), oculta la barra flotante de acciones y abre 
+   los formularios en el modal en modo 100% de solo lectura (inputs deshabilitados).
+
+4. BUSCADOR GLOBAL INTEGRADO:
+   Se integró un buscador textual en el Dashboard del Auditor que permite 
+   filtrar y localizar solicitudes por ID, nombre o descripción en caliente.
+
+5. RESTRICCIÓN DE TAMAÑO EN DOCUMENTOS ADJUNTOS (10MB):
+   Tanto en el cliente (React) como en el servidor (Spring Boot) se implementó un 
+   límite estricto de 10MB por archivo para evitar sobrecargar el VPS.
+
+6. FILTRADO POR EXTENSIONES DE ARCHIVOS:
+   Se bloquea la subida de extensiones peligrosas (.exe, .bat) mostrando alertas 
+   claras, permitiendo solo formatos aprobados (pdf, png, jpg, jpeg, xls, xlsx, 
+   csv, doc, docx, txt).
+
+7. APERTURA INLINE DE ADJUNTOS (NO DESCARGA FORZADA):
+   Al presionar el botón "Abrir" en los archivos adjuntos, el navegador abre el 
+   archivo (PDF, JPG, PNG, TXT) en una nueva pestaña usando el visualizador nativo, 
+   en lugar de forzar la descarga directa al disco.
+
+8. COMPROBACIÓN DE ACCESO A GOOGLE CALENDAR EN CALIENTE:
+   En "Mis Ajustes de Resolutor" (Resolutor de Agenda) se añadió el botón "Comprobar 
+   Acceso" para consultar dinámicamente si el backend posee permisos válidos de 
+   conexión con la API de Google Calendar, desplegando badges informativos (Activo, 
+   Sin Acceso, No Comprobado).
+
+9. RESILIENCIA ANTE CAÍDAS DE GOOGLE SHEETS:
+   Se blindó el backend (`SolicitudController.java`) para que, ante cualquier 
+   error transitorio de red o falta de permisos en las planillas externas al poner 
+   una solicitud en consideración, el sistema registre el warning pero continúe 
+   exitosamente la transacción local (HTTP 200 OK) sin interrumpir el flujo.
+
+10. ROBUSTECIMIENTO EN LA DESERIALIZACIÓN DE FECHAS:
+    Se blindaron las funciones de mapeo y parseo de fechas en el frontend 
+    (`ProjectDetailsPage.jsx` y `SolicitudModal.jsx`) para soportar arrays de 
+    Jackson (`[yyyy, MM, dd]`) devueltos por el backend, previniendo crashes de React 
+    en el navegador.
+
+--------------------------------------------------------------------------------
+PARTE 2: CATÁLOGO DE USUARIOS Y CASOS DE USO DE NEGOCIO
+--------------------------------------------------------------------------------
+
+A continuación se detalla la nómina de usuarios habilitados en el sistema SGP 
+con su rol y cómo interactúan en el flujo de negocio:
+
+1. ADMINISTRADOR GENERAL
+   * Usuario: `admin@sgp.com`
+   * Contraseña: `SGP_Admin_#2026_Prod_Secure_!`
+   * Caso de Uso: Control de proyectos, configuración avanzada de planillas de 
+     Google Sheets, auditoría de usuarios y eliminación masiva de registros.
+
+2. CARGA DE SOLICITUDES (OPERADOR)
+   * Usuario: `celestesolari19@gmail.com`
+   * Contraseña: `Celeste_SGP_2026#`
+   * Caso de Uso: Recibe la demanda de los ciudadanos. Es la encargada de cargar 
+     las solicitudes desde cero (Pedido, Subsidio o Agenda).
+
+3. DISTRIBUIDOR (ASIGNACIÓN DE ZONAS)
+   * Usuario: `matias.ippolito@gmail.com`
+   * Contraseña: `Matias_Dist_SGP_2026!`
+   * Caso de Uso: Revisa las solicitudes entrantes ("Pendientes") y les asigna 
+     la Zona Territorial (Norte o Sur) y el Responsable correspondiente.
+
+4. RESPONSABLE DE ZONA (ZONA NORTE)
+   * Usuario: `matias.ippolito.responsable@gmail.com`
+   * Contraseña: `Matias_Resp_SGP_2026!`
+   * Caso de Uso: Revisa el listado de su zona. Agrega las asignaciones de áreas 
+     secundarias (Subsidio, Agenda, Otra) que deben evaluar el caso.
+
+5. RESPONSABLE DE ZONA (ZONA SUR)
+   * Usuario: `barbarabrancatto@gmail.com`
+   * Contraseña: `Barbara_Resp_SGP_2026!`
+   * Caso de Uso: Mismo rol del anterior, enfocado en las demandas asignadas a 
+     la Zona Sur.
+
+6. RESOLUTOR DE SUBSIDIOS
+   * Usuario: `martinnocioni@gmail.com`
+   * Contraseña: `Martin_SGP_2026*`
+   * Caso de Uso: Revisa la bandeja de subsidios asignados. Completa los 
+     formularios de datos (CBU, DNI, etc.) y pone la solicitud en "Consideración" 
+     para exportar a la planilla.
+
+7. RESOLUTORA DE AGENDA (GOOGLE CALENDAR)
+   * Usuario: `mvgonza79@gmail.com`
+   * Contraseña: `Maria_SGP_2026%`
+   * Caso de Uso: Revisa actividades. Aprueba las resoluciones y agenda los 
+     eventos directamente en Google Calendar. Puede comprobar la conexión a la API.
+
+8. RESOLUTOR GENERAL (ÁREAS ADMINISTRATIVAS)
+   * Usuario: `matias.ippolito.resolutor@gmail.com`
+   * Contraseña: `Matias_Res_SGP_2026!`
+   * Caso de Uso: Resuelve de forma directa los tipos de resolución administrativa 
+     no vinculados a Sheets o Calendar (como Pedidos o Declaraciones).
+
+9. AUDITOR GENERAL (SOLO LECTURA)
+   * Usuario: `test.auditor@gmail.com`
+   * Contraseña: `Auditor_SGP_2026!`
+   * Caso de Uso: Acceso de supervisión. Consulta métricas generales mediante 
+     gráficos dinámicos de Recharts, realiza búsquedas globales y visualiza todas 
+     las solicitudes del sistema en formato de solo lectura.
+
+10. USUARIO MULTI-ROL (TEST DE PERFILES)
+    * Usuario: `test.multirol@gmail.com`
+    * Contraseña: `MultiRol_SGP_2026!`
+    * Caso de Uso: Usuario especial con perfiles concurrentes de OPERADOR y 
+      RESOLUTOR. Permite testear el modal de selección de rol inicial al loguearse.
