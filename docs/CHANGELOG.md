@@ -2,7 +2,22 @@
 
 > **Propósito**: Este archivo registra todos los cambios, mejoras y decisiones técnicas del proyecto SGP para facilitar la continuidad entre sesiones de desarrollo.
 
-**Versión Actual**: `0.9.5` (Multi-Resolución por Checkboxes y Catálogo Seguro de Usuarios)
+**Versión Actual**: `0.9.6` (Resiliencia de Carga, Rol Auditor y Ajustes de Calendario)
+
+---
+
+## 📅 Agosto 2026
+
+### 09/08/2026
+- **⭐️ Cierre de la Etapa 9.1 - Resiliencia de Carga, Rol Auditor y Ajustes de Calendario:**
+    - **Mejora de Resiliencia en Puesta en Consideración**: Modificados los endpoints de puesta en consideración unitario y batch en [`SolicitudController.java`](file:///c:/Users/fran/dev/projects/SGP/code/backend/src/main/java/com/sgp/backend/controller/SolicitudController.java) para capturar de forma tolerante los errores de conexión de la API de Google Sheets. Ahora, ante una caída de red o falta de permisos externos en producción, se registra un aviso en consola (`System.err.println`) pero se continúa y confirma la transacción local con éxito (`HTTP 200 OK`) previniendo interrupciones.
+    - **Gestión Multi-Rol con Checkboxes**: Se rediseñó el modal de usuarios en [`UsersPage.jsx`](file:///c:/Users/fran/dev/projects/SGP/code/frontend/src/pages/UsersPage.jsx) reemplazando la selección mediante radio buttons por una lista de checkboxes. Permite asociar hasta 2 roles concurrentes y añade soporte reactivo para el rol `AUDITOR`.
+    - **Apertura Inline de Documentos Adjuntos**: Se configuraron los enlaces de descarga en [`SolicitudModal.jsx`](file:///c:/Users/fran/dev/projects/SGP/code/frontend/src/components/SolicitudModal.jsx) para desplegar archivos de tipo PDF, JPG, PNG y TXT inline en una pestaña nueva mediante el visor nativo del navegador, en lugar de forzar descargas directas a disco.
+    - **Estricción y Filtrado de Adjuntos**: Se implementaron validaciones en el frontend (React) y en el backend (Spring Boot) para limitar a 10MB el tamaño de archivos adjuntos y bloquear formatos de ejecutables inseguros (.exe, .bat), alertando al usuario de forma prolija.
+    - **Verificación de Google Calendar**: Adición del botón "Comprobar Acceso" en [`ResolutorSettingsPage.jsx`](file:///c:/Users/fran/dev/projects/SGP/code/frontend/src/pages/ResolutorSettingsPage.jsx) para evaluar en caliente las credenciales de la API de Calendar, renderizando insignias de estado dinámicas.
+    - **Perfil Auditor de Solo Lectura**: Deshabilitación de selección masiva de registros, ocultamiento de botones de alta/baja y apertura de detalles del modal en modo de solo lectura cuando un usuario con rol `AUDITOR` accede a solicitudes.
+    - **Robustecimiento de Pruebas de Pedro (`pruebas_basicas.spec.js`)**: Encapsulado de selectores en sub-modales específicos en Playwright para evitar conflictos de Strict Mode, y automatización del llenado de asistencia obligatoria ("Con Asistencia") en las resoluciones de Agenda.
+    - **Script de Purgado y Siembra de Testigos**: Creación del script [`setup_production_witness.spec.js`](file:///c:/Users/fran/dev/projects/SGP/code/frontend/tests/setup_production_witness.spec.js) para inicializar limpiamente la base de datos de producción mediante `/api/test-helper/keep-only-witness` y sembrar las dos solicitudes testigo del flujo de trabajo.
 
 ---
 
