@@ -468,7 +468,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             toast.error("La zona / eje de la solicitud es obligatoria.");
             return;
         }
-        if (!formData.responsableId) {
+        if (formData.id && !formData.responsableId) {
             toast.error("El responsable de la solicitud es obligatorio.");
             return;
         }
@@ -706,13 +706,13 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             )}
                             {/* Tipo y Estado */}
                             <div className="grid grid-cols-2 gap-4">
-                                {user?.role !== 'DISTRIBUIDOR' && (
+                                {!!formData.id && user?.role !== 'DISTRIBUIDOR' && (
                                     <div>
                                         <label className="block text-sm font-medium text-gray-400 mb-1">Tipo</label>
                                         <select
                                             className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
                                             value={formData.type}
-                                            disabled={!!formData.id}
+                                            disabled={true}
                                             onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                                         >
                                             <option value="PEDIDO">Pedido</option>

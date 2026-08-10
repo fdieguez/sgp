@@ -118,9 +118,7 @@ test.describe('Validación E2E SGP: Ciclo de Vida y Planilla de Salida (KISS Mod
         await page.locator('input[placeholder*="Ej: Santa Fe"]').fill('Santa Fe');
         await page.locator('input[placeholder*="Ej: Santa Fe"]').press('Tab');
         
-        // Cambiar el tipo de la solicitud a SUBSIDIO y guardar
-        await page.locator('label:has-text("Tipo") + select').first().selectOption('SUBSIDIO');
-        await page.locator('label:has-text("Monto") + input').first().fill('180000');
+        // En la versión 1.0, las solicitudes nuevas siempre se crean como PEDIDO y no se muestra el campo Tipo ni Monto en creación.
 
         // Guardar solicitud
         await page.click('button:has-text("Guardar Solicitud")');
