@@ -157,6 +157,55 @@ public class TestHelperController {
         }
     }
 
+    @Transactional
+    @PostMapping("/clear-all-solicitudes")
+    public ResponseEntity<?> clearAllSolicitudes() {
+        log.info("TestHelper: Limpiando absolutamente todas las solicitudes y reseteando auto_increment");
+        try {
+            entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 0").executeUpdate();
+            
+            try {
+                List<com.sgp.backend.entity.DocumentoAdjunto> adjuntos = entityManager.createQuery(
+                    "SELECT da FROM DocumentoAdjunto da", 
+                    com.sgp.backend.entity.DocumentoAdjunto.class)
+                    .getResultList();
+                for (com.sgp.backend.entity.DocumentoAdjunto adjunto : adjuntos) {
+                    if (adjunto.getFileName() != null) {
+                        try {
+                            fileService.deleteFile(adjunto.getFileName());
+                        } catch (Exception e) {
+                            log.warn("Fallo al eliminar archivo físico de adjunto {}", adjunto.getFileName(), e);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Error al intentar limpiar archivos físicos de adjuntos: {}", e.getMessage());
+            }
+
+            entityManager.createNativeQuery("TRUNCATE TABLE documento_adjunto").executeUpdate();
+            entityManager.createNativeQuery("TRUNCATE TABLE ticket_seguimiento").executeUpdate();
+            entityManager.createNativeQuery("TRUNCATE TABLE asignacion_historial").executeUpdate();
+            entityManager.createNativeQuery("TRUNCATE TABLE solicitud_resolutor_assignment").executeUpdate();
+            entityManager.createNativeQuery("TRUNCATE TABLE solicitudes").executeUpdate();
+            
+            try {
+                entityManager.createNativeQuery("ALTER TABLE solicitudes ALTER COLUMN id RESTART WITH 1").executeUpdate();
+            } catch (Exception e) {
+                // ignorar si no es H2
+            }
+            
+            entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();
+            
+            return ResponseEntity.ok(Map.of("message", "Todas las solicitudes han sido eliminadas y el identificador de inicio ha sido reseteado a 1."));
+        } catch (Exception e) {
+            log.error("Error al limpiar todas las solicitudes", e);
+            try {
+                entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();
+            } catch (Exception ex) {}
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @GetMapping("/sheet-titles")
     public ResponseEntity<?> getSheetTitles(@RequestParam String spreadsheetId) {
         try {

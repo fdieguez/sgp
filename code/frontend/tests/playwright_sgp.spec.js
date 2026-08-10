@@ -46,14 +46,26 @@ test.describe('Validación E2E SGP: Ciclo de Vida y Planilla de Salida (KISS Mod
         }
     });
 
-    // Función auxiliar para iniciar sesión en SGP
-    const iniciarSesion = async (page, email, password) => {
+    // Función auxiliar para iniciar sesión en SGP con soporte para selección múltiple de rol
+    const iniciarSesion = async (page, email, password, rolASeleccionar = null) => {
         await page.goto('/login');
         await page.locator('input[type="email"]').fill(email);
         await page.locator('input[type="password"]').fill(password);
         await page.click('button:has-text("Ingresar")');
-        await page.waitForURL(/.*(dashboard|mis-solicitudes|settings).*/, { timeout: 20000 });
+        await page.waitForURL(/.*(dashboard|mis-solicitudes|settings|select-rol).*/, { timeout: 20000 });
         await page.waitForTimeout(1000);
+
+        if (page.url().includes('/select-rol')) {
+            if (rolASeleccionar) {
+                // Hacer clic en el botón que contenga el texto del rol
+                await page.click(`button:has-text("${rolASeleccionar}")`);
+            } else {
+                // Si no se especifica, hacer clic en el primero disponible
+                await page.locator('.grid button').first().click();
+            }
+            await page.waitForURL(/.*(dashboard|mis-solicitudes|settings).*/, { timeout: 20000 });
+            await page.waitForTimeout(1000);
+        }
     };
 
     test('Paso 1: Limpieza del sistema y base de datos (Admin)', async ({ page }) => {
@@ -129,30 +141,30 @@ test.describe('Validación E2E SGP: Ciclo de Vida y Planilla de Salida (KISS Mod
     test('Paso 4: Asignar Responsable y Zona (Distribuidor)', async ({ page }) => {
         test.setTimeout(45000);
         console.log('[E2E SGP] Iniciando Paso 4: Asignando Responsable y Zona');
-
-        await iniciarSesion(page, 'matias.ippolito@gmail.com', 'Matias_Dist_SGP_2026!');
+ 
+        await iniciarSesion(page, 'matias.ippolito@gmail.com', 'Matias_Dist_SGP_2026!', 'DISTRIBUIDOR');
         await page.goto('/mis-solicitudes');
         await page.fill('input[placeholder*="Buscar por N° Orden"]', nombreBeneficiario);
         await page.waitForTimeout(1000);
-
+ 
         await page.locator('tbody tr').first().locator('button[title="Ver / Editar Detalles"]').click();
         await page.waitForTimeout(1000);
-
+ 
         // Asignar zona y responsable
         await page.locator('label:has-text("Zona Territorial") + select').selectOption('Norte');
         await page.waitForTimeout(500);
         await page.locator('label:has-text("Responsable") + select').selectOption({ label: 'Matías Ippolito' });
-
+ 
         await page.click('button:has-text("Guardar Solicitud")');
         await expect(page.locator('text=Solicitud actualizada con éxito')).toBeVisible();
         console.log('[E2E SGP] Responsable y Zona asignados correctamente.');
     });
-
+ 
     test('Paso 5: Derivar y Completar Asignaciones Múltiples con Adjuntos (Responsable)', async ({ page }) => {
         test.setTimeout(120000);
         console.log('[E2E SGP] Iniciando Paso 5: Creando asignaciones múltiples y subiendo archivos de soporte como Responsable');
-
-        await iniciarSesion(page, 'matias.ippolito.responsable@gmail.com', 'Matias_Resp_SGP_2026!');
+ 
+        await iniciarSesion(page, 'matias.ippolito@gmail.com', 'Matias_Dist_SGP_2026!', 'Responsable');
         await page.goto('/mis-solicitudes');
         await page.fill('input[placeholder*="Buscar por N° Orden"]', nombreBeneficiario);
         await page.waitForTimeout(1000);

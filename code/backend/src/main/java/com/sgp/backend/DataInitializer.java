@@ -69,8 +69,6 @@ public class DataInitializer implements CommandLineRunner {
                 "matias.ippolito.gmail.com", // Distribuidor corregido en DB
                 "matias.ippolito@gmail.com",
                 "sabrivschmidt@gmail.com",
-                "matias.ippolito.responsable@gmail.com",
-                "matias.ippolito.resolutor@gmail.com",
                 "barbarabrancatto@gmail.com",
                 "martinnocioni@gmail.com",
                 "mvgonza79@gmail.com",
@@ -158,25 +156,18 @@ public class DataInitializer implements CommandLineRunner {
             // Sembrar Operador
             createUserIfNotFound("celestesolari19@gmail.com", "Celeste_SGP_2026#", "OPERADOR", "Celeste", "Solari", LocalDate.of(1990, 1, 1), "3424760480", null, "30.562.372");
 
-            // Sembrar Distribuidores
-            createUserIfNotFound("matias.ippolito@gmail.com", "Matias_Dist_SGP_2026!", "DISTRIBUIDOR", "Matías", "Ippolito", LocalDate.of(1990, 1, 1), "3426148609", null, "28.925.931");
+            // Sembrar Distribuidores y Responsables combinados
+            createUserIfNotFound("matias.ippolito@gmail.com", "Matias_Dist_SGP_2026!", "DISTRIBUIDOR,RESPONSABLE", "Matías", "Ippolito", LocalDate.of(1990, 1, 1), "3426148609", "Norte", "28.925.931");
             createUserIfNotFound("sabrivschmidt@gmail.com", "Sabrina_SGP_2026$", "DISTRIBUIDOR", "Sabrina", "Schmidt", LocalDate.of(1990, 1, 1), "3424777085", null, "31.273.418");
-
-            // Sembrar Responsables
-            createUserIfNotFound("matias.ippolito.responsable@gmail.com", "Matias_Resp_SGP_2026!", "RESPONSABLE", "Matías", "Ippolito", LocalDate.of(1990, 1, 1), "3426148609", "Norte", "28.925.931");
             createUserIfNotFound("barbarabrancatto@gmail.com", "Barbara_Resp_SGP_2026!", "RESPONSABLE", "Barbara", "Brancatto", LocalDate.of(1990, 1, 1), "3424216840", "Sur", "26.972.841");
-
+ 
             // Sembrar Resolutores
             User resMartin = createUserIfNotFound("martinnocioni@gmail.com", "Martin_SGP_2026*", "RESOLUTOR", "Martín", "Nocioni", LocalDate.of(1990, 1, 1), "3426144703", null, "31.111.251");
             User resMaria = createUserIfNotFound("mvgonza79@gmail.com", "Maria_SGP_2026%", "RESOLUTOR", "María Veronica", "Gonzalez", LocalDate.of(1990, 1, 1), "3425119354", null, "27.620.830");
             User resEduardo = createUserIfNotFound("ealfaro.51@gmail.com", "Eduardo_SGP_2026^", "RESOLUTOR", "Eduardo", "Alfaro", LocalDate.of(1990, 1, 1), "3434404035", null, "32.831.230");
-            User resMatiasResol = createUserIfNotFound("matias.ippolito.resolutor@gmail.com", "Matias_Res_SGP_2026!", "RESOLUTOR", "Matías", "Resolutor", LocalDate.of(1990, 1, 1), "3426148609", null, "28.925.931");
-
+ 
             // Sembrar Lector de Planillas
             createUserIfNotFound("auditor.sheets@gmail.com", "Lector_SGP_2026#", "LECTOR", "Auditor", "Sheets", LocalDate.of(1990, 1, 1), "3420000000", null, "33.444.555");
-
-            // Sembrar Usuario Multi-Rol de Prueba
-            createUserIfNotFound("test.multirol@gmail.com", "MultiRol_SGP_2026!", "OPERADOR,RESOLUTOR", "Multi", "Rol", LocalDate.of(1990, 1, 1), "3425555555", null, "35.555.555");
 
             // Sembrar Usuario Auditor de Prueba (Etapa 10)
             createUserIfNotFound("test.auditor@gmail.com", "Auditor_SGP_2026!", "AUDITOR", "Auditor", "Seguimiento", LocalDate.of(1990, 1, 1), "3424444444", null, "36.666.666");
@@ -192,7 +183,7 @@ public class DataInitializer implements CommandLineRunner {
             
             // Primero limpiar las relaciones previas para estos usuarios específicos
             entityManager.createNativeQuery("DELETE FROM user_tipo_resolucion WHERE user_id IN (:ids)")
-                         .setParameter("ids", List.of(resMaria.getId(), resMartin.getId(), resEduardo.getId(), resMatiasResol.getId()))
+                         .setParameter("ids", List.of(resMaria.getId(), resMartin.getId(), resEduardo.getId()))
                          .executeUpdate();
             
             tipoResolucionRepository.findByTipoIgnoreCase("AGENDA").ifPresent(tr -> {
@@ -204,7 +195,7 @@ public class DataInitializer implements CommandLineRunner {
                              .setParameter("tipoId", tr.getId())
                              .executeUpdate();
             });
-
+ 
             tipoResolucionRepository.findByTipoIgnoreCase("SUBSIDIO").ifPresent(tr -> {
                 tr.setResolutor(resMartin);
                 tipoResolucionRepository.save(tr);
@@ -214,23 +205,13 @@ public class DataInitializer implements CommandLineRunner {
                              .setParameter("tipoId", tr.getId())
                              .executeUpdate();
             });
-
+ 
             tipoResolucionRepository.findByTipoIgnoreCase("DECLARACION DE INTERES").ifPresent(tr -> {
                 tr.setResolutor(resEduardo);
                 tipoResolucionRepository.save(tr);
                 
                 entityManager.createNativeQuery("INSERT INTO user_tipo_resolucion (user_id, tipo_resolucion_id) VALUES (:userId, :tipoId)")
                              .setParameter("userId", resEduardo.getId())
-                             .setParameter("tipoId", tr.getId())
-                             .executeUpdate();
-            });
-
-            tipoResolucionRepository.findByTipoIgnoreCase("OTRA").ifPresent(tr -> {
-                tr.setResolutor(resMatiasResol);
-                tipoResolucionRepository.save(tr);
-                
-                entityManager.createNativeQuery("INSERT INTO user_tipo_resolucion (user_id, tipo_resolucion_id) VALUES (:userId, :tipoId)")
-                             .setParameter("userId", resMatiasResol.getId())
                              .setParameter("tipoId", tr.getId())
                              .executeUpdate();
             });
@@ -298,7 +279,7 @@ public class DataInitializer implements CommandLineRunner {
                         .orElse(null);
 
                 // Encontrar un responsable
-                User responsable = userRepository.findByEmail("matias.ippolito.responsable@gmail.com").orElse(null);
+                User responsable = userRepository.findByEmail("matias.ippolito@gmail.com").orElse(null);
                 
                 // Encontrar la ciudad de Santa Fe
                 com.sgp.backend.entity.Location santaFe = locationRepository.findFirstByNameAndType("Santa Fe", "CITY").orElse(null);
