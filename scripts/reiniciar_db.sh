@@ -6,8 +6,10 @@ echo "🚀 SGP Database Reset Helper"
 echo "========================"
 echo "⚠️  ADVERTENCIA: Esto borrará permanentemente todas las solicitudes y beneficiarios."
 read -p "¿Estás seguro de reiniciar la base de datos? (yes/no): " confirm
+# Limpiar retorno de carro residual si el archivo tiene CRLF y convertir a minúsculas
+confirm=$(echo "$confirm" | tr -d '\r' | tr '[:upper:]' '[:lower:]')
 
-if [ "$confirm" == "yes" ]; then
+if [ "$confirm" == "yes" ] || [ "$confirm" == "y" ] || [ "$confirm" == "si" ] || [ "$confirm" == "s" ]; then
     echo "🔄 Reseteando base de datos SGP..."
     
     # Credenciales por defecto (pueden ser sobrescritas por variables de entorno)
