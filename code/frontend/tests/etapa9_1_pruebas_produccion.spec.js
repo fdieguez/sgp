@@ -214,6 +214,10 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       expect(res.ok()).toBeTruthy();
     }
 
+    // Esperar a que Google Sheets actualice y propague la caché de los datos modificados
+    console.log('[QA] Esperando 5 segundos para propagación de la caché de Google Sheets...');
+    await page.waitForTimeout(5000);
+
     // Importar la planilla y verificar que pasen a estado Resuelto / Completadas
     console.log('[QA] Importando la planilla de salida...');
     await page.locator('button:has-text("Importar Planilla")').click();
