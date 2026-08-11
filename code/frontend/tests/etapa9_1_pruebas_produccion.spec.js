@@ -67,6 +67,7 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
   test('Caso 1: Flujo Completo de 3 Solicitudes de Subsidio con Importación', async ({ page }) => {
     test.setTimeout(240000);
     const idsCreados = [];
+    const nombresCreados = [];
 
     // Crear 3 solicitudes como Operador
     console.log('[QA] Creando 3 solicitudes como Operador...');
@@ -115,15 +116,18 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       
       expect(solicitudId).not.toBeNull();
       idsCreados.push(solicitudId);
+      nombresCreados.push(benefName);
       console.log(`[QA] Solicitud creada exitosamente con ID: ${solicitudId}`);
     }
 
     // Distribuidor asigna responsable
     console.log('[QA] Distribuidor asigna Responsable y Zona a las 3 solicitudes...');
-    for (const id of idsCreados) {
+    for (let idx = 0; idx < idsCreados.length; idx++) {
+      const id = idsCreados[idx];
+      const nombre = nombresCreados[idx];
       await iniciarSesion(page, CREDENTIALS.DISTRIBUIDOR.email, CREDENTIALS.DISTRIBUIDOR.pass, 'DISTRIBUIDOR');
       await page.goto(`${BASE_URL}/mis-solicitudes`);
-      await page.fill('input[placeholder*="Buscar por N° Orden"]', id);
+      await page.fill('input[placeholder*="Buscar por N° Orden"]', nombre);
       await expect(page.locator('tbody tr').first().locator('td').nth(1)).toHaveText(`#${id}`, { timeout: 15000 });
       await page.locator('tbody tr').first().locator('button[title="Ver / Editar Detalles"]').click();
       await page.waitForTimeout(1000);
@@ -138,10 +142,12 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
 
     // Responsable deriva a Resolutor de Subsidio y pone en Consideración
     console.log('[QA] Responsable asigna Resolutor de Subsidio y cambia estado a Consideración...');
-    for (const id of idsCreados) {
+    for (let idx = 0; idx < idsCreados.length; idx++) {
+      const id = idsCreados[idx];
+      const nombre = nombresCreados[idx];
       await iniciarSesion(page, CREDENTIALS.RESPONSABLE.email, CREDENTIALS.RESPONSABLE.pass, 'Responsable');
       await page.goto(`${BASE_URL}/mis-solicitudes`);
-      await page.fill('input[placeholder*="Buscar por N° Orden"]', id);
+      await page.fill('input[placeholder*="Buscar por N° Orden"]', nombre);
       await expect(page.locator('tbody tr').first().locator('td').nth(1)).toHaveText(`#${id}`, { timeout: 15000 });
       await page.locator('tbody tr').first().locator('button[title="Ver / Editar Detalles"]').click();
       await page.waitForTimeout(1000);
@@ -204,9 +210,11 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
 
     // Validar estados en la UI
     console.log('[QA] Verificando que las solicitudes pasaron a estado Resuelto...');
-    for (const id of idsCreados) {
+    for (let idx = 0; idx < idsCreados.length; idx++) {
+      const id = idsCreados[idx];
+      const nombre = nombresCreados[idx];
       await page.goto(`${BASE_URL}/mis-solicitudes`);
-      await page.fill('input[placeholder*="Buscar por N° Orden"]', id);
+      await page.fill('input[placeholder*="Buscar por N° Orden"]', nombre);
       await expect(page.locator('tbody tr').first().locator('td').nth(1)).toHaveText(`#${id}`, { timeout: 15000 });
       const estadoCelda = page.locator('tbody tr').first().locator('td:nth-child(7)'); // Columna estado
       await expect(estadoCelda).toHaveText('Resueltas');
@@ -279,6 +287,7 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
   test('Caso 3: Flujo Completo de 3 Solicitudes de Resolución de Tipo Agenda', async ({ page }) => {
     test.setTimeout(240000);
     const idsCreados = [];
+    const nombresCreados = [];
 
     // Crear 3 solicitudes como Operador
     console.log('[QA] Creando 3 solicitudes para flujo Agenda...');
@@ -327,15 +336,18 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       
       expect(solicitudId).not.toBeNull();
       idsCreados.push(solicitudId);
+      nombresCreados.push(benefName);
       console.log(`[QA] Solicitud creada exitosamente con ID: ${solicitudId}`);
     }
 
     // Distribuidor asigna responsable
     console.log('[QA] Distribuidor asigna Responsable y Zona...');
-    for (const id of idsCreados) {
+    for (let idx = 0; idx < idsCreados.length; idx++) {
+      const id = idsCreados[idx];
+      const nombre = nombresCreados[idx];
       await iniciarSesion(page, CREDENTIALS.DISTRIBUIDOR.email, CREDENTIALS.DISTRIBUIDOR.pass, 'DISTRIBUIDOR');
       await page.goto(`${BASE_URL}/mis-solicitudes`);
-      await page.fill('input[placeholder*="Buscar por N° Orden"]', id);
+      await page.fill('input[placeholder*="Buscar por N° Orden"]', nombre);
       await expect(page.locator('tbody tr').first().locator('td').nth(1)).toHaveText(`#${id}`, { timeout: 15000 });
       await page.locator('tbody tr').first().locator('button[title="Ver / Editar Detalles"]').click();
       await page.waitForTimeout(1000);
@@ -350,10 +362,12 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
 
     // Responsable deriva a Resolutor de Agenda (Maria Veronica Gonzalez)
     console.log('[QA] Responsable asigna Resolutor de Agenda...');
-    for (const id of idsCreados) {
+    for (let idx = 0; idx < idsCreados.length; idx++) {
+      const id = idsCreados[idx];
+      const nombre = nombresCreados[idx];
       await iniciarSesion(page, CREDENTIALS.RESPONSABLE.email, CREDENTIALS.RESPONSABLE.pass, 'Responsable');
       await page.goto(`${BASE_URL}/mis-solicitudes`);
-      await page.fill('input[placeholder*="Buscar por N° Orden"]', id);
+      await page.fill('input[placeholder*="Buscar por N° Orden"]', nombre);
       await expect(page.locator('tbody tr').first().locator('td').nth(1)).toHaveText(`#${id}`, { timeout: 15000 });
       await page.locator('tbody tr').first().locator('button[title="Ver / Editar Detalles"]').click();
       await page.waitForTimeout(1000);
@@ -370,10 +384,12 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
 
     // Resolutor de Agenda aprueba la resolución
     console.log('[QA] Resolutor de Agenda completa y aprueba la resolución...');
-    for (const id of idsCreados) {
+    for (let idx = 0; idx < idsCreados.length; idx++) {
+      const id = idsCreados[idx];
+      const nombre = nombresCreados[idx];
       await iniciarSesion(page, CREDENTIALS.RESOLUTOR_AGENDA.email, CREDENTIALS.RESOLUTOR_AGENDA.pass, 'Resolutor');
       await page.goto(`${BASE_URL}/mis-solicitudes`);
-      await page.fill('input[placeholder*="Buscar por N° Orden"]', id);
+      await page.fill('input[placeholder*="Buscar por N° Orden"]', nombre);
       await expect(page.locator('tbody tr').first().locator('td').nth(1)).toHaveText(`#${id}`, { timeout: 15000 });
       await page.locator('tbody tr').first().locator('button[title="Ver / Editar Detalles"]').click();
       await page.waitForTimeout(1000);
@@ -395,10 +411,12 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
 
     // Verificar en la UI que pasaron a estado Resuelto / Completadas
     console.log('[QA] Verificando que las solicitudes pasaron a estado Resuelto...');
-    for (const id of idsCreados) {
+    for (let idx = 0; idx < idsCreados.length; idx++) {
+      const id = idsCreados[idx];
+      const nombre = nombresCreados[idx];
       await iniciarSesion(page, CREDENTIALS.OPERADOR.email, CREDENTIALS.OPERADOR.pass);
       await page.goto(`${BASE_URL}/mis-solicitudes`);
-      await page.fill('input[placeholder*="Buscar por N° Orden"]', id);
+      await page.fill('input[placeholder*="Buscar por N° Orden"]', nombre);
       await expect(page.locator('tbody tr').first().locator('td').nth(1)).toHaveText(`#${id}`, { timeout: 15000 });
       const estadoCelda = page.locator('tbody tr').first().locator('td:nth-child(7)');
       await expect(estadoCelda).toHaveText('Resueltas');
