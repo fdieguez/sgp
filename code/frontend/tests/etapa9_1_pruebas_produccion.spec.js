@@ -402,4 +402,12 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
     }
     console.log('🎉 ¡Prueba de 3 flujos de Agenda finalizada con éxito!');
   });
+
+  // Limpiar la base de datos de producción después de correr todas las pruebas de la suite
+  test.afterAll(async ({ request }) => {
+    console.log('[QA] Limpiando todos los registros de prueba generados en producción...');
+    const response = await request.post(`${BASE_URL}/api/test-helper/clear-all-solicitudes`);
+    expect(response.ok()).toBeTruthy();
+    console.log('[QA] Base de datos de producción limpiada con éxito.');
+  });
 });
