@@ -2,11 +2,24 @@
 
 > **Propósito**: Este archivo registra todos los cambios, mejoras y decisiones técnicas del proyecto SGP para facilitar la continuidad entre sesiones de desarrollo.
 
-**Versión Actual**: `0.9.6` (Resiliencia de Carga, Rol Auditor y Ajustes de Calendario)
+**Versión Actual**: `1.0.0` (Versión Oficial SGP 1.0 - Despliegue, Regresión y Purga de Producción)
 
 ---
 
 ## 📅 Agosto 2026
+
+### 11/08/2026
+- **⭐️ Cierre de la Versión 1.0.0 - QA final, Regresión en Producción y Purga Definitiva:**
+    - **Puesta a Punto de Regresión (Playwright)**:
+        - Robustecimiento de los selectores en [`etapa9_1_pruebas_produccion.spec.js`](file:///c:/Users/fran/dev/projects/SGP/code/frontend/tests/etapa9_1_pruebas_produccion.spec.js) para sincronizar correctamente la columna de verificación de estado (columna número 13 en lugar de la columna 7 correspondiente a Localidad).
+        - Implementación del filtrado robusto por nombre único del beneficiario (`Subsidio E2E Prod <random_6_digitos>`) en el input de búsqueda de la grilla de solicitudes, previniendo fallos por lentitud y castings de ID en la consulta `LIKE` nativa de MySQL en producción.
+    - **Controlador de Control de Calidad Robustecido (`TestHelperController.java`)**:
+        - Corrección del endpoint `/api/test-helper/clear-all-solicitudes` para realizar un `UPDATE` seguro de los campos de `sheets_config` en lugar de `DELETE` o `null`. Esto previene fallos por restricciones `NOT NULL` de clave ajena (`sheet_config_id` en la tabla `projects`) bajo el motor MySQL en producción.
+        - Integración del endpoint POST `/api/test-helper/clear-sheet` y del método `clearSheet` en [`GoogleSheetsService.java`](file:///c:/Users/fran/dev/projects/SGP/code/backend/src/main/java/com/sgp/backend/service/GoogleSheetsService.java) para realizar el vaciado selectivo de las pestañas en planillas externas mediante la API de Google Sheets antes de iniciar tests.
+    - **Resolución de Latencia de Google Sheets**:
+        - Adición de un retardo de 5 segundos (`page.waitForTimeout(5000)`) entre las escrituras del test-helper y la importación de datos en el test de producción. Esto asegura que la API de Google Sheets propague los cambios en sus servidores de caché antes de realizar la lectura de sincronización de estados.
+    - **Limpieza Absoluta de Producción**:
+        - Ejecución final de la purga de la base de datos de producción y vaciado completo de la pestaña `TEST` de Google Sheets, dejando el servidor listo y el autoincremento en `1` para el ingreso oficial de los clientes.
 
 ### 09/08/2026
 - **⭐️ Cierre de la Etapa 9.1 - Resiliencia de Carga, Rol Auditor y Ajustes de Calendario:**
