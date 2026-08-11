@@ -85,8 +85,7 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       await page.locator('label:text-is("Subtipo") + select').selectOption('emprendedor');
       await page.locator('input[placeholder*="Ej: Santa Fe"]').fill('Santa Fe');
       await page.locator('input[placeholder*="Ej: Santa Fe"]').press('Tab');
-      await page.locator('input[placeholder*="Ej: Centro"]').fill('centro');
-
+ 
       await page.click('button:has-text("Guardar Solicitud")');
       
       // Obtener el ID de la solicitud creada del mensaje de toast o del modal
@@ -276,8 +275,7 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       await page.locator('label:text-is("Subtipo") + select').selectOption('emprendedor');
       await page.locator('input[placeholder*="Ej: Santa Fe"]').fill('Santa Fe');
       await page.locator('input[placeholder*="Ej: Santa Fe"]').press('Tab');
-      await page.locator('input[placeholder*="Ej: Centro"]').fill('centro');
-
+ 
       await page.click('button:has-text("Guardar Solicitud")');
       
       const toastSuccess = page.locator('text=creada con éxito');
