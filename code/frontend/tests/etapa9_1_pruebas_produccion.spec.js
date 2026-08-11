@@ -101,7 +101,7 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
         solicitudId = match ? match[1] : null;
       } catch (err) {
         console.error(`[QA] Error al guardar la solicitud ${i}. Inspeccionando mensajes de error en pantalla...`);
-        const validationErrors = await page.locator('text=/.*obligatorio.*/i, text=/.*error.*/i, .text-red-500').allInnerTexts();
+        const validationErrors = await page.locator('.text-red-500, [role="alert"]').allInnerTexts();
         console.error('[QA] Errores visibles en pantalla:', validationErrors);
         throw err;
       }
@@ -303,7 +303,7 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
         solicitudId = match ? match[1] : null;
       } catch (err) {
         console.error(`[QA] Error al guardar la solicitud ${i}. Inspeccionando mensajes de error en pantalla...`);
-        const validationErrors = await page.locator('text=/.*obligatorio.*/i, text=/.*error.*/i, .text-red-500').allInnerTexts();
+        const validationErrors = await page.locator('.text-red-500, [role="alert"]').allInnerTexts();
         console.error('[QA] Errores visibles en pantalla:', validationErrors);
         throw err;
       }
