@@ -165,10 +165,9 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       await expect(page.locator('text=Solicitud actualizada con éxito')).toBeVisible();
     }
 
-    // Exportar las solicitudes a la planilla
     console.log('[QA] Administrador exporta solicitudes en consideración a la planilla...');
     await iniciarSesion(page, CREDENTIALS.ADMIN.email, CREDENTIALS.ADMIN.pass);
-    await page.goto(`${BASE_URL}/settings`);
+    await page.goto(`${BASE_URL}/mis-solicitudes`);
     
     // Asociar o verificar asociación de planilla
     await page.click('button:has-text("Asociar Planilla")');
