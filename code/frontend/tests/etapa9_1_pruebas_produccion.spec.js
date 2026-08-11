@@ -165,8 +165,8 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       await expect(page.locator('text=Solicitud actualizada con éxito')).toBeVisible();
     }
 
-    console.log('[QA] Administrador exporta solicitudes en consideración a la planilla...');
-    await iniciarSesion(page, CREDENTIALS.ADMIN.email, CREDENTIALS.ADMIN.pass);
+    console.log('[QA] Resolutor de Subsidio exporta solicitudes en consideración a la planilla...');
+    await iniciarSesion(page, CREDENTIALS.RESOLUTOR_SUBSIDIO.email, CREDENTIALS.RESOLUTOR_SUBSIDIO.pass, 'Resolutor');
     await page.goto(`${BASE_URL}/mis-solicitudes`);
     
     // Asociar o verificar asociación de planilla
@@ -177,7 +177,9 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
     await page.locator('form button[type="submit"]:has-text("Asociar Planilla")').click();
     await page.waitForTimeout(2000);
 
-    await page.locator('button:has-text("Exportar Planilla")').click();
+    // Exportar a Google Sheets abriendo el dropdown correspondiente
+    await page.click('button:has-text("Exportar...")');
+    await page.click('button:has-text("Google Sheets")');
     await expect(page.locator('text=Sincronización de exportación finalizada')).toBeVisible({ timeout: 45000 });
 
     // Modificar los montos en la planilla a un monto positivo (menor al original de forma simulada)
