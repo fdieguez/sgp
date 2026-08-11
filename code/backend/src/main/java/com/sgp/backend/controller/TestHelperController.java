@@ -189,6 +189,14 @@ public class TestHelperController {
             entityManager.createNativeQuery("TRUNCATE TABLE solicitudes").executeUpdate();
             
             try {
+                entityManager.createNativeQuery("UPDATE proyectos SET sheets_config_id = null").executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM sheets_config").executeUpdate();
+                log.info("TestHelper: Configuraciones de SheetsConfig purgadas de forma exitosa.");
+            } catch (Exception e) {
+                log.warn("Error al intentar limpiar sheets_config: {}", e.getMessage());
+            }
+            
+            try {
                 java.sql.Connection conn = entityManager.unwrap(java.sql.Connection.class);
                 String dbProductName = conn.getMetaData().getDatabaseProductName().toLowerCase();
                 if (dbProductName.contains("mysql") || dbProductName.contains("mariadb")) {
