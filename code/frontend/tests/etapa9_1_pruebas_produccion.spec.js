@@ -124,7 +124,7 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       await iniciarSesion(page, CREDENTIALS.DISTRIBUIDOR.email, CREDENTIALS.DISTRIBUIDOR.pass, 'DISTRIBUIDOR');
       await page.goto(`${BASE_URL}/mis-solicitudes`);
       await page.fill('input[placeholder*="Buscar por N° Orden"]', id);
-      await page.waitForTimeout(1000);
+      await expect(page.locator('tbody tr').first().locator('td').nth(1)).toHaveText(`#${id}`, { timeout: 15000 });
       await page.locator('tbody tr').first().locator('button[title="Ver / Editar Detalles"]').click();
       await page.waitForTimeout(1000);
 
@@ -142,7 +142,7 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       await iniciarSesion(page, CREDENTIALS.RESPONSABLE.email, CREDENTIALS.RESPONSABLE.pass, 'Responsable');
       await page.goto(`${BASE_URL}/mis-solicitudes`);
       await page.fill('input[placeholder*="Buscar por N° Orden"]', id);
-      await page.waitForTimeout(1000);
+      await expect(page.locator('tbody tr').first().locator('td').nth(1)).toHaveText(`#${id}`, { timeout: 15000 });
       await page.locator('tbody tr').first().locator('button[title="Ver / Editar Detalles"]').click();
       await page.waitForTimeout(1000);
 
@@ -207,7 +207,7 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
     for (const id of idsCreados) {
       await page.goto(`${BASE_URL}/mis-solicitudes`);
       await page.fill('input[placeholder*="Buscar por N° Orden"]', id);
-      await page.waitForTimeout(1000);
+      await expect(page.locator('tbody tr').first().locator('td').nth(1)).toHaveText(`#${id}`, { timeout: 15000 });
       const estadoCelda = page.locator('tbody tr').first().locator('td:nth-child(7)'); // Columna estado
       await expect(estadoCelda).toHaveText('Resueltas');
     }
@@ -336,7 +336,7 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       await iniciarSesion(page, CREDENTIALS.DISTRIBUIDOR.email, CREDENTIALS.DISTRIBUIDOR.pass, 'DISTRIBUIDOR');
       await page.goto(`${BASE_URL}/mis-solicitudes`);
       await page.fill('input[placeholder*="Buscar por N° Orden"]', id);
-      await page.waitForTimeout(1000);
+      await expect(page.locator('tbody tr').first().locator('td').nth(1)).toHaveText(`#${id}`, { timeout: 15000 });
       await page.locator('tbody tr').first().locator('button[title="Ver / Editar Detalles"]').click();
       await page.waitForTimeout(1000);
 
@@ -354,7 +354,7 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       await iniciarSesion(page, CREDENTIALS.RESPONSABLE.email, CREDENTIALS.RESPONSABLE.pass, 'Responsable');
       await page.goto(`${BASE_URL}/mis-solicitudes`);
       await page.fill('input[placeholder*="Buscar por N° Orden"]', id);
-      await page.waitForTimeout(1000);
+      await expect(page.locator('tbody tr').first().locator('td').nth(1)).toHaveText(`#${id}`, { timeout: 15000 });
       await page.locator('tbody tr').first().locator('button[title="Ver / Editar Detalles"]').click();
       await page.waitForTimeout(1000);
 
@@ -374,7 +374,7 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       await iniciarSesion(page, CREDENTIALS.RESOLUTOR_AGENDA.email, CREDENTIALS.RESOLUTOR_AGENDA.pass, 'Resolutor');
       await page.goto(`${BASE_URL}/mis-solicitudes`);
       await page.fill('input[placeholder*="Buscar por N° Orden"]', id);
-      await page.waitForTimeout(1000);
+      await expect(page.locator('tbody tr').first().locator('td').nth(1)).toHaveText(`#${id}`, { timeout: 15000 });
       await page.locator('tbody tr').first().locator('button[title="Ver / Editar Detalles"]').click();
       await page.waitForTimeout(1000);
 
@@ -399,7 +399,7 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       await iniciarSesion(page, CREDENTIALS.OPERADOR.email, CREDENTIALS.OPERADOR.pass);
       await page.goto(`${BASE_URL}/mis-solicitudes`);
       await page.fill('input[placeholder*="Buscar por N° Orden"]', id);
-      await page.waitForTimeout(1000);
+      await expect(page.locator('tbody tr').first().locator('td').nth(1)).toHaveText(`#${id}`, { timeout: 15000 });
       const estadoCelda = page.locator('tbody tr').first().locator('td:nth-child(7)');
       await expect(estadoCelda).toHaveText('Resueltas');
     }
