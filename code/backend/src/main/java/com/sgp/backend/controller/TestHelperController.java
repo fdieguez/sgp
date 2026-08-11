@@ -35,7 +35,7 @@ public class TestHelperController {
                 .replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u") : "";
 
         try {
-            String range = "'" + sheetName + "'!A1:AD300";
+            String range = "'" + sheetName + "'!A1:AD1000";
             List<List<Object>> data = googleSheetsService.readSheet(spreadsheetId, range);
             if (data == null || data.size() < 2) {
                 return ResponseEntity.badRequest().body(Map.of("error", "No hay datos en la planilla."));
@@ -230,6 +230,20 @@ public class TestHelperController {
             return ResponseEntity.ok(Map.of("data", data != null ? data : List.of()));
         } catch (Exception e) {
             log.error("Error al leer hoja", e);
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/clear-sheet")
+    public ResponseEntity<?> clearSheet(@RequestBody Map<String, Object> payload) {
+        String spreadsheetId = (String) payload.get("spreadsheetId");
+        String sheetName = (String) payload.get("sheetName");
+        log.info("TestHelper: Limpiando la pestaña {} de la planilla {}", sheetName, spreadsheetId);
+        try {
+            googleSheetsService.clearSheet(spreadsheetId, "'" + sheetName + "'!A3:Z1000");
+            return ResponseEntity.ok(Map.of("message", "Planilla limpiada exitosamente"));
+        } catch (Exception e) {
+            log.error("Fallo al limpiar planilla", e);
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }

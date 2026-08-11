@@ -108,4 +108,17 @@ public class GoogleSheetsService {
                 .setInsertDataOption("INSERT_ROWS")
                 .execute();
     }
+
+    /**
+     * Limpia o vacía las celdas de un rango específico de una planilla de Google Sheets.
+     *
+     * @param spreadsheetId El ID de la planilla.
+     * @param range         El rango en notación A1 (ej: "Planilla de Salida!A3:Z1000").
+     */
+    public void clearSheet(String spreadsheetId, String range) throws java.io.IOException {
+        sheetsService.spreadsheets().values()
+                .clear(spreadsheetId, range, new com.google.api.services.sheets.v4.model.ClearValuesRequest())
+                .execute();
+    }
 }
+
