@@ -51,6 +51,10 @@ public class SecurityConfig {
                                                                 new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
                                                                                 "/h2-console/**"))
                                                 .permitAll()
+                                                .requestMatchers(
+                                                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
+                                                                                "/error"))
+                                                .permitAll()
                                                 // Endpoints de Sincronización de Planilla de Salida (Accesible para ADMIN y RESOLUTOR)
                                                 .requestMatchers(
                                                                 new org.springframework.security.web.util.matcher.AntPathRequestMatcher(

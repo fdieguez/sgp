@@ -189,9 +189,15 @@ public class TestHelperController {
             entityManager.createNativeQuery("TRUNCATE TABLE solicitudes").executeUpdate();
             
             try {
-                entityManager.createNativeQuery("ALTER TABLE solicitudes ALTER COLUMN id RESTART WITH 1").executeUpdate();
+                java.sql.Connection conn = entityManager.unwrap(java.sql.Connection.class);
+                String dbProductName = conn.getMetaData().getDatabaseProductName().toLowerCase();
+                if (dbProductName.contains("mysql") || dbProductName.contains("mariadb")) {
+                    entityManager.createNativeQuery("ALTER TABLE solicitudes AUTO_INCREMENT = 1").executeUpdate();
+                } else {
+                    entityManager.createNativeQuery("ALTER TABLE solicitudes ALTER COLUMN id RESTART WITH 1").executeUpdate();
+                }
             } catch (Exception e) {
-                // ignorar si no es H2
+                log.warn("Fallo al reiniciar el AUTO_INCREMENT de solicitudes: {}", e.getMessage());
             }
             
             entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();
