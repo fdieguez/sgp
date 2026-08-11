@@ -89,6 +89,9 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       await page.locator('input[placeholder*="Ej: Santa Fe"]').press('Enter');
       await page.waitForTimeout(500);
  
+      await page.locator('label:has-text("Barrio")').locator('..').locator('input').first().fill('Centro');
+      await page.waitForTimeout(500);
+ 
       await page.click('button:has-text("Guardar Solicitud")');
       
       // Obtener el ID de la solicitud creada con captura de errores de validación
@@ -101,8 +104,12 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
         solicitudId = match ? match[1] : null;
       } catch (err) {
         console.error(`[QA] Error al guardar la solicitud ${i}. Inspeccionando mensajes de error en pantalla...`);
-        const validationErrors = await page.locator('.text-red-500, [role="alert"]').allInnerTexts();
-        console.error('[QA] Errores visibles en pantalla:', validationErrors);
+        const validationErrors = await page.evaluate(() => {
+          return Array.from(document.querySelectorAll('*'))
+            .map(el => el.innerText)
+            .filter(text => text && (text.toLowerCase().includes('obligatorio') || text.toLowerCase().includes('error')));
+        });
+        console.error('[QA] Errores/Toasts detectados:', validationErrors.slice(0, 10));
         throw err;
       }
       
@@ -291,6 +298,9 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       await page.locator('input[placeholder*="Ej: Santa Fe"]').press('Enter');
       await page.waitForTimeout(500);
  
+      await page.locator('label:has-text("Barrio")').locator('..').locator('input').first().fill('Centro');
+      await page.waitForTimeout(500);
+ 
       await page.click('button:has-text("Guardar Solicitud")');
       
       // Obtener el ID de la solicitud creada con captura de errores de validación
@@ -303,8 +313,12 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
         solicitudId = match ? match[1] : null;
       } catch (err) {
         console.error(`[QA] Error al guardar la solicitud ${i}. Inspeccionando mensajes de error en pantalla...`);
-        const validationErrors = await page.locator('.text-red-500, [role="alert"]').allInnerTexts();
-        console.error('[QA] Errores visibles en pantalla:', validationErrors);
+        const validationErrors = await page.evaluate(() => {
+          return Array.from(document.querySelectorAll('*'))
+            .map(el => el.innerText)
+            .filter(text => text && (text.toLowerCase().includes('obligatorio') || text.toLowerCase().includes('error')));
+        });
+        console.error('[QA] Errores/Toasts detectados:', validationErrors.slice(0, 10));
         throw err;
       }
       
