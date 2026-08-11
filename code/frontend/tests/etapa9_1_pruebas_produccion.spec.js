@@ -171,6 +171,8 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
     await page.goto(`${BASE_URL}/settings`);
     
     // Asociar o verificar asociación de planilla
+    await page.click('button:has-text("Asociar Planilla")');
+    await page.waitForSelector('h3:has-text("Asociar Planilla Externa")');
     await page.locator('input[placeholder*="Ej: 1jPw9ni4BW"]').fill(SPREADSHEET_ID);
     await page.locator('label:has-text("Nombre de la Hoja") + input').fill(SHEET_NAME);
     await page.locator('form button[type="submit"]:has-text("Asociar Planilla")').click();
