@@ -84,16 +84,28 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       await page.locator('label:has-text("Tipo Solicitante") + select').selectOption('Personal');
       await page.locator('label:text-is("Subtipo") + select').selectOption('emprendedor');
       await page.locator('input[placeholder*="Ej: Santa Fe"]').fill('Santa Fe');
-      await page.locator('input[placeholder*="Ej: Santa Fe"]').press('Tab');
+      await page.waitForTimeout(1000);
+      await page.locator('input[placeholder*="Ej: Santa Fe"]').press('ArrowDown');
+      await page.locator('input[placeholder*="Ej: Santa Fe"]').press('Enter');
+      await page.waitForTimeout(500);
  
       await page.click('button:has-text("Guardar Solicitud")');
       
-      // Obtener el ID de la solicitud creada del mensaje de toast o del modal
-      const toastSuccess = page.locator('text=creada con éxito');
-      await expect(toastSuccess).toBeVisible();
-      const toastText = await toastSuccess.innerText();
-      const match = toastText.match(/#(\d+)/);
-      const solicitudId = match ? match[1] : null;
+      // Obtener el ID de la solicitud creada con captura de errores de validación
+      let solicitudId = null;
+      try {
+        const toastSuccess = page.locator('text=creada con éxito');
+        await expect(toastSuccess).toBeVisible({ timeout: 8000 });
+        const toastText = await toastSuccess.innerText();
+        const match = toastText.match(/#(\d+)/);
+        solicitudId = match ? match[1] : null;
+      } catch (err) {
+        console.error(`[QA] Error al guardar la solicitud ${i}. Inspeccionando mensajes de error en pantalla...`);
+        const validationErrors = await page.locator('text=/.*obligatorio.*/i, text=/.*error.*/i, .text-red-500').allInnerTexts();
+        console.error('[QA] Errores visibles en pantalla:', validationErrors);
+        throw err;
+      }
+      
       expect(solicitudId).not.toBeNull();
       idsCreados.push(solicitudId);
       console.log(`[QA] Solicitud creada exitosamente con ID: ${solicitudId}`);
@@ -274,15 +286,28 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       await page.locator('label:has-text("Tipo Solicitante") + select').selectOption('Personal');
       await page.locator('label:text-is("Subtipo") + select').selectOption('emprendedor');
       await page.locator('input[placeholder*="Ej: Santa Fe"]').fill('Santa Fe');
-      await page.locator('input[placeholder*="Ej: Santa Fe"]').press('Tab');
+      await page.waitForTimeout(1000);
+      await page.locator('input[placeholder*="Ej: Santa Fe"]').press('ArrowDown');
+      await page.locator('input[placeholder*="Ej: Santa Fe"]').press('Enter');
+      await page.waitForTimeout(500);
  
       await page.click('button:has-text("Guardar Solicitud")');
       
-      const toastSuccess = page.locator('text=creada con éxito');
-      await expect(toastSuccess).toBeVisible();
-      const toastText = await toastSuccess.innerText();
-      const match = toastText.match(/#(\d+)/);
-      const solicitudId = match ? match[1] : null;
+      // Obtener el ID de la solicitud creada con captura de errores de validación
+      let solicitudId = null;
+      try {
+        const toastSuccess = page.locator('text=creada con éxito');
+        await expect(toastSuccess).toBeVisible({ timeout: 8000 });
+        const toastText = await toastSuccess.innerText();
+        const match = toastText.match(/#(\d+)/);
+        solicitudId = match ? match[1] : null;
+      } catch (err) {
+        console.error(`[QA] Error al guardar la solicitud ${i}. Inspeccionando mensajes de error en pantalla...`);
+        const validationErrors = await page.locator('text=/.*obligatorio.*/i, text=/.*error.*/i, .text-red-500').allInnerTexts();
+        console.error('[QA] Errores visibles en pantalla:', validationErrors);
+        throw err;
+      }
+      
       expect(solicitudId).not.toBeNull();
       idsCreados.push(solicitudId);
       console.log(`[QA] Solicitud creada exitosamente con ID: ${solicitudId}`);
