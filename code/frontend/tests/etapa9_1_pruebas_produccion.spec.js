@@ -69,6 +69,17 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
     const idsCreados = [];
     const nombresCreados = [];
 
+    // Limpiar la pestaña TEST de la planilla externa de Google Sheets
+    console.log('[QA] Limpiando pestaña TEST en la planilla de Google Sheets...');
+    const clearRes = await page.request.post(`${BASE_URL}/api/test-helper/clear-sheet`, {
+      data: {
+        spreadsheetId: SPREADSHEET_ID,
+        sheetName: SHEET_NAME
+      }
+    });
+    expect(clearRes.ok()).toBeTruthy();
+    console.log('[QA] Planilla de cálculo de Google Sheets limpiada con éxito.');
+
     // Crear 3 solicitudes como Operador
     console.log('[QA] Creando 3 solicitudes como Operador...');
     for (let i = 1; i <= 3; i++) {
