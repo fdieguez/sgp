@@ -216,7 +216,7 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       await page.goto(`${BASE_URL}/mis-solicitudes`);
       await page.fill('input[placeholder*="Buscar por N° Orden"]', nombre);
       await expect(page.locator('tbody tr').first().locator('td').nth(1)).toHaveText(`#${id}`, { timeout: 15000 });
-      const estadoCelda = page.locator('tbody tr').first().locator('td:nth-child(7)'); // Columna estado
+      const estadoCelda = page.locator('tbody tr').first().locator('td:nth-child(13)'); // Columna estado
       await expect(estadoCelda).toHaveText('Resueltas');
     }
   });
@@ -418,7 +418,7 @@ test.describe('Pruebas de Calidad y Regresión en Producción SGP (v1.0)', () =>
       await page.goto(`${BASE_URL}/mis-solicitudes`);
       await page.fill('input[placeholder*="Buscar por N° Orden"]', nombre);
       await expect(page.locator('tbody tr').first().locator('td').nth(1)).toHaveText(`#${id}`, { timeout: 15000 });
-      const estadoCelda = page.locator('tbody tr').first().locator('td:nth-child(7)');
+      const estadoCelda = page.locator('tbody tr').first().locator('td:nth-child(13)');
       await expect(estadoCelda).toHaveText('Resueltas');
     }
     console.log('🎉 ¡Prueba de 3 flujos de Agenda finalizada con éxito!');
