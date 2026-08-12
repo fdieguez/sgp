@@ -76,7 +76,7 @@ test.describe('Pruebas Locales E2E SGP - Reglas de Negocio de Importación de Su
 
     for (let i = 0; i < variaciones.length; i++) {
       await iniciarSesion(page, CREDENTIALS.OPERADOR.email, CREDENTIALS.OPERADOR.pass);
-      await page.goto(`${BASE_URL}/projects/config/2`);
+      await page.goto(`${BASE_URL}/mis-solicitudes`);
       await page.click('button:has-text("Nueva Solicitud")');
 
       const rand = Math.floor(Math.random() * 900000) + 100000;
