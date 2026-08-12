@@ -202,8 +202,8 @@ public class TestHelperController {
             entityManager.createNativeQuery("TRUNCATE TABLE solicitudes").executeUpdate();
             
             try {
-                entityManager.createNativeQuery("UPDATE sheets_config SET spreadsheet_id = '', sheet_name = ''").executeUpdate();
-                log.info("TestHelper: Campos de SheetsConfig vaciados de forma exitosa.");
+                entityManager.createNativeQuery("UPDATE sheets_config SET spreadsheet_id = ''").executeUpdate();
+                log.info("TestHelper: Campos de spreadsheetId en SheetsConfig vaciados de forma exitosa.");
             } catch (Exception e) {
                 log.warn("Error al intentar limpiar sheets_config: {}", e.getMessage());
             }
