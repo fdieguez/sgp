@@ -238,6 +238,16 @@ public class TestHelperController {
         }
     }
 
+    @GetMapping("/get-configs")
+    public ResponseEntity<?> getConfigs() {
+        try {
+            List<?> configs = entityManager.createNativeQuery("SELECT * FROM sheets_config").getResultList();
+            return ResponseEntity.ok(configs);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(e.getMessage());
+        }
+    }
+
     @GetMapping("/sheet-titles")
     public ResponseEntity<?> getSheetTitles(@RequestParam String spreadsheetId) {
         try {
