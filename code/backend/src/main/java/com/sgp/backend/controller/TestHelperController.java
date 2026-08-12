@@ -162,7 +162,15 @@ public class TestHelperController {
     public ResponseEntity<?> clearAllSolicitudes() {
         log.info("TestHelper: Limpiando absolutamente todas las solicitudes y reseteando auto_increment");
         try {
-            entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 0").executeUpdate();
+            try {
+                entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 0").executeUpdate();
+            } catch (Exception e) {
+                try {
+                    entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY FALSE").executeUpdate();
+                } catch (Exception ex) {
+                    log.warn("Fallo al deshabilitar restricciones de clave ajena: {}", ex.getMessage());
+                }
+            }
             
             try {
                 List<com.sgp.backend.entity.DocumentoAdjunto> adjuntos = entityManager.createQuery(
@@ -207,13 +215,25 @@ public class TestHelperController {
                 log.warn("Fallo al reiniciar el AUTO_INCREMENT de solicitudes: {}", e.getMessage());
             }
             
-            entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();
+            try {
+                entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();
+            } catch (Exception e) {
+                try {
+                    entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE").executeUpdate();
+                } catch (Exception ex) {
+                    log.warn("Fallo al habilitar restricciones de clave ajena: {}", ex.getMessage());
+                }
+            }
             
             return ResponseEntity.ok(Map.of("message", "Todas las solicitudes han sido eliminadas y el identificador de inicio ha sido reseteado a 1."));
         } catch (Exception e) {
             log.error("Error al limpiar todas las solicitudes", e);
             try {
-                entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();
+                try {
+                    entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();
+                } catch (Exception ex) {
+                    entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE").executeUpdate();
+                }
             } catch (Exception ex) {}
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
