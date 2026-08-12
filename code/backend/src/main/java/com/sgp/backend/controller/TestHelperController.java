@@ -162,14 +162,14 @@ public class TestHelperController {
     public ResponseEntity<?> clearAllSolicitudes() {
         log.info("TestHelper: Limpiando absolutamente todas las solicitudes y reseteando auto_increment");
         try {
-            try {
+            java.sql.Connection conn = entityManager.unwrap(java.sql.Connection.class);
+            String dbProductName = conn.getMetaData().getDatabaseProductName().toLowerCase();
+            boolean isMySQL = dbProductName.contains("mysql") || dbProductName.contains("mariadb");
+
+            if (isMySQL) {
                 entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 0").executeUpdate();
-            } catch (Exception e) {
-                try {
-                    entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY FALSE").executeUpdate();
-                } catch (Exception ex) {
-                    log.warn("Fallo al deshabilitar restricciones de clave ajena: {}", ex.getMessage());
-                }
+            } else {
+                entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY FALSE").executeUpdate();
             }
             
             try {
@@ -204,9 +204,7 @@ public class TestHelperController {
             }
             
             try {
-                java.sql.Connection conn = entityManager.unwrap(java.sql.Connection.class);
-                String dbProductName = conn.getMetaData().getDatabaseProductName().toLowerCase();
-                if (dbProductName.contains("mysql") || dbProductName.contains("mariadb")) {
+                if (isMySQL) {
                     entityManager.createNativeQuery("ALTER TABLE solicitudes AUTO_INCREMENT = 1").executeUpdate();
                 } else {
                     entityManager.createNativeQuery("ALTER TABLE solicitudes ALTER COLUMN id RESTART WITH 1").executeUpdate();
@@ -215,23 +213,21 @@ public class TestHelperController {
                 log.warn("Fallo al reiniciar el AUTO_INCREMENT de solicitudes: {}", e.getMessage());
             }
             
-            try {
+            if (isMySQL) {
                 entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();
-            } catch (Exception e) {
-                try {
-                    entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE").executeUpdate();
-                } catch (Exception ex) {
-                    log.warn("Fallo al habilitar restricciones de clave ajena: {}", ex.getMessage());
-                }
+            } else {
+                entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE").executeUpdate();
             }
             
             return ResponseEntity.ok(Map.of("message", "Todas las solicitudes han sido eliminadas y el identificador de inicio ha sido reseteado a 1."));
         } catch (Exception e) {
             log.error("Error al limpiar todas las solicitudes", e);
             try {
-                try {
+                java.sql.Connection conn = entityManager.unwrap(java.sql.Connection.class);
+                String dbProductName = conn.getMetaData().getDatabaseProductName().toLowerCase();
+                if (dbProductName.contains("mysql") || dbProductName.contains("mariadb")) {
                     entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();
-                } catch (Exception ex) {
+                } else {
                     entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE").executeUpdate();
                 }
             } catch (Exception ex) {}
