@@ -19,6 +19,7 @@ public class TestHelperController {
     private final GoogleSheetsService googleSheetsService;
     private final FileService fileService;
     private final jakarta.persistence.EntityManager entityManager;
+    private final javax.sql.DataSource dataSource;
 
     @PostMapping("/modify-solicitud-row")
     public ResponseEntity<?> modifySolicitudRow(@RequestBody Map<String, Object> payload) {
@@ -161,11 +162,15 @@ public class TestHelperController {
     @PostMapping("/clear-all-solicitudes")
     public ResponseEntity<?> clearAllSolicitudes() {
         log.info("TestHelper: Limpiando absolutamente todas las solicitudes y reseteando auto_increment");
-        try {
-            java.sql.Connection conn = entityManager.unwrap(java.sql.Connection.class);
+        boolean isMySQL = false;
+        try (java.sql.Connection conn = dataSource.getConnection()) {
             String dbProductName = conn.getMetaData().getDatabaseProductName().toLowerCase();
-            boolean isMySQL = dbProductName.contains("mysql") || dbProductName.contains("mariadb");
+            isMySQL = dbProductName.contains("mysql") || dbProductName.contains("mariadb");
+        } catch (Exception e) {
+            log.warn("Fallo al detectar motor de base de datos desde DataSource: {}", e.getMessage());
+        }
 
+        try {
             if (isMySQL) {
                 entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 0").executeUpdate();
             } else {
@@ -223,9 +228,7 @@ public class TestHelperController {
         } catch (Exception e) {
             log.error("Error al limpiar todas las solicitudes", e);
             try {
-                java.sql.Connection conn = entityManager.unwrap(java.sql.Connection.class);
-                String dbProductName = conn.getMetaData().getDatabaseProductName().toLowerCase();
-                if (dbProductName.contains("mysql") || dbProductName.contains("mariadb")) {
+                if (isMySQL) {
                     entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();
                 } else {
                     entityManager.createNativeQuery("SET REFERENTIAL_INTEGRITY TRUE").executeUpdate();
