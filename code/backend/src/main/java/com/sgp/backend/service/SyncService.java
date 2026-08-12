@@ -747,7 +747,7 @@ public class SyncService {
             }
 
             // 2. Si es de tipo Subsidio, sincronizar diferencias e importar estado por importe
-            if ("SUBSIDIO".equalsIgnoreCase(solicitud.getType()) || "PEDIDO".equalsIgnoreCase(solicitud.getType())) {
+            if ("SUBSIDIO".equalsIgnoreCase(solicitud.getType())) {
                 // Sincronizar Monto
                 if (columnMapping.containsKey("monto_solicitado")) {
                     String montoStr = getValue(row, columnMapping.get("monto_solicitado"));
