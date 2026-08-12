@@ -385,7 +385,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 setAsistencia(initialData.asistencia || '');
             } else {
                 setFormData({
-                    type: 'PEDIDO',
+                    type: configId ? 'SUBSIDIO' : 'PEDIDO',
                     description: '',
                     status: 'pendiente',
                     origin: 'MANUAL',
