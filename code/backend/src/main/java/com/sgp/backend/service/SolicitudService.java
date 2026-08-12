@@ -301,6 +301,9 @@ public class SolicitudService {
             userRepository.findByEmail(auth.getName()).ifPresent(solicitud::setCreatedBy);
         }
 
+        if (solicitud.getType() == null || "PEDIDO".equalsIgnoreCase(solicitud.getType())) {
+            solicitud.setType("SUBSIDIO");
+        }
         Solicitud saved = solicitudRepository.save(solicitud);
 
         // Procesar asignaciones si están presentes
