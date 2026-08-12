@@ -233,7 +233,7 @@ test.describe('Pruebas Locales E2E SGP - Reglas de Negocio de Importación de Su
       await page.goto(`${BASE_URL}/mis-solicitudes`);
       await page.fill('input[placeholder*="Buscar por N° Orden"]', aser.nombre);
       await expect(page.locator('tbody tr').first().locator('td').nth(1)).toHaveText(`#${aser.id}`, { timeout: 15000 });
-      const estadoCelda = page.locator('tbody tr').first().locator('td:nth-child(10)');
+      const estadoCelda = page.locator('tbody tr').first().locator('td:nth-child(13)');
       await expect(estadoCelda).toHaveText(aser.estadoEsperado);
       console.log(`[QA-Local] Solicitud #${aser.id} validada con éxito: Estado es "${aser.estadoEsperado}".`);
     }
