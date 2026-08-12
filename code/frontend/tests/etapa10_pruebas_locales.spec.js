@@ -191,18 +191,16 @@ test.describe('Pruebas Locales E2E SGP - Reglas de Negocio de Importación de Su
     ];
 
     for (const mod of modificaciones) {
-      if (mod.valor !== '') {
-        const res = await page.request.post(`${BACKEND_URL}/api/test-helper/modify-solicitud-row`, {
-          data: {
-            spreadsheetId: SPREADSHEET_ID,
-            sheetName: SHEET_NAME,
-            solicitudId: mod.id,
-            columnName: 'Monto en dinero',
-            newValue: mod.valor
-          }
-        });
-        expect(res.ok()).toBeTruthy();
-      }
+      const res = await page.request.post(`${BACKEND_URL}/api/test-helper/modify-solicitud-row`, {
+        data: {
+          spreadsheetId: SPREADSHEET_ID,
+          sheetName: SHEET_NAME,
+          solicitudId: mod.id,
+          columnName: 'Monto en dinero',
+          newValue: mod.valor
+        }
+      });
+      expect(res.ok()).toBeTruthy();
     }
 
     // Esperar propagación de caché
