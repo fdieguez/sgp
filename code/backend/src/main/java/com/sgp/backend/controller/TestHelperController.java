@@ -238,26 +238,6 @@ public class TestHelperController {
         }
     }
 
-    @GetMapping("/get-solicitudes")
-    public ResponseEntity<?> getSolicitudes() {
-        try {
-            List<?> solicitudes = entityManager.createNativeQuery("SELECT id, type, status FROM solicitudes").getResultList();
-            return ResponseEntity.ok(solicitudes);
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(e.getMessage());
-        }
-    }
-
-    @GetMapping("/get-configs")
-    public ResponseEntity<?> getConfigs() {
-        try {
-            List<?> configs = entityManager.createNativeQuery("SELECT * FROM sheets_config").getResultList();
-            return ResponseEntity.ok(configs);
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(e.getMessage());
-        }
-    }
-
     @GetMapping("/sheet-titles")
     public ResponseEntity<?> getSheetTitles(@RequestParam String spreadsheetId) {
         try {
