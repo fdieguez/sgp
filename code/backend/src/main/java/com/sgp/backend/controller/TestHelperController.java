@@ -238,6 +238,16 @@ public class TestHelperController {
         }
     }
 
+    @GetMapping("/get-solicitudes")
+    public ResponseEntity<?> getSolicitudes() {
+        try {
+            List<?> solicitudes = entityManager.createNativeQuery("SELECT id, type, status FROM solicitudes").getResultList();
+            return ResponseEntity.ok(solicitudes);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(e.getMessage());
+        }
+    }
+
     @GetMapping("/get-configs")
     public ResponseEntity<?> getConfigs() {
         try {
