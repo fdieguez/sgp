@@ -235,8 +235,8 @@ test.describe('Flujo Avanzado: Doble Resolutor y Carga Completa', () => {
       // ========================================================
       // PASO 4: RESOLUTOR 1 - APROBACIÓN DE RESOLUCIÓN "OTRA"
       // ========================================================
-      console.log(`[TEST-AVANZADO] PASO 4: Ingresando como Resolutor 1 (matias.ippolito.resolutor@gmail.com)...`);
-      await robustLogin('matias.ippolito.resolutor@gmail.com', 'Matias_Res_SGP_2026!');
+      console.log(`[TEST-AVANZADO] PASO 4: Ingresando como Resolutor 1 (resolutor@sgp.com)...`);
+      await robustLogin('resolutor@sgp.com', 'Resolutor_SGP_2026!');
 
       const searchInputResol1 = page.locator('input[placeholder*="Buscar"]');
       await searchInputResol1.fill(solicitudId);
