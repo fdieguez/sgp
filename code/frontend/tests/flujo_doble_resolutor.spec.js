@@ -183,15 +183,9 @@ test.describe('Flujo Avanzado: Doble Resolutor y Carga Completa', () => {
       await container2.locator('select').first().selectOption('AGENDA');
       await page.waitForTimeout(1500);
       
-      // Rellenar los 9 campos dinámicos de AGENDA
-      await container2.locator('label:has-text("actividad") + select').selectOption({ index: 1 });
-      await container2.locator('label:has-text("Organización propia") + select').selectOption({ index: 1 });
-      await container2.locator('label:has-text("Detalle de actividad") + textarea').fill(`Temario de la actividad del evento: agenda del día, presentaciones, debate y conclusiones ${idUnico}`);
-      await container2.locator('label:has-text("asisten") + input').fill(`Asistentes esperados: 50 personas de la comunidad local y representantes ${idUnico}`);
+      // Rellenar los 3 campos dinámicos reales de AGENDA sembrados en base de datos
+      await container2.locator('label:has-text("Fecha") + input').fill('2026-05-30');
       await container2.locator('label:has-text("inter") + select').selectOption({ index: 1 });
-      await container2.locator('label:has-text("Aporte") + select').selectOption({ index: 1 });
-      await container2.locator('label:has-text("aporte") + textarea').fill(`Aporte del SGP para la logística del evento y sonido ${idUnico}`);
-      await container2.locator('label:has-text("responsable") + input').fill(`Juan Perez Responsable, DNI: ${dniAleatorio}, Tel: 3415998877`);
       await container2.locator('label:has-text("Observac") + textarea').fill(`Observación de la agenda del evento cargada por el test de doble resolutor.`);
       await page.waitForTimeout(1000);
 
