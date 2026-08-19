@@ -147,8 +147,8 @@ test.describe('Flujo Avanzado: Doble Resolutor y Carga Completa', () => {
       await page.locator('label:has-text("Barrio") + input').fill('Candioti');
       await page.locator('label:has-text("Zona") + input').fill('Zona Norte');
 
-      // 3.3 Datos del Pedido (Subsidio)
-      await page.locator('label:text-is("Tipo") + select').selectOption('SUBSIDIO');
+      // 3.3 Datos del Pedido (Subsidio) - Omitido selector oculto en creación
+      // await page.locator('label:text-is("Tipo") + select').selectOption('SUBSIDIO');
       await page.locator('label:has-text("Monto") + input').fill('250000');
       await page.locator('label:has-text("Fecha Entrega") + input').fill('2026-05-30');
 
