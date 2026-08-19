@@ -277,9 +277,9 @@ test.describe('Flujo Avanzado: Doble Resolutor y Carga Completa', () => {
       console.log(`[TEST-AVANZADO] Resolutor 2 aprueba la resolución AGENDA...`);
       await page.click('button:has-text("Aprobar")');
       await page.locator('textarea[placeholder*="detalles"]').fill(`Resolución aprobada por Resolutor 2 en agenda (${idUnico})`);
-      
+      await page.locator('label:has-text("Sin Asistencia") input[type="radio"]').check();
       await page.screenshot({ path: path.join(pruebaDir, '5_resolutor2_aprobacion.png') });
-      await page.click('button:has-text("Confirmar")');
+      await page.click('button:has-text("Confirmar y Finalizar")');
       await page.waitForTimeout(2000);
 
       // Salir
