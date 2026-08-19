@@ -165,6 +165,7 @@ public class DataInitializer implements CommandLineRunner {
             User resMartin = createUserIfNotFound("martinnocioni@gmail.com", "Martin_SGP_2026*", "RESOLUTOR", "Martín", "Nocioni", LocalDate.of(1990, 1, 1), "3426144703", null, "31.111.251");
             User resMaria = createUserIfNotFound("mvgonza79@gmail.com", "Maria_SGP_2026%", "RESOLUTOR", "María Veronica", "Gonzalez", LocalDate.of(1990, 1, 1), "3425119354", null, "27.620.830");
             User resEduardo = createUserIfNotFound("ealfaro.51@gmail.com", "Eduardo_SGP_2026^", "RESOLUTOR", "Eduardo", "Alfaro", LocalDate.of(1990, 1, 1), "3434404035", null, "32.831.230");
+            User resDefault = createUserIfNotFound("resolutor@sgp.com", "Resolutor_SGP_2026!", "RESOLUTOR", "Resolutor", "Defecto", LocalDate.of(1990, 1, 1), "3420000000", null, "31.222.333");
  
             // Sembrar Lector de Planillas
             createUserIfNotFound("auditor.sheets@gmail.com", "Lector_SGP_2026#", "LECTOR", "Auditor", "Sheets", LocalDate.of(1990, 1, 1), "3420000000", null, "33.444.555");
@@ -176,14 +177,14 @@ public class DataInitializer implements CommandLineRunner {
             initializeLocations();
 
             // 3. Seed TipoResolucion y Atributos (Omitido)
-            seedTiposYAtributos(null);
+            seedTiposYAtributos(resDefault);
 
             // 4. Vincular Tipos de Resolución a Resolutores en la Base de Datos (ManyToMany)
             System.out.println("⏳ Vinculando tipos de resolución a perfiles de resolutores...");
             
             // Primero limpiar las relaciones previas para estos usuarios específicos
             entityManager.createNativeQuery("DELETE FROM user_tipo_resolucion WHERE user_id IN (:ids)")
-                         .setParameter("ids", List.of(resMaria.getId(), resMartin.getId(), resEduardo.getId()))
+                         .setParameter("ids", List.of(resMaria.getId(), resMartin.getId(), resEduardo.getId(), resDefault.getId()))
                          .executeUpdate();
             
             tipoResolucionRepository.findByTipoIgnoreCase("AGENDA").ifPresent(tr -> {
@@ -212,6 +213,16 @@ public class DataInitializer implements CommandLineRunner {
                 
                 entityManager.createNativeQuery("INSERT INTO user_tipo_resolucion (user_id, tipo_resolucion_id) VALUES (:userId, :tipoId)")
                              .setParameter("userId", resEduardo.getId())
+                             .setParameter("tipoId", tr.getId())
+                             .executeUpdate();
+            });
+
+            tipoResolucionRepository.findByTipoIgnoreCase("OTRA").ifPresent(tr -> {
+                tr.setResolutor(resDefault);
+                tipoResolucionRepository.save(tr);
+                
+                entityManager.createNativeQuery("INSERT INTO user_tipo_resolucion (user_id, tipo_resolucion_id) VALUES (:userId, :tipoId)")
+                             .setParameter("userId", resDefault.getId())
                              .setParameter("tipoId", tr.getId())
                              .executeUpdate();
             });
@@ -457,6 +468,16 @@ public class DataInitializer implements CommandLineRunner {
         ));
 
         upsertTipoResolucion("DECLARACION DE INTERES", resolutorDefault, List.of());
+
+        AtributoResolucion attrDescCorta = obtenerOCrearAtributo("Descripción corta", "TEXT", null);
+        AtributoResolucion attrDetalleResolucion = obtenerOCrearAtributo("Detalle de resolución", "TEXTAREA", null);
+        AtributoResolucion attrAdjuntosAdicionales = obtenerOCrearAtributo("Adjuntos adicionales", "FILE", null);
+
+        upsertTipoResolucion("OTRA", resolutorDefault, List.of(
+            new AtributoConfig(attrDescCorta, true, 1),
+            new AtributoConfig(attrDetalleResolucion, true, 2),
+            new AtributoConfig(attrAdjuntosAdicionales, false, 3)
+        ));
 
         System.out.println("✅ Seeding Formatos Dinámicos Nivel 2 Terminado.");
     }
