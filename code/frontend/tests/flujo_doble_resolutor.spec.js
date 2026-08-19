@@ -98,8 +98,8 @@ test.describe('Flujo Avanzado: Doble Resolutor y Carga Completa', () => {
       await page.locator('label:has-text("Tel") + input').fill('3415998877');
       await page.locator('label:has-text("DNI") + input').fill(dniAleatorio);
       
-      // Checkbox de rol RESOLUTOR y desmarcar OPERADOR
-      await page.locator('label:has-text("Resolutor") input[type="radio"]').check();
+      await page.locator('label:has-text("Resolutor") input[type="checkbox"]').check();
+      await page.locator('label:has-text("Operador") input[type="checkbox"]').uncheck();
 
       // Guardar pantalla de creación de usuario
       await page.screenshot({ path: path.join(pruebaDir, '1_admin_creacion_resolutor2.png') });
