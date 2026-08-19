@@ -131,7 +131,7 @@ test.describe('Flujo Avanzado: Doble Resolutor y Carga Completa', () => {
       // PASO 3: ADMINISTRADOR - CREAR SOLICITUD TOTALMENTE COMPLETA
       // ========================================================
       console.log(`[TEST-AVANZADO] PASO 3: Creando solicitud con todos los campos y dos asignaciones...`);
-      await page.goto('/mis-solicitudes');
+      await page.goto('/projects/config/2');
       await page.click('button:has-text("Nueva Solicitud")');
       await expect(page.locator('h2:has-text("Nueva Solicitud")')).toBeVisible();
 
