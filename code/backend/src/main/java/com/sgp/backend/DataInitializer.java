@@ -242,10 +242,13 @@ public class DataInitializer implements CommandLineRunner {
                 }
             }
 
-            if (projectRepository.count() == 0) {
-                System.out.println("⏳ Sembrando proyectos de prueba por defecto...");
+            List<com.sgp.backend.entity.Project> proyectosExistentes = projectRepository.findAll();
+            boolean existeAgenda = proyectosExistentes.stream().anyMatch(p -> "Proyecto de Agenda E2E".equalsIgnoreCase(p.getName()));
+            boolean existeSubsidio = proyectosExistentes.stream().anyMatch(p -> "Proyecto de Subsidio E2E".equalsIgnoreCase(p.getName()));
+
+            if (!existeAgenda) {
+                System.out.println("⏳ Sembrando proyecto de Agenda por defecto...");
                 
-                // Proyecto 1: Agenda
                 com.sgp.backend.entity.SheetsConfig sc1 = new com.sgp.backend.entity.SheetsConfig();
                 sc1.setSpreadsheetId("spreadsheet-agenda-default-id");
                 sc1.setSheetName("AGENDA");
@@ -258,8 +261,12 @@ public class DataInitializer implements CommandLineRunner {
                 p1.setSheetsConfig(sc1);
                 p1.setDataJson("{}");
                 projectRepository.save(p1);
+                System.out.println("✅ Proyecto de Agenda sembrado correctamente.");
+            }
+
+            if (!existeSubsidio) {
+                System.out.println("⏳ Sembrando proyecto de Subsidio por defecto...");
                 
-                // Proyecto 2: Subsidio
                 com.sgp.backend.entity.SheetsConfig sc2 = new com.sgp.backend.entity.SheetsConfig();
                 sc2.setSpreadsheetId("spreadsheet-subsidio-default-id");
                 sc2.setSheetName("Solicitudes Subsidios");
@@ -271,8 +278,7 @@ public class DataInitializer implements CommandLineRunner {
                 p2.setSheetsConfig(sc2);
                 p2.setDataJson("{}");
                 projectRepository.save(p2);
-                
-                System.out.println("✅ Proyectos de prueba sembrados correctamente.");
+                System.out.println("✅ Proyecto de Subsidio sembrado correctamente.");
             }
 
             // La siembra automática de solicitudes y beneficiarios de ejemplo ha sido removida para que producción permanezca limpio.
