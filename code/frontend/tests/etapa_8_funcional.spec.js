@@ -11,8 +11,8 @@ test.describe('Etapa 8 - Pruebas Funcionales y de Integración', () => {
     const descSolicitudAgenda = `Reunión de agenda de prueba funcional Etapa 8. ID: ${idUnico}`;
     const descSolicitudSubsidio = `Subsidio de prueba funcional Etapa 8. ID: ${idUnico}`;
 
-    // Helper para realizar login de forma robusta
-    const login = async (page, email, pass) => {
+    // Helper para realizar login de forma robusta con soporte para selección de rol
+    const login = async (page, email, pass, rolASeleccionar = null) => {
         await page.goto('/login');
         const emailInput = page.locator('input[type="email"]');
         const passInput = page.locator('input[type="password"]');
@@ -28,8 +28,18 @@ test.describe('Etapa 8 - Pruebas Funcionales y de Integración', () => {
         await passInput.fill(pass);
         
         await page.click('button:has-text("Ingresar")');
-        await page.waitForURL(/.*(dashboard|mis-solicitudes|settings|descargar-adjunto).*/, { timeout: 15000 });
+        await page.waitForURL(/.*(dashboard|mis-solicitudes|settings|descargar-adjunto|select-rol).*/, { timeout: 15000 });
         await page.waitForTimeout(1000);
+
+        if (page.url().includes('/select-rol')) {
+            if (rolASeleccionar) {
+                await page.click(`button:has-text("${rolASeleccionar}")`);
+            } else {
+                await page.locator('.grid button').first().click();
+            }
+            await page.waitForURL(/.*(dashboard|mis-solicitudes|settings).*/, { timeout: 15000 });
+            await page.waitForTimeout(1000);
+        }
     };
 
     test('Escenario 1 & 2: Creación de Agenda, Asistencia Obligatoria en Aprobación y Visualización', async ({ page }) => {
@@ -47,15 +57,16 @@ test.describe('Etapa 8 - Pruebas Funcionales y de Integración', () => {
         // Completar formulario de solicitud
         await page.locator('label:has-text("Nombre Completo") + input').fill(nombreBeneficiarioAgenda);
         await page.locator('label:has-text("Tel") + input').first().fill('3424112233');
+        await page.locator('label:has-text("Tipo Solicitante") + select').selectOption('Club');
+        await page.locator('label:has-text("Localidad") + input').fill('Santa Fe');
+        await page.waitForTimeout(500);
+        await page.locator('label:has-text("Barrio") + input').fill('Centro');
         await page.locator('label:has-text("Descripción / Pedido") + textarea').fill(descSolicitudAgenda);
         
         // Seleccionar Zona y Responsable
         await page.locator('label:has-text("Zona Territorial") + select').selectOption('Norte');
         await page.waitForTimeout(500);
         await page.locator('label:has-text("Responsable") + select').selectOption({ label: 'Matías Ippolito' });
-
-        // Seleccionar Tipo "Agenda"
-        await page.locator('label:has-text("Tipo") + select').first().selectOption('AGENDA');
 
         // Agregar la asignación de Agenda para desplegar sus campos dinámicos
         await page.click('button:has-text("Agregar")');
@@ -119,7 +130,7 @@ test.describe('Etapa 8 - Pruebas Funcionales y de Integración', () => {
 
         // 6. [ESCENARIO 2] Iniciar sesión como Responsable para verificar visualización
         console.log('[ESCENARIO 2] Verificando la asistencia como Responsable');
-        await login(page, 'matias.ippolito.responsable@gmail.com', 'Matias_Resp_SGP_2026!');
+        await login(page, 'matias.ippolito@gmail.com', 'Matias_Dist_SGP_2026!', 'Responsable');
         await page.goto('/mis-solicitudes');
         await page.fill('input[placeholder*="Buscar por N° Orden"]', nombreBeneficiarioAgenda);
         await page.waitForTimeout(1000);
@@ -138,7 +149,7 @@ test.describe('Etapa 8 - Pruebas Funcionales y de Integración', () => {
 
         // 1. Iniciar sesión como Responsable
         console.log('[ESCENARIO 5] Verificando encabezado dinámico para Responsable');
-        await login(page, 'matias.ippolito.responsable@gmail.com', 'Matias_Resp_SGP_2026!');
+        await login(page, 'matias.ippolito@gmail.com', 'Matias_Dist_SGP_2026!', 'Responsable');
         const navbarTextResp = await page.locator('nav').first().innerText();
         expect(navbarTextResp.toUpperCase()).toContain('MATÍAS');
         expect(navbarTextResp.toUpperCase()).toContain('IPPOLITO');
@@ -168,14 +179,17 @@ test.describe('Etapa 8 - Pruebas Funcionales y de Integración', () => {
 
         await page.locator('label:has-text("Nombre Completo") + input').fill(nombreBeneficiarioSubsidio);
         await page.locator('label:has-text("Tel") + input').first().fill('3424998877');
+        await page.locator('label:has-text("Tipo Solicitante") + select').selectOption('Personal');
+        await page.waitForTimeout(500);
+        await page.locator('label:has-text("Subtipo") + select').selectOption('referente');
+        await page.locator('label:has-text("Localidad") + input').fill('Santa Fe');
+        await page.waitForTimeout(500);
+        await page.locator('label:has-text("Barrio") + input').fill('Centro');
         await page.locator('label:has-text("Descripción / Pedido") + textarea').fill(descSolicitudSubsidio);
         await page.locator('label:has-text("Zona Territorial") + select').selectOption('Norte');
         await page.waitForTimeout(500);
         await page.locator('label:has-text("Responsable") + select').selectOption({ label: 'Matías Ippolito' });
         
-        // Seleccionar Tipo "Subsidio"
-        await page.locator('label:has-text("Tipo") + select').first().selectOption('SUBSIDIO');
-
         // Agregar la asignación de Subsidio para desplegar sus campos dinámicos
         await page.click('button:has-text("Agregar")');
         await page.waitForTimeout(500);
@@ -237,16 +251,19 @@ test.describe('Etapa 8 - Pruebas Funcionales y de Integración', () => {
         await login(page, 'martinnocioni@gmail.com', 'Martin_SGP_2026*');
         await page.goto('/mis-solicitudes');
 
-        // Los botones "Exportar Planilla" e "Importar Planilla" deben estar visibles para este perfil
-        const exportBtn = page.locator('button:has-text("Exportar Planilla")');
+        // Los botones "Exportar..." e "Importar Planilla" deben estar visibles para este perfil
+        const exportDropdownBtn = page.locator('button:has-text("Exportar...")');
         const importBtn = page.locator('button:has-text("Importar Planilla")');
         
-        await expect(exportBtn).toBeVisible();
+        await expect(exportDropdownBtn).toBeVisible();
         await expect(importBtn).toBeVisible();
 
-        // Hacer clic en Exportar Planilla (validar flujo sin errores fatales)
+        // Hacer clic en Exportar... para abrir el dropdown y luego a Google Sheets (validar flujo sin errores fatales)
         console.log('[ESCENARIO 8] Ejecutando Exportar a la planilla externa...');
-        await exportBtn.click();
+        await exportDropdownBtn.click();
+        const exportSheetsBtn = page.locator('button:has-text("Google Sheets")');
+        await expect(exportSheetsBtn).toBeVisible();
+        await exportSheetsBtn.click();
         
         // Esperamos mensaje de éxito o feedback del backend
         await page.waitForTimeout(2000);

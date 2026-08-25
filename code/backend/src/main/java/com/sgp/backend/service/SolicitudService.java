@@ -44,6 +44,7 @@ public class SolicitudService {
     // Servicios adicionales de la Etapa 8
     private final GoogleCalendarService googleCalendarService;
     private final EmailService emailService;
+    private final SyncService syncService;
     private final ObjectMapper objectMapper;
 
     public org.springframework.data.domain.Page<Solicitud> getAllSolicitudes(String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, org.springframework.data.domain.Pageable pageable) {
@@ -301,9 +302,6 @@ public class SolicitudService {
             userRepository.findByEmail(auth.getName()).ifPresent(solicitud::setCreatedBy);
         }
 
-        if (solicitud.getType() == null || "PEDIDO".equalsIgnoreCase(solicitud.getType())) {
-            solicitud.setType("SUBSIDIO");
-        }
         Solicitud saved = solicitudRepository.save(solicitud);
 
         // Procesar asignaciones si están presentes
@@ -389,6 +387,9 @@ public class SolicitudService {
         }
 
         // 3. Actualizar campos primitivos
+        if (dto.getType() != null) {
+            existing.setType(dto.getType());
+        }
         existing.setDescription(dto.getDescription());
         existing.setStatus(dto.getStatus());
         existing.setOrigin(dto.getOrigin());
@@ -506,8 +507,13 @@ public class SolicitudService {
                 solicitud.getResolutorAssignments().add(assignment);
             }
 
+            if (dto.getTipoResolucion() != null && dto.getTipoResolucion().equalsIgnoreCase("AGENDA")) {
+                solicitud.setType("AGENDA");
+            }
+
             // Requisito R1: Procesar la asignación de tipo SUBSIDIO y extraer su monto desde el JSON de detalle
             if (dto.getTipoResolucion() != null && dto.getTipoResolucion().equalsIgnoreCase("SUBSIDIO")) {
+                solicitud.setType("SUBSIDIO");
                 if (dto.getDetalle() != null && !dto.getDetalle().trim().isEmpty()) {
                     try {
                         JsonNode rootNode = objectMapper.readTree(dto.getDetalle());
@@ -628,19 +634,19 @@ public class SolicitudService {
         User resolutor = userRepository.findByEmail(emailResolutor)
                 .orElseThrow(() -> new RuntimeException("Resolutor no encontrado"));
 
-        // Validar y registrar la asistencia de forma obligatoria si es de tipo AGENDA
-        if ("AGENDA".equalsIgnoreCase(solicitud.getType())) {
-            if (asistencia == null || asistencia.trim().isEmpty()) {
-                throw new IllegalArgumentException("La selección de asistencia ('con asistencia' o 'sin asistencia') es obligatoria para solicitudes de tipo AGENDA.");
-            }
-            solicitud.setAsistencia(asistencia.trim());
-        }
-
         // Buscar la asignación específica para este resolutor en esta solicitud
         SolicitudResolutorAssignment assignment = solicitud.getResolutorAssignments().stream()
                 .filter(a -> a.getResolutor().getId().equals(resolutor.getId()) && !a.getApproved())
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Asignación pendiente no encontrada para este resolutor"));
+
+        // Validar y registrar la asistencia de forma obligatoria si la asignación es de tipo AGENDA
+        if ("AGENDA".equalsIgnoreCase(assignment.getTipoResolucion())) {
+            if (asistencia == null || asistencia.trim().isEmpty()) {
+                throw new IllegalArgumentException("La selección de asistencia ('con asistencia' o 'sin asistencia') es obligatoria para solicitudes de tipo AGENDA.");
+            }
+            solicitud.setAsistencia(asistencia.trim());
+        }
 
         assignment.setApproved(true);
         
@@ -705,7 +711,11 @@ public class SolicitudService {
                 String date = calendarData.get("date");
                 String time = calendarData.get("time");
                 
-                googleCalendarService.createEvent(calendarId, title, description, location, date, time, saved.getId());
+                try {
+                    googleCalendarService.createEvent(calendarId, title, description, location, date, time, saved.getId());
+                } catch (Exception e) {
+                    throw new RuntimeException(e.getMessage(), e);
+                }
             }
         } else if ("SUBSIDIO".equalsIgnoreCase(assignment.getTipoResolucion())) {
             emailService.sendSubsidioApprovedEmail(resolutor.getEmail(), saved.getId());
@@ -745,6 +755,28 @@ public class SolicitudService {
 
         solicitud.setStatus("consideracion");
         Solicitud saved = solicitudRepository.save(solicitud);
+
+        // Auto-exportar inmediatamente de forma síncrona y transaccional a la planilla de salida
+        try {
+            String spreadsheetId = null;
+            if (saved.getSheetsConfig() != null && saved.getSheetsConfig().getSpreadsheetId() != null) {
+                spreadsheetId = saved.getSheetsConfig().getSpreadsheetId();
+            } else {
+                var configOpt = sheetsConfigRepository.findAll().stream()
+                        .filter(c -> c.getSheetName() != null && !c.getSheetName().toUpperCase().contains("AGENDA"))
+                        .findFirst();
+                if (configOpt.isPresent()) {
+                    spreadsheetId = configOpt.get().getSpreadsheetId();
+                }
+            }
+
+            if (spreadsheetId != null) {
+                syncService.exportarPlanillaSalida(spreadsheetId, java.util.List.of(id));
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error al exportar a Google Sheets en ponerEnConsideracion para la solicitud #" + id + ": " + e.getMessage());
+            throw new RuntimeException("Error al exportar a Google Sheets: " + e.getMessage(), e);
+        }
 
         logAssignmentChange(saved, null, "PUESTA EN CONSIDERACIÓN");
         return saved;

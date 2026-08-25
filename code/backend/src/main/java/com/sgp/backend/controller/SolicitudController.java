@@ -126,27 +126,6 @@ public class SolicitudController {
     public ResponseEntity<Solicitud> ponerEnConsideracion(@PathVariable Long id) {
         Solicitud saved = solicitudService.ponerEnConsideracion(id);
 
-        // Auto-exportar inmediatamente la solicitud en consideración a la planilla de salida y releer por consola
-        try {
-            String spreadsheetId = null;
-            if (saved.getSheetsConfig() != null && saved.getSheetsConfig().getSpreadsheetId() != null) {
-                spreadsheetId = saved.getSheetsConfig().getSpreadsheetId();
-            } else {
-                var configOpt = sheetsConfigRepository.findAll().stream()
-                        .filter(c -> c.getSheetName() != null && !c.getSheetName().toUpperCase().contains("AGENDA"))
-                        .findFirst();
-                if (configOpt.isPresent()) {
-                    spreadsheetId = configOpt.get().getSpreadsheetId();
-                }
-            }
-
-            if (spreadsheetId != null) {
-                syncService.exportarPlanillaSalida(spreadsheetId, java.util.List.of(id));
-            }
-        } catch (Exception e) {
-            System.err.println("⚠️ Error al exportar automáticamente la solicitud #" + id + " a Google Sheets: " + e.getMessage() + ". Continuando transicion de estado local.");
-        }
-
         return ResponseEntity.ok(saved);
     }
 

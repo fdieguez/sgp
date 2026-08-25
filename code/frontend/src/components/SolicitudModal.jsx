@@ -468,7 +468,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             toast.error("La zona / eje de la solicitud es obligatoria.");
             return;
         }
-        if (formData.id && !formData.responsableId) {
+        if (user?.role !== 'OPERADOR' && user?.role !== 'DISTRIBUIDOR' && formData.id && !formData.responsableId) {
             toast.error("El responsable de la solicitud es obligatorio.");
             return;
         }

@@ -75,6 +75,10 @@ public class SecurityConfig {
                                                 .hasAnyRole("ADMINISTRADOR", "RESOLUTOR")
                                                 .requestMatchers(
                                                                 new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
+                                                                                "/api/config/**/check-calendar", "POST"))
+                                                .hasAnyRole("ADMINISTRADOR", "RESOLUTOR")
+                                                .requestMatchers(
+                                                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
                                                                                 "/api/config/**"))
                                                 .hasRole("ADMINISTRADOR")
                                                 // Endpoints Asegurados (Cualquier otra solicitud autenticada)

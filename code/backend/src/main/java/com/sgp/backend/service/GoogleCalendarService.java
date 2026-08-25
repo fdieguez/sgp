@@ -61,42 +61,41 @@ public class GoogleCalendarService {
     /**
      * Crea un evento en el Google Calendar especificado con los datos customizados desde el frontend.
      */
-    @Async
-    public void createEvent(String calendarId, String title, String description, String location, String dateStr, String timeStr, Long agendaId) {
-        System.out.println("📅 Iniciando creación de evento en Google Calendar de forma asíncrona para la Agenda #" + agendaId);
+    public void createEvent(String calendarId, String title, String description, String location, String dateStr, String timeStr, Long agendaId) throws Exception {
+        System.out.println("📅 Iniciando creación de evento en Google Calendar para la Agenda #" + agendaId);
+        Calendar calendarService = getCalendarService();
+
+        Event event = new Event()
+                .setSummary(title)
+                .setDescription(description)
+                .setLocation(location);
+
+        if (timeStr != null && !timeStr.trim().isEmpty()) {
+            // Evento con hora específica
+            String dateTimeStr = dateStr + "T" + timeStr + ":00-03:00"; // Asumiendo zona horaria de Argentina (UTC-3)
+            DateTime startDateTime = new DateTime(dateTimeStr);
+            EventDateTime start = new EventDateTime().setDateTime(startDateTime);
+            event.setStart(start);
+            
+            // Por defecto, duración de 1 hora
+            java.time.LocalDateTime startLocal = java.time.LocalDateTime.parse(dateStr + "T" + timeStr);
+            java.time.LocalDateTime endLocal = startLocal.plusHours(1);
+            DateTime endDateTime = new DateTime(endLocal.toString() + ":00-03:00");
+            EventDateTime end = new EventDateTime().setDateTime(endDateTime);
+            event.setEnd(end);
+        } else {
+            // Evento de todo el día
+            DateTime startDateTime = new DateTime(dateStr);
+            EventDateTime start = new EventDateTime().setDate(startDateTime);
+            event.setStart(start);
+
+            LocalDate eventDate = LocalDate.parse(dateStr);
+            DateTime endDateTime = new DateTime(eventDate.plusDays(1).toString());
+            EventDateTime end = new EventDateTime().setDate(endDateTime);
+            event.setEnd(end);
+        }
+
         try {
-            Calendar calendarService = getCalendarService();
-
-            Event event = new Event()
-                    .setSummary(title)
-                    .setDescription(description)
-                    .setLocation(location);
-
-            if (timeStr != null && !timeStr.trim().isEmpty()) {
-                // Evento con hora específica
-                String dateTimeStr = dateStr + "T" + timeStr + ":00-03:00"; // Asumiendo zona horaria de Argentina (UTC-3)
-                DateTime startDateTime = new DateTime(dateTimeStr);
-                EventDateTime start = new EventDateTime().setDateTime(startDateTime);
-                event.setStart(start);
-                
-                // Por defecto, duración de 1 hora
-                java.time.LocalDateTime startLocal = java.time.LocalDateTime.parse(dateStr + "T" + timeStr);
-                java.time.LocalDateTime endLocal = startLocal.plusHours(1);
-                DateTime endDateTime = new DateTime(endLocal.toString() + ":00-03:00");
-                EventDateTime end = new EventDateTime().setDateTime(endDateTime);
-                event.setEnd(end);
-            } else {
-                // Evento de todo el día
-                DateTime startDateTime = new DateTime(dateStr);
-                EventDateTime start = new EventDateTime().setDate(startDateTime);
-                event.setStart(start);
-
-                LocalDate eventDate = LocalDate.parse(dateStr);
-                DateTime endDateTime = new DateTime(eventDate.plusDays(1).toString());
-                EventDateTime end = new EventDateTime().setDate(endDateTime);
-                event.setEnd(end);
-            }
-
             Event createdEvent = calendarService.events().insert(calendarId, event).execute();
             String googleEventId = createdEvent.getId();
 
@@ -110,10 +109,15 @@ public class GoogleCalendarService {
                     solicitudRepository.save(solicitud);
                 }
             }
-
+        } catch (com.google.api.client.googleapis.json.GoogleJsonResponseException e) {
+            System.err.println("❌ Error de la API de Google al crear evento para la Agenda #" + agendaId + ": " + e.getMessage());
+            if (e.getStatusCode() == 404) {
+                throw new RuntimeException("El calendario '" + calendarId + "' no fue encontrado o no está compartido con la Cuenta de Servicio. Por favor, compártalo con permisos de edición ('Realizar cambios en eventos') con: sgp-bot@n8ncredencialesplatzi-464818.iam.gserviceaccount.com");
+            }
+            throw new RuntimeException("Error en Google Calendar (" + e.getStatusCode() + "): " + e.getDetails().getMessage(), e);
         } catch (Exception e) {
-            System.err.println("❌ Error al crear el evento en Google Calendar para la Agenda #" + agendaId + ": " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("❌ Error inesperado al crear evento para la Agenda #" + agendaId + ": " + e.getMessage());
+            throw new RuntimeException("Error al crear el evento en Google Calendar: " + e.getMessage(), e);
         }
     }
 

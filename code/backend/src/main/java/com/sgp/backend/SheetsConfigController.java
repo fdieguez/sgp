@@ -143,8 +143,9 @@ public class SheetsConfigController {
             } catch (Exception e) {
                 // Capturar errores de autenticación o calendarios no compartidos
                 String msg = e.getMessage() != null ? e.getMessage() : "Error desconocido al validar acceso.";
-                if (msg.contains("403") || msg.contains("forbidden") || msg.contains("not found")) {
-                    msg = "No compartido. Asegúrate de compartir el calendario con la Cuenta de Servicio del sistema con permisos de edición.";
+                String lowerMsg = msg.toLowerCase();
+                if (lowerMsg.contains("403") || lowerMsg.contains("forbidden") || lowerMsg.contains("404") || lowerMsg.contains("not found") || lowerMsg.contains("permission")) {
+                    msg = "No compartido o inexistente. Asegúrate de compartir el calendario con la Cuenta de Servicio del sistema con permisos de edición ('Realizar cambios en eventos').";
                 }
                 return ResponseEntity.ok(java.util.Map.of("active", false, "error", msg));
             }
