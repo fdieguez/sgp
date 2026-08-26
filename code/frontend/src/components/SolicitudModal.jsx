@@ -416,7 +416,36 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 setActiveTab('detalles');
             }
         } else {
-            // Cuando se cierra, podemos resetear el tab pero no es crítico
+            // Cuando se cierra, limpiamos el formulario para asegurar que la próxima apertura cargue datos frescos del backend
+            setFormData({
+                type: 'PEDIDO',
+                description: '',
+                status: 'pendiente',
+                origin: 'MANUAL',
+                entryDate: new Date().toISOString().split('T')[0],
+                person: { name: '', phone: '' },
+                locationName: '',
+                barrio: '',
+                responsableId: '',
+                amount: '',
+                grantDate: '',
+                subsidioType: '',
+                zone: '',
+                contactDate: '',
+                resolutionDate: '',
+                observation: '',
+                resolution: '',
+                suggestedResolutionType: '',
+                resolutionApproved: false,
+                detail: '',
+                firstContactControl: false,
+                asistencia: '',
+                porDonde: '',
+                googleEventId: '',
+                assignments: []
+            });
+            setSelectedZone('');
+            setAsistencia('');
             setActiveTab('detalles');
         }
     }, [isOpen, initialData?.id, fetchResponsables, fetchLocations, fetchTiposResolucion, isResponsable, user?.responsable?.id, user?.responsable?.zone]);

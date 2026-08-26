@@ -262,6 +262,21 @@ public class DataInitializer implements CommandLineRunner {
                 p1.setDataJson("{}");
                 projectRepository.save(p1);
                 System.out.println("✅ Proyecto de Agenda sembrado correctamente.");
+            } else {
+                proyectosExistentes.stream()
+                    .filter(p -> "Proyecto de Agenda E2E".equalsIgnoreCase(p.getName()))
+                    .findFirst()
+                    .ifPresent(p -> {
+                        com.sgp.backend.entity.SheetsConfig sc = p.getSheetsConfig();
+                        if (sc != null && (sc.getSpreadsheetId() == null || sc.getSpreadsheetId().trim().isEmpty() || sc.getCalendarId() == null || sc.getCalendarId().trim().isEmpty())) {
+                            sc.setSpreadsheetId("spreadsheet-agenda-default-id");
+                            sc.setSheetName("AGENDA");
+                            sc.setCalendarId("mvgonza79@gmail.com");
+                            sc.setStatus("ACTIVE");
+                            sheetsConfigRepository.save(sc);
+                            System.out.println("✅ Proyecto de Agenda existente restaurado con configuraciones por defecto.");
+                        }
+                    });
             }
 
             if (!existeSubsidio) {
@@ -279,6 +294,20 @@ public class DataInitializer implements CommandLineRunner {
                 p2.setDataJson("{}");
                 projectRepository.save(p2);
                 System.out.println("✅ Proyecto de Subsidio sembrado correctamente.");
+            } else {
+                proyectosExistentes.stream()
+                    .filter(p -> "Proyecto de Subsidio E2E".equalsIgnoreCase(p.getName()))
+                    .findFirst()
+                    .ifPresent(p -> {
+                        com.sgp.backend.entity.SheetsConfig sc = p.getSheetsConfig();
+                        if (sc != null && (sc.getSpreadsheetId() == null || sc.getSpreadsheetId().trim().isEmpty())) {
+                            sc.setSpreadsheetId("spreadsheet-subsidio-default-id");
+                            sc.setSheetName("Solicitudes Subsidios");
+                            sc.setStatus("ACTIVE");
+                            sheetsConfigRepository.save(sc);
+                            System.out.println("✅ Proyecto de Subsidio existente restaurado con configuraciones por defecto.");
+                        }
+                    });
             }
 
             // La siembra automática de solicitudes y beneficiarios de ejemplo ha sido removida para que producción permanezca limpio.
@@ -494,17 +523,15 @@ public class DataInitializer implements CommandLineRunner {
         tr.setResolutor(resolutor);
         tr.setActivo(true);
         
-        // Si es nuevo o queremos forzar atributos (simplificado: solo si es nuevo o no tiene)
-        if (tr.getId() == null || tr.getAtributosConfig().isEmpty()) {
-            if (tr.getAtributosConfig() == null) {
-                tr.setAtributosConfig(new java.util.ArrayList<>());
-            } else {
-                tr.getAtributosConfig().clear();
-            }
-            
-            for (AtributoConfig ac : atributos) {
-                agregarAtributo(tr, ac.attr, ac.requerido, ac.orden);
-            }
+        // Forzar siempre la actualización y orden de los atributos para garantizar la consistencia en el entorno local de pruebas
+        if (tr.getAtributosConfig() == null) {
+            tr.setAtributosConfig(new java.util.ArrayList<>());
+        } else {
+            tr.getAtributosConfig().clear();
+        }
+        
+        for (AtributoConfig ac : atributos) {
+            agregarAtributo(tr, ac.attr, ac.requerido, ac.orden);
         }
         tipoResolucionRepository.save(tr);
     }

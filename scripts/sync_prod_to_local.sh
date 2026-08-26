@@ -62,10 +62,11 @@ echo "⚙️  MÉTODO DE RESTAURACIÓN LOCAL"
 echo "========================================================="
 echo "1) Restaurar en MySQL Local (Vía Docker - Recomendado para paridad total)"
 echo "2) Restaurar en H2 Local (Embebida - Convierte el dialecto SQL automáticamente)"
-read -p "Seleccione una opción (1 o 2): " RESTORE_OPTION
+echo "3) Restaurar en MySQL Local Nativo (Instalado directamente en el sistema operativo)"
+read -p "Seleccione una opción (1, 2 o 3): " RESTORE_OPTION
 
 if [ "$RESTORE_OPTION" = "1" ]; then
-    # Restaurar en MySQL Local
+    # Restaurar en MySQL Local (Docker)
     echo "🐳 Verificando Docker en el sistema..."
     if ! command -v docker &> /dev/null; then
         echo "❌ Error: Docker no está instalado o no se encuentra en el PATH."
@@ -137,6 +138,33 @@ elif [ "$RESTORE_OPTION" = "2" ]; then
     echo "👉 El script SQL se ejecutará automáticamente en el próximo"
     echo "   arranque del backend de desarrollo Spring Boot mediante el"
     echo "   DatabaseMigrationRunner incorporado."
+    echo "========================================================="
+
+elif [ "$RESTORE_OPTION" = "3" ]; then
+    # Restaurar en MySQL Local Nativo (Windows/Linux sin Docker)
+    echo "🔍 Verificando ejecutable de MySQL en el sistema..."
+    MYSQL_BIN="mysql"
+    if ! command -v mysql &> /dev/null; then
+        # Intentar ruta por defecto en Windows (Git Bash traduce C:\ a /c/)
+        TYPICAL_WIN_PATH="/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql"
+        if [ -f "$TYPICAL_WIN_PATH" ] || [ -f "${TYPICAL_WIN_PATH}.exe" ]; then
+            MYSQL_BIN="$TYPICAL_WIN_PATH"
+            echo "✅ Se detectó MySQL en la ruta por defecto: $MYSQL_BIN"
+        else
+            echo "❌ Error: No se encontró 'mysql' en el PATH ni en la ruta por defecto de Windows."
+            echo "   Asegúrate de agregar MySQL al PATH o de instalarlo en la ruta estándar."
+            exit 1
+        fi
+    fi
+
+    echo "🔄 Restaurando datos en MySQL Local Nativo..."
+    "$MYSQL_BIN" -u sgp_admin -ppassword sgp_db < "$SQL_FILE"
+    
+    echo "========================================================="
+    echo "🎉 ¡Sincronización en MySQL Nativo Completada con Éxito!"
+    echo "========================================================="
+    echo "👉 Asegúrate de que tu archivo 'application-dev.properties' apunte"
+    echo "   a este MySQL local con el puerto 3306 y usuario sgp_admin."
     echo "========================================================="
 
 else

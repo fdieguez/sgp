@@ -62,4 +62,7 @@ code/frontend/test-results/
 # Pruebas locales y evidencia
 /pruebas/
 
+# Copias de seguridad de la base de datos locales
+db_bkp/
+
 

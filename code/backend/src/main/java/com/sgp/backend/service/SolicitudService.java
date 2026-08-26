@@ -206,6 +206,7 @@ public class SolicitudService {
         for (Long id : ids) {
             Solicitud solicitud = solicitudRepository.findById(id).orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
             solicitud.setResponsable(responsable);
+            updateSolicitudStatus(solicitud); // Recalcular estado automático tras la asignación
             solicitudRepository.save(solicitud);
 
             AsignacionHistorial historial = new AsignacionHistorial();
