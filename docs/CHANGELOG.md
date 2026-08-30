@@ -8,6 +8,25 @@
 
 ## 📅 Agosto 2026
 
+### 29/08/2026
+- **⭐️ Cierre de la Etapa 10 - Mejoras del Dashboard, Soporte Multirrol de Sesión, Selectores Estrictos y Control de Siembra:**
+    - **Soporte Multirrol Dinámico por Cabecera (`X-Active-Role`)**:
+        - Implementación del envío automático de la cabecera HTTP `X-Active-Role` en el interceptor de Axios en [`axios.js`](file:///c:/Users/fran/dev/projects/SGP/code/frontend/src/config/axios.js) a partir del rol de sesión activo.
+        - Creación de [`SecurityUtils.java`](file:///c:/Users/fran/dev/projects/SGP/code/backend/src/main/java/com/sgp/backend/security/SecurityUtils.java) en el backend para recuperar de forma segura y validar el rol activo del request contra los roles de base de datos del usuario autenticado.
+        - Actualización de los filtros de especificaciones de JPA y lógica de control de permisos en [`DashboardService.java`](file:///c:/Users/fran/dev/projects/SGP/code/backend/src/main/java/com/sgp/backend/service/DashboardService.java), [`SolicitudService.java`](file:///c:/Users/fran/dev/projects/SGP/code/backend/src/main/java/com/sgp/backend/service/SolicitudService.java) y [`SheetsConfigController.java`](file:///c:/Users/fran/dev/projects/SGP/code/backend/src/main/java/com/sgp/backend/SheetsConfigController.java) para utilizar el rol activo de sesión, logrando que usuarios multirrol (ej. Martín como Resolutor y Operador) visualicen y operen únicamente con los permisos y filtros correspondientes a su perfil activo.
+    - **Mejoras del Dashboard del Auditor (`DashboardPage.jsx`)**:
+        - **Bypass de Traducción Automática**: Incorporación de los atributos `translate="no" lang="es"` en los títulos de tarjetas para evitar traducciones incorrectas (como *"Pendientes"* traduciéndose como *"ESTAR"*).
+        - **Tarjeta \"Asignadas\"**: Adición de la tarjeta de solicitudes *"En Proceso"* (Asignadas), reestructurando el grid superior a 6 columnas (`lg:grid-cols-6`).
+        - **Visualización Histórica por Defecto**: Configuración del selector temporal en `"Todos los años"` (`'ALL'`) como valor inicial, permitiendo la visualización histórica acumulada.
+        - **Etiquetas de Porcentajes en Localidades**: Adición del elemento `<LabelList>` de Recharts en el gráfico de barras horizontales de localidades para renderizar directamente el total y porcentaje sobre la barra.
+        - **Pie Chart de Vías de Ingreso (Canal de Origen)**: Reemplazo del gráfico compuesto de categorías de subsidio por un gráfico circular (Pie Chart) limpio que representa el desglose porcentual de los canales de entrada de solicitudes (WhatsApp, Nota física, etc.) traduciendo los nombres a formato amigable en español.
+        - **Corrección de Clasificación de Barrios de Santa Fe (Backend)**: Modificación de la lógica de distribución geográfica en [`DashboardService.java`](file:///c:/Users/fran/dev/projects/SGP/code/backend/src/main/java/com/sgp/backend/service/DashboardService.java) para evaluar de forma jerárquica el parentesco de las ubicaciones. Esto resuelve el bug de datos desestructurados, permitiendo que solicitudes asociadas directamente a vecinales específicas de Santa Fe (como `"Centro"`, `"Candioti"`, `"El Pozo"`) se agrupen y desglosen en el gráfico de torta de barrios de la ciudad en lugar de mostrarse vacío.
+    - **Selectores de Ubicación Estrictos (Localidad y Barrio)**:
+        - Conversión de los campos de texto con datalist en elementos de selección estrictos (`<select>`) en [`SolicitudModal.jsx`](file:///c:/Users/fran/dev/projects/SGP/code/frontend/src/components/SolicitudModal.jsx), evitando la edición de texto libre y forzando la selección de opciones oficiales.
+        - Inyección dinámica de la opción virtual `"Otro"` en el listado de barrios para todas las localidades. Otorga flexibilidad y evita el bloqueo del formulario en localidades que no tengan barrios precargados en el catálogo local de la base de datos.
+    - **Propiedad de Control de Siembra de Usuarios**:
+        - Declaración del parámetro `sgp.seed.overwrite-users` en [`application.properties`](file:///c:/Users/fran/dev/projects/SGP/code/backend/src/main/resources/application.properties) (`true` por defecto en desarrollo local) y en [`application-prod.properties`](file:///c:/Users/fran/dev/projects/SGP/code/backend/src/main/resources/application-prod.properties) (`false` para producción) evaluado en [`DataInitializer.java`](file:///c:/Users/fran/dev/projects/SGP/code/backend/src/main/java/com/sgp/backend/DataInitializer.java). Resguarda las contraseñas, roles y perfiles configurados de forma manual en producción contra cualquier reinicio de servidor.
+
 ### 11/08/2026
 - **⭐️ Cierre de la Versión 1.0.0 - QA final, Regresión en Producción y Purga Definitiva:**
     - **Puesta a Punto de Regresión (Playwright)**:

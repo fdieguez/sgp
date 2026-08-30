@@ -145,11 +145,23 @@ public class DashboardService {
                 })
                 .collect(java.util.stream.Collectors.toList());
 
-        // 3. Distribución por Localidad
+        // 3. Distribución por Localidad (Etapa 10)
         Map<String, Long> solicitudesPorLocalidad = new HashMap<>();
         for (Solicitud s : filteredSolicitudes) {
-            String loc = (s.getLocation() != null) ? s.getLocation().getName() : s.getLocationName();
-            if (loc == null || loc.trim().isEmpty()) loc = "Sin Localidad";
+            String loc = null;
+            if (s.getLocation() != null) {
+                com.sgp.backend.entity.Location locObj = s.getLocation();
+                if ("NEIGHBORHOOD".equalsIgnoreCase(locObj.getType()) && locObj.getParent() != null) {
+                    loc = locObj.getParent().getName();
+                } else {
+                    loc = locObj.getName();
+                }
+            } else {
+                loc = s.getLocationName();
+            }
+            if (loc == null || loc.trim().isEmpty()) {
+                loc = "Sin Localidad";
+            }
             solicitudesPorLocalidad.put(loc.trim(), solicitudesPorLocalidad.getOrDefault(loc.trim(), 0L) + 1);
         }
 
