@@ -17,7 +17,8 @@ import {
     MapPin,
     TrendingUp,
     PieChart as PieIcon,
-    BarChart3
+    BarChart3,
+    Share2
 } from 'lucide-react';
 
 import {
@@ -33,7 +34,8 @@ import {
     Legend,
     PieChart,
     Pie,
-    Cell
+    Cell,
+    LabelList
 } from 'recharts';
 
 export default function DashboardPage() {
@@ -47,7 +49,7 @@ export default function DashboardPage() {
     // Estados del Auditor (Etapa 10)
     const [stats, setStats] = useState(null);
     const [filterType, setFilterType] = useState('ALL');
-    const [filterYear, setFilterYear] = useState(new Date().getFullYear());
+    const [filterYear, setFilterYear] = useState('ALL');
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [searching, setSearching] = useState(false);
@@ -85,7 +87,7 @@ export default function DashboardPage() {
     const fetchAuditorStats = async () => {
         setLoading(true);
         try {
-            const data = await dashboardService.getStats(filterType, filterYear);
+            const data = await dashboardService.getStats(filterType, filterYear === 'ALL' ? '' : filterYear);
             setStats(data);
         } catch (error) {
             console.error("Failed to fetch dashboard stats", error);
@@ -177,10 +179,25 @@ export default function DashboardPage() {
             cantidad: val
         })).sort((a, b) => b.cantidad - a.cantidad).slice(0, 8);
 
-        const barrioData = Object.entries(stats.solicitudesPorBarrioSantaFe || {}).map(([key, val]) => ({
+        const rawBarrioData = Object.entries(stats.solicitudesPorBarrioSantaFe || {}).map(([key, val]) => ({
             name: key,
             value: val
-        })).sort((a, b) => b.value - a.value).slice(0, 5);
+        })).filter(b => b.value > 0).sort((a, b) => b.value - a.value);
+
+        const topBarrios = rawBarrioData.slice(0, 5);
+        const otrosCount = rawBarrioData.slice(5).reduce((sum, b) => sum + b.value, 0);
+        const barrioData = otrosCount > 0 
+            ? [...topBarrios, { name: 'Otras vecinales', value: otrosCount }]
+            : topBarrios;
+
+        const originData = Object.entries(stats.solicitudesByOrigin || {}).map(([key, val]) => ({
+            name: key === 'NOTE' ? 'Nota física' : 
+                  key === 'WHATSAPP' ? 'WhatsApp' : 
+                  key === 'EMAIL' ? 'Email' : 
+                  key === 'SOCIAL_MEDIA' ? 'Redes Sociales' : 
+                  key === 'IMPORTED' ? 'Planilla Externa' : key,
+            value: val
+        })).filter(o => o.value > 0).sort((a, b) => b.value - a.value);
 
         const subsidyTypeData = (stats.estadisticasPorTipoSubsidio || []).map(s => ({
             tipo: s.tipo,
@@ -211,8 +228,9 @@ export default function DashboardPage() {
                             <select
                                 className="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none"
                                 value={filterYear}
-                                onChange={(e) => setFilterYear(Number(e.target.value))}
+                                onChange={(e) => setFilterYear(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
                             >
+                                <option value="ALL">Todos los años</option>
                                 <option value={2024}>2024</option>
                                 <option value={2025}>2025</option>
                                 <option value={2026}>2026</option>
@@ -285,17 +303,18 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Tarjetas de Métricas de Control */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6">
                     {[
                         { title: "Solicitudes Totales", value: total, pct: "100%", color: "text-indigo-400", bg: "bg-indigo-950/30", border: "border-indigo-900/50" },
                         { title: "Pendientes", value: stats.pendingSolicitudes, pct: `${calculatePct(stats.pendingSolicitudes)}%`, color: "text-yellow-400", bg: "bg-yellow-950/30", border: "border-yellow-900/50" },
+                        { title: "Asignadas", value: stats.inProgressSolicitudes || 0, pct: `${calculatePct(stats.inProgressSolicitudes)}%`, color: "text-blue-400", bg: "bg-blue-950/30", border: "border-blue-900/50" },
                         { title: "En Resolución", value: stats.inResolutionSolicitudes || 0, pct: `${calculatePct(stats.inResolutionSolicitudes)}%`, color: "text-purple-400", bg: "bg-purple-950/30", border: "border-purple-900/50" },
                         { title: "Completadas", value: stats.completedSolicitudes, pct: `${calculatePct(stats.completedSolicitudes)}%`, color: "text-green-400", bg: "bg-green-950/30", border: "border-green-900/50" },
                         { title: "Rechazadas", value: stats.rejectedSolicitudes || 0, pct: `${calculatePct(stats.rejectedSolicitudes)}%`, color: "text-red-400", bg: "bg-red-950/30", border: "border-red-900/50" }
                     ].map((card, i) => (
                         <div key={i} className={`bg-gray-800/40 rounded-2xl border ${card.border} p-6 shadow-xl backdrop-blur-md flex flex-col justify-between`}>
                             <div className="flex items-center justify-between mb-4">
-                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{card.title}</span>
+                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider" translate="no" lang="es">{card.title}</span>
                                 <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${card.bg} ${card.color} border border-current/25`}>{card.pct}</span>
                             </div>
                             <div className="text-3xl font-black text-white">{card.value}</div>
@@ -384,7 +403,9 @@ export default function DashboardPage() {
                                         <XAxis type="number" stroke="#9ca3af" fontSize={10} />
                                         <YAxis dataKey="name" type="category" stroke="#9ca3af" fontSize={10} width={80} />
                                         <Tooltip contentStyle={{ backgroundColor: '#111827', borderColor: '#374151', borderRadius: '12px' }} />
-                                        <Bar dataKey="cantidad" fill="#ec4899" radius={[0, 4, 4, 0]} />
+                                        <Bar dataKey="cantidad" fill="#ec4899" radius={[0, 4, 4, 0]}>
+                                            <LabelList dataKey="cantidad" position="right" fill="#f3f4f6" fontSize={10} formatter={(val) => `${val} (${total > 0 ? Math.round((val / total) * 100) : 0}%)`} />
+                                        </Bar>
                                     </BarChart>
                                 </ResponsiveContainer>
                             ) : (
@@ -441,27 +462,52 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Desglose Especial: Tipos de Subsidios (Culturales, Deportes, etc.) */}
+                {/* Gráfico 5: Distribución de Demandas por Canal de Origen (Etapa 10) */}
                 <div className="bg-gray-800/40 border border-gray-700/60 p-6 rounded-2xl shadow-xl backdrop-blur-md space-y-4">
-                    <h3 className="text-base font-bold text-white flex items-center gap-2">
-                        <BarChart3 className="h-5 w-5 text-violet-400" /> Clasificación y Presupuesto por Categoría de Subsidios
-                    </h3>
-                    <div className="h-72">
-                        {subsidyTypeData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={subsidyTypeData} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                                    <XAxis dataKey="tipo" stroke="#9ca3af" fontSize={10} />
-                                    <YAxis stroke="#9ca3af" fontSize={10} yAxisId="left" />
-                                    <YAxis stroke="#9ca3af" fontSize={10} yAxisId="right" orientation="right" tickFormatter={(tick) => `$${tick / 1000}k`} />
-                                    <Tooltip contentStyle={{ backgroundColor: '#111827', borderColor: '#374151', borderRadius: '12px' }} />
-                                    <Legend />
-                                    <Bar yAxisId="left" dataKey="cantidad" name="Cantidad Solicitudes" fill="#818cf8" radius={[4, 4, 0, 0]} />
-                                    <Bar yAxisId="right" dataKey="monto" name="Monto Presupuestado (ARS)" fill="#34d399" radius={[4, 4, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-base font-bold text-white flex items-center gap-2">
+                            <Share2 className="h-5 w-5 text-violet-400" /> Vías de Ingreso / Canal de Origen
+                        </h3>
+                    </div>
+                    <div className="h-72 flex flex-col md:flex-row items-center justify-around gap-4">
+                        {originData.length > 0 ? (
+                            <>
+                                <div className="h-52 w-52">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={originData}
+                                                cx="50%"
+                                                cy="50%"
+                                                innerRadius={45}
+                                                outerRadius={75}
+                                                paddingAngle={3}
+                                                dataKey="value"
+                                            >
+                                                {originData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip contentStyle={{ backgroundColor: '#111827', borderColor: '#374151', borderRadius: '12px' }} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                                <div className="space-y-2.5">
+                                    {originData.map((entry, index) => {
+                                        const totalOrigin = originData.reduce((sum, o) => sum + o.value, 0);
+                                        const pct = totalOrigin > 0 ? Math.round((entry.value / totalOrigin) * 100) : 0;
+                                        return (
+                                            <div key={index} className="flex items-center gap-2">
+                                                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
+                                                <span className="text-xs font-semibold text-gray-300 truncate w-32" title={entry.name}>{entry.name}</span>
+                                                <span className="text-xs text-gray-500">({entry.value} - {pct}%)</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
                         ) : (
-                            <div className="h-full flex items-center justify-center text-xs text-gray-500">No hay subsidios cargados en este período para visualizar la clasificación.</div>
+                            <div className="h-full flex items-center justify-center text-xs text-gray-500">Sin datos de origen de solicitudes disponibles en este período.</div>
                         )}
                     </div>
                 </div>

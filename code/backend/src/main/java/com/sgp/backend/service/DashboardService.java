@@ -36,9 +36,9 @@ public class DashboardService {
             String email = auth.getName();
             User user = userRepository.findByEmail(email).orElse(null);
             if (user != null) {
-                String userRole = user.getRole();
-                // Si es ADMIN, DISTRIBUIDOR o AUDITOR, tiene acceso completo a todas las estadísticas sin filtrar
-                if (userRole != null && !userRole.contains("ADMIN") && !userRole.contains("DISTRIBUIDOR") && !userRole.contains("AUDITOR")) {
+                String userRole = com.sgp.backend.security.SecurityUtils.getActiveRole(user);
+                // Si es ADMIN, DISTRIBUIDOR, OPERADOR o AUDITOR, tiene acceso completo a todas las estadísticas sin filtrar
+                if (userRole != null && !userRole.contains("ADMIN") && !userRole.contains("DISTRIBUIDOR") && !userRole.contains("OPERADOR") && !userRole.contains("AUDITOR")) {
                     spec = spec.and((root, query, cb) -> {
                         List<jakarta.persistence.criteria.Predicate> orPredicates = new java.util.ArrayList<>();
                         
@@ -153,12 +153,30 @@ public class DashboardService {
             solicitudesPorLocalidad.put(loc.trim(), solicitudesPorLocalidad.getOrDefault(loc.trim(), 0L) + 1);
         }
 
-        // 4. Distribución por Barrio / Zona dentro de Santa Fe
+        // 4. Distribución por Barrio / Zona dentro de Santa Fe (Etapa 10)
         Map<String, Long> solicitudesPorBarrioSantaFe = new HashMap<>();
         for (Solicitud s : filteredSolicitudes) {
-            String loc = (s.getLocation() != null) ? s.getLocation().getName() : s.getLocationName();
-            if (loc != null && loc.trim().equalsIgnoreCase("santa fe")) {
-                String barrio = s.getBarrio();
+            boolean isSantaFe = false;
+            String barrio = s.getBarrio();
+            
+            if (s.getLocation() != null) {
+                com.sgp.backend.entity.Location locObj = s.getLocation();
+                if ("Santa Fe".equalsIgnoreCase(locObj.getName())) {
+                    isSantaFe = true;
+                } else if (locObj.getParent() != null && "Santa Fe".equalsIgnoreCase(locObj.getParent().getName())) {
+                    isSantaFe = true;
+                    if (barrio == null || barrio.trim().isEmpty()) {
+                        barrio = locObj.getName();
+                    }
+                }
+            } else {
+                String locName = s.getLocationName();
+                if (locName != null && "Santa Fe".equalsIgnoreCase(locName.trim())) {
+                    isSantaFe = true;
+                }
+            }
+            
+            if (isSantaFe) {
                 if (barrio == null || barrio.trim().isEmpty()) {
                     barrio = s.getZone();
                 }

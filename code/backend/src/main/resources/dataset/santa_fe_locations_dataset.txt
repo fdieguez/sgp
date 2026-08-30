@@ -2,35 +2,92 @@ PROVINCE|Santa Fe
 
 # Cities with neighborhoods
 CITY|Santa Fe
-NEIGHBORHOOD|7 Jefes
-NEIGHBORHOOD|Alberdi
-NEIGHBORHOOD|Alto Verde
-NEIGHBORHOOD|Acería
-NEIGHBORHOOD|Barranquitas
-NEIGHBORHOOD|Candioti
+NEIGHBORHOOD|12 de Octubre
+NEIGHBORHOOD|20 de Junio
+NEIGHBORHOOD|21 de Octubre
+NEIGHBORHOOD|Altos de Noguera
+NEIGHBORHOOD|Altos del Valle
+NEIGHBORHOOD|Barranquita Oeste
+NEIGHBORHOOD|Barranquitas Sur
+NEIGHBORHOOD|Barrio Arenales
+NEIGHBORHOOD|Barrio Chalet
+NEIGHBORHOOD|Bernardo Rivadavia
+NEIGHBORHOOD|Cabaña Leiva
+NEIGHBORHOOD|Candioti Norte
+NEIGHBORHOOD|Candioti Sur
+NEIGHBORHOOD|Ceferino Namuncurá
 NEIGHBORHOOD|Centenario
-NEIGHBORHOOD|Ciudadela
-NEIGHBORHOOD|Constituyentes
+NEIGHBORHOOD|Central Guadalupe
+NEIGHBORHOOD|Centro
+NEIGHBORHOOD|Ciudadela Norte
+NEIGHBORHOOD|Colastiné Norte
+NEIGHBORHOOD|Colastiné Sur
 NEIGHBORHOOD|Coronel Dorrego
-NEIGHBORHOOD|Escalante
-NEIGHBORHOOD|Fomento 9 de Julio
-NEIGHBORHOOD|Guadalupe
-NEIGHBORHOOD|Los Hornos
-NEIGHBORHOOD|Roma
-NEIGHBORHOOD|San Lorenzo
-NEIGHBORHOOD|Sargento Cabral
-NEIGHBORHOOD|Santa Rosa de Lima
-NEIGHBORHOOD|Sur
-NEIGHBORHOOD|Villa del Parque
-NEIGHBORHOOD|Yapeyú
-NEIGHBORHOOD|Varadero Sarsotti
+NEIGHBORHOOD|Del Tránsito
+NEIGHBORHOOD|Domingo F. Sarmiento
 NEIGHBORHOOD|El Pozo
-NEIGHBORHOOD|Las Flores
-NEIGHBORHOOD|Scarafía
+NEIGHBORHOOD|Escarafía
+NEIGHBORHOOD|Estanislao López
+NEIGHBORHOOD|Ex-Plaza España
+NEIGHBORHOOD|Facundo Quiroga
+NEIGHBORHOOD|Fomento 9 de Julio
+NEIGHBORHOOD|General Alvear
+NEIGHBORHOOD|General Belgrano
+NEIGHBORHOOD|General Mosconi
+NEIGHBORHOOD|Guadalupe Este
+NEIGHBORHOOD|Guadalupe Noreste
+NEIGHBORHOOD|Guadalupe Oeste
+NEIGHBORHOOD|J. B. Alberdi
+NEIGHBORHOOD|J. M. Estrada
+NEIGHBORHOOD|Jardín Mayoraz
+NEIGHBORHOOD|Juana Azurduy
+NEIGHBORHOOD|Juventud del Norte
+NEIGHBORHOOD|La Boca Alto Verde
+NEIGHBORHOOD|La Guardia - Colastiné
+NEIGHBORHOOD|La esmeralda
+NEIGHBORHOOD|Las Delicias
+NEIGHBORHOOD|Las Flores II
+NEIGHBORHOOD|Las Lomitas
+NEIGHBORHOOD|Liceo Zona Norte
+NEIGHBORHOOD|Loyola Norte
+NEIGHBORHOOD|Mariano Comas
+NEIGHBORHOOD|Norte Unido
+NEIGHBORHOOD|Nueva Pompeya
+NEIGHBORHOOD|Nueva Santa Fe
+NEIGHBORHOOD|Parque Juan de Garay
+NEIGHBORHOOD|Peñaloza Norte
+NEIGHBORHOOD|Piquete y Las Flores
+NEIGHBORHOOD|Pro Mejoras Alto Verde
+NEIGHBORHOOD|Pro-Mejoras Barrio Barranquitas
+NEIGHBORHOOD|Pro-adelanto Barranquitas
+NEIGHBORHOOD|Progreso Pompeya Oeste
+NEIGHBORHOOD|República Los Hornos
+NEIGHBORHOOD|República del Oeste
+NEIGHBORHOOD|Roma
+NEIGHBORHOOD|Roque Saenz Peña
 NEIGHBORHOOD|San Agustín
-NEIGHBORHOOD|Cabal
-NEIGHBORHOOD|Las Lomas
+NEIGHBORHOOD|San Gerónimo
+NEIGHBORHOOD|San Ignacio de Loyola Sur
+NEIGHBORHOOD|San José
+NEIGHBORHOOD|San Martín
+NEIGHBORHOOD|San Pantaleón
+NEIGHBORHOOD|San Roque
+NEIGHBORHOOD|Santa Marta
+NEIGHBORHOOD|Santa Rosa de Lima
 NEIGHBORHOOD|Santo Domingo
+NEIGHBORHOOD|Sargento Cabral
+NEIGHBORHOOD|Schneider
+NEIGHBORHOOD|Siete Jefes
+NEIGHBORHOOD|Solidaridad y Progreso San Lorenzo
+NEIGHBORHOOD|Unión y Trabajo
+NEIGHBORHOOD|Unión-Progreso y Libertad de Barranquitas
+NEIGHBORHOOD|Varadero Sarsotti
+NEIGHBORHOOD|Villa Las Flores
+NEIGHBORHOOD|Villa Setúbal
+NEIGHBORHOOD|Villa del Parque
+NEIGHBORHOOD|Vuelta del Paraguayo
+NEIGHBORHOOD|Yapeyú Oeste
+NEIGHBORHOOD|Zona Sur Pedro Candioti
 
 CITY|Rosario
 NEIGHBORHOOD|Abasto

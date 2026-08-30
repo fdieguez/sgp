@@ -138,9 +138,9 @@ public class SolicitudService {
             String email = auth.getName();
             User user = userRepository.findByEmail(email).orElse(null);
             if (user != null) {
-                String userRole = user.getRole();
-                // Si es ADMIN o DISTRIBUIDOR o AUDITOR, tiene acceso completo a todas las solicitudes sin filtrado
-                if (userRole != null && !userRole.contains("ADMIN") && !userRole.contains("DISTRIBUIDOR") && !userRole.contains("AUDITOR")) {
+                String userRole = com.sgp.backend.security.SecurityUtils.getActiveRole(user);
+                // Si es ADMIN, DISTRIBUIDOR, OPERADOR o AUDITOR, tiene acceso completo a todas las solicitudes sin filtrado
+                if (userRole != null && !userRole.contains("ADMIN") && !userRole.contains("DISTRIBUIDOR") && !userRole.contains("OPERADOR") && !userRole.contains("AUDITOR")) {
                     spec = spec.and((root, query, cb) -> {
                         query.distinct(true);
                         jakarta.persistence.criteria.Join<Solicitud, SolicitudResolutorAssignment> assignments = root.join("resolutorAssignments", jakarta.persistence.criteria.JoinType.LEFT);
@@ -735,8 +735,9 @@ public class SolicitudService {
             String email = auth.getName();
             User currentUser = userRepository.findByEmail(email).orElse(null);
             if (currentUser != null && currentUser.getRole() != null) {
+                String activeRole = com.sgp.backend.security.SecurityUtils.getActiveRole(currentUser);
                 // Verificar si el usuario tiene rol RESOLUTOR
-                if ("RESOLUTOR".equalsIgnoreCase(currentUser.getRole())) {
+                if ("RESOLUTOR".equalsIgnoreCase(activeRole)) {
                     // Verificar si la colección de tipos de resolución del resolutor contiene la competencia 'SUBSIDIO'
                     boolean tieneSubsidio = currentUser.getTiposResolucion() != null && currentUser.getTiposResolucion().stream()
                             .anyMatch(tr -> tr.getTipo() != null && "SUBSIDIO".equalsIgnoreCase(tr.getTipo()));

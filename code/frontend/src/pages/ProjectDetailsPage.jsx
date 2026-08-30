@@ -274,6 +274,7 @@ export default function ProjectDetailsPage() {
     }, [configId, user?.id, user?.role, isResolutorSubsidio, filters, searchTerm, currentPage, sortConfig, rowsPerPage]);
 
     const fetchConfig = async () => {
+        if (!configId) return;
         try {
             const res = await api.get(`/api/config/${configId}`);
             setConfig(res.data);
@@ -1256,7 +1257,11 @@ export default function ProjectDetailsPage() {
                 isOpen={isAsociarModalOpen}
                 onClose={() => setIsAsociarModalOpen(false)}
                 onSuccess={() => {
-                    fetchConfig();
+                    if (configId) {
+                        fetchConfig();
+                    } else if (isResolutorSubsidio) {
+                        fetchConfigForSubsidios();
+                    }
                     fetchData();
                 }}
                 config={config}

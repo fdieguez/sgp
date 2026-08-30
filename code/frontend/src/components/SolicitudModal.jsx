@@ -42,7 +42,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         origin: 'MANUAL',
         entryDate: new Date().toISOString().split('T')[0],
         person: { name: '', phone: '' },
-        locationName: '',
+        locationName: 'Santa Fe',
         barrio: '',
         responsableId: '',
         amount: '',
@@ -391,7 +391,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     origin: 'MANUAL',
                     entryDate: new Date().toISOString().split('T')[0],
                     person: { name: '', phone: '' },
-                    locationName: '',
+                    locationName: 'Santa Fe',
                     barrio: '',
                     responsableId: (isResponsable && user?.responsable?.id) ? user.responsable.id : '',
                     amount: '',
@@ -424,7 +424,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 origin: 'MANUAL',
                 entryDate: new Date().toISOString().split('T')[0],
                 person: { name: '', phone: '' },
-                locationName: '',
+                locationName: 'Santa Fe',
                 barrio: '',
                 responsableId: '',
                 amount: '',
@@ -454,8 +454,16 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const availableCities = locations.filter(l => l.type === 'CITY' || l.type === 'LOCALITY');
     const selectedCity = availableCities.find(c => c.name.toLowerCase() === (formData.locationName || '').trim().toLowerCase());
     const availableNeighborhoods = selectedCity
-        ? locations.filter(l => l.type === 'NEIGHBORHOOD' && l.parent?.id === selectedCity.id)
+        ? [
+            ...locations.filter(l => {
+                if (l.type !== 'NEIGHBORHOOD' || !l.parent) return false;
+                const parentId = typeof l.parent === 'object' ? l.parent.id : l.parent;
+                return parentId === selectedCity.id;
+            }),
+            { id: 'OTRO', name: 'Otro' }
+          ]
         : [];
+
 
     const handleSubmit = async (e) => {
         if (e) e.preventDefault();
@@ -489,8 +497,25 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             toast.error("La localidad es obligatoria.");
             return;
         }
+        const validCity = availableCities.some(c => c.name.toLowerCase() === (formData.locationName || '').trim().toLowerCase());
+        if (!validCity) {
+            toast.error("La localidad ingresada no es válida. Debe elegir una de la lista.");
+            return;
+        }
         if (!formData.barrio || !formData.barrio.trim()) {
             toast.error("El barrio es obligatorio.");
+            return;
+        }
+        const validBarrio = availableNeighborhoods.some(n => {
+            const entered = (formData.barrio || '').trim().toLowerCase();
+            const official = n.name.toLowerCase();
+            return official === entered || 
+                   (entered === 'candioti' && (official === 'candioti norte' || official === 'candioti sur')) ||
+                   official.startsWith(entered) || 
+                   entered.startsWith(official);
+        });
+        if (!validBarrio) {
+            toast.error("El barrio ingresado no es válido. Debe elegir una de la lista oficial.");
             return;
         }
         if (user?.role !== 'OPERADOR' && user?.role !== 'DISTRIBUIDOR' && (!formData.zone || !formData.zone.trim())) {
@@ -834,7 +859,6 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         </div>
                     </div>
 
-                    {/* Datos de Ubicación */}
                     <div className="space-y-4 p-4 bg-gray-900/40 rounded-xl border border-gray-700">
                         <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
                             <MapPin className="h-4 w-4 text-indigo-400" /> Ubicación
@@ -842,38 +866,32 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
                                 <label className="block text-sm text-gray-500 mb-1">Localidad</label>
-                                <input
-                                    type="text"
-                                    list="cities-list"
-                                    autoComplete="off"
-                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                                <select
+                                    required
+                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
                                     value={formData.locationName}
                                     onChange={(e) => setFormData({ ...formData, locationName: e.target.value, barrio: '' })} // Reset barrio al cambiar ciudad
-                                    placeholder="Ej: Santa Fe"
-                                />
-                                <datalist id="cities-list">
+                                >
+                                    <option value="">Seleccione Localidad...</option>
                                     {availableCities.map(c => (
-                                        <option key={c.id} value={c.name} />
+                                        <option key={c.id} value={c.name}>{c.name}</option>
                                     ))}
-                                </datalist>
+                                </select>
                             </div>
                             <div>
                                 <label className="block text-sm text-gray-500 mb-1">Barrio</label>
-                                <input
-                                    type="text"
-                                    list="neighborhoods-list"
-                                    autoComplete="off"
-                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                                <select
+                                    required
+                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                                     value={formData.barrio}
                                     onChange={(e) => setFormData({ ...formData, barrio: e.target.value })}
-                                    placeholder={selectedCity ? "Seleccionar o escribir..." : "Primero elija localidad"}
                                     disabled={!formData.locationName}
-                                />
-                                <datalist id="neighborhoods-list">
+                                >
+                                    <option value="">{selectedCity ? "Seleccione Barrio..." : "Primero elija localidad"}</option>
                                     {availableNeighborhoods.map(n => (
-                                        <option key={n.id} value={n.name} />
+                                        <option key={n.id} value={n.name}>{n.name}</option>
                                     ))}
-                                </datalist>
+                                </select>
                             </div>
                             {user?.role !== 'OPERADOR' && user?.role !== 'DISTRIBUIDOR' && (
                                 <div>

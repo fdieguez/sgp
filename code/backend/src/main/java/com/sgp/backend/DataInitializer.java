@@ -32,6 +32,9 @@ public class DataInitializer implements CommandLineRunner {
     private final AtributoResolucionRepository atributoRepository;
     private final jakarta.persistence.EntityManager entityManager;
 
+    @org.springframework.beans.factory.annotation.Value("${sgp.seed.overwrite-users:true}")
+    private boolean overwriteUsers;
+
     @Override
     @org.springframework.transaction.annotation.Transactional
     public void run(String... args) throws Exception {
@@ -162,7 +165,7 @@ public class DataInitializer implements CommandLineRunner {
             createUserIfNotFound("barbarabrancatto@gmail.com", "Barbara_Resp_SGP_2026!", "RESPONSABLE", "Barbara", "Brancatto", LocalDate.of(1990, 1, 1), "3424216840", "Sur", "26.972.841");
  
             // Sembrar Resolutores
-            User resMartin = createUserIfNotFound("martinnocioni@gmail.com", "Martin_SGP_2026*", "RESOLUTOR", "Martín", "Nocioni", LocalDate.of(1990, 1, 1), "3426144703", null, "31.111.251");
+            User resMartin = createUserIfNotFound("martinnocioni@gmail.com", "Martin_SGP_2026*", "RESOLUTOR,OPERADOR", "Martín", "Nocioni", LocalDate.of(1990, 1, 1), "3426144703", null, "31.111.251");
             User resMaria = createUserIfNotFound("mvgonza79@gmail.com", "Maria_SGP_2026%", "RESOLUTOR", "María Veronica", "Gonzalez", LocalDate.of(1990, 1, 1), "3425119354", null, "27.620.830");
             User resEduardo = createUserIfNotFound("ealfaro.51@gmail.com", "Eduardo_SGP_2026^", "RESOLUTOR", "Eduardo", "Alfaro", LocalDate.of(1990, 1, 1), "3434404035", null, "32.831.230");
             User resDefault = createUserIfNotFound("resolutor@sgp.com", "Resolutor_SGP_2026!", "RESOLUTOR", "Resolutor", "Defecto", LocalDate.of(1990, 1, 1), "3420000000", null, "31.222.333");
@@ -320,13 +323,7 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void initializeLocations() {
-        if (locationRepository.count() > 0) {
-            // Si ya hay localidades en la base de datos, aseguramos que las requeridas estén marcadas como visibles
-            actualizarLocalidadesVisibles();
-            return;
-        }
-
-        System.out.println("⏳ Cargando dataset de localidades de Santa Fe...");
+        System.out.println("⏳ Sincronizando dataset de localidades y vecinales de Santa Fe de forma incremental...");
         try (java.io.InputStream is = getClass().getResourceAsStream("/dataset/santa_fe_locations_dataset.txt");
              java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(is, java.nio.charset.StandardCharsets.UTF_8))) {
 
@@ -334,6 +331,9 @@ public class DataInitializer implements CommandLineRunner {
             com.sgp.backend.entity.Location currentProvince = null;
             com.sgp.backend.entity.Location currentCity = null;
             int count = 0;
+
+            // Cargar o recuperar provincias de la base de datos
+            List<com.sgp.backend.entity.Location> allLocations = locationRepository.findAll();
 
             while ((line = reader.readLine()) != null) {
                 line = line.trim();
@@ -346,30 +346,57 @@ public class DataInitializer implements CommandLineRunner {
                 String name = parts[1];
 
                 if ("PROVINCE".equals(type)) {
-                    currentProvince = new com.sgp.backend.entity.Location();
-                    currentProvince.setName(name);
-                    currentProvince.setType("PROVINCE");
-                    currentProvince = locationRepository.save(currentProvince);
-                    count++;
+                    final String provName = name;
+                    currentProvince = allLocations.stream()
+                        .filter(l -> "PROVINCE".equals(l.getType()) && provName.equalsIgnoreCase(l.getName()))
+                        .findFirst()
+                        .orElseGet(() -> {
+                            var p = new com.sgp.backend.entity.Location();
+                            p.setName(provName);
+                            p.setType("PROVINCE");
+                            p.setShowInUi(false);
+                            var saved = locationRepository.save(p);
+                            allLocations.add(saved);
+                            return saved;
+                        });
                 } else if ("CITY".equals(type) || "LOCALITY".equals(type)) {
-                    currentCity = new com.sgp.backend.entity.Location();
-                    currentCity.setName(name);
-                    currentCity.setType("CITY");
-                    currentCity.setParent(currentProvince);
-                    currentCity = locationRepository.save(currentCity);
-                    count++;
+                    final String cityName = name;
+                    final com.sgp.backend.entity.Location parentProv = currentProvince;
+                    currentCity = allLocations.stream()
+                        .filter(l -> ("CITY".equals(l.getType()) || "LOCALITY".equals(l.getType())) && cityName.equalsIgnoreCase(l.getName()))
+                        .findFirst()
+                        .orElseGet(() -> {
+                            var c = new com.sgp.backend.entity.Location();
+                            c.setName(cityName);
+                            c.setType("CITY"); // normalizado
+                            c.setParent(parentProv);
+                            c.setShowInUi(false);
+                            var saved = locationRepository.save(c);
+                            allLocations.add(saved);
+                            return saved;
+                        });
                 } else if ("NEIGHBORHOOD".equals(type) && currentCity != null) {
-                    com.sgp.backend.entity.Location neighborhood = new com.sgp.backend.entity.Location();
-                    neighborhood.setName(name);
-                    neighborhood.setType("NEIGHBORHOOD");
-                    neighborhood.setParent(currentCity);
-                    locationRepository.save(neighborhood);
-                    count++;
+                    final String neighName = name;
+                    final com.sgp.backend.entity.Location parentCity = currentCity;
+                    boolean exists = allLocations.stream()
+                        .anyMatch(l -> "NEIGHBORHOOD".equals(l.getType()) && neighName.equalsIgnoreCase(l.getName()) && l.getParent() != null && l.getParent().getId().equals(parentCity.getId()));
+                    if (!exists) {
+                        com.sgp.backend.entity.Location neighborhood = new com.sgp.backend.entity.Location();
+                        neighborhood.setName(neighName);
+                        neighborhood.setType("NEIGHBORHOOD");
+                        neighborhood.setParent(parentCity);
+                        neighborhood.setShowInUi(false);
+                        var saved = locationRepository.save(neighborhood);
+                        allLocations.add(saved);
+                        count++;
+                    }
                 }
             }
-            System.out.println("✅ Se inicializaron " + count + " registros de ubicación exitosamente.");
+            if (count > 0) {
+                System.out.println("✅ Se agregaron " + count + " nuevas vecinales oficiales al catálogo.");
+            }
 
-            // Aseguramos las localidades visibles para la interfaz en la base de datos recién creada
+            // Aseguramos las localidades visibles para la interfaz
             actualizarLocalidadesVisibles();
         } catch (Exception e) {
             System.err.println("❌ Error al cargar las localidades: " + e.getMessage());
@@ -415,6 +442,12 @@ public class DataInitializer implements CommandLineRunner {
             user.setPassword(passwordEncoder.encode(password));
             isNew = true;
         } else {
+            // Si el usuario existe y no está configurado para sobrescribirse, omitimos los cambios
+            if (!overwriteUsers) {
+                System.out.println("ℹ️ User already exists, skipping overwrite (sgp.seed.overwrite-users=false): " + email);
+                return user;
+            }
+
             // Solo actualizamos la contraseña si el plain text definido en el código
             // no coincide con el hash actual (útil para resetear desde el código si se olvida)
             if (!passwordEncoder.matches(password, user.getPassword())) {
@@ -473,9 +506,9 @@ public class DataInitializer implements CommandLineRunner {
 
         // Definición de tipos básicos
         upsertTipoResolucion("AGENDA", resolutorDefault, List.of(
-            new AtributoConfig(attrFecha, true, 1),
-            new AtributoConfig(attrDecInteres, true, 2),
-            new AtributoConfig(attrDatoObs, true, 3)
+            new AtributoConfig(attrFecha, false, 1),
+            new AtributoConfig(attrDecInteres, false, 2),
+            new AtributoConfig(attrDatoObs, false, 3)
         ));
 
         upsertTipoResolucion("SUBSIDIO", resolutorDefault, List.of(

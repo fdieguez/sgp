@@ -57,8 +57,9 @@ public class SheetsConfigController {
             com.sgp.backend.entity.User user = userRepository.findByEmail(currentUserDetails.getUsername())
                     .orElseThrow(() -> new UsernameNotFoundException("Usuario no encontrado: " + currentUserDetails.getUsername()));
 
+            String activeRole = com.sgp.backend.security.SecurityUtils.getActiveRole(user);
             // Si el rol es RESOLUTOR, validar de forma segura la especificidad asociada (excluyendo accesos cruzados entre Agenda y Subsidios)
-            if ("RESOLUTOR".equalsIgnoreCase(user.getRole())) {
+            if ("RESOLUTOR".equalsIgnoreCase(activeRole)) {
                 com.sgp.backend.entity.Project project = projectRepository.findBySheetsConfig(config).orElse(null);
                 String tipoProyecto = (project != null) ? project.getName() : config.getSheetName();
                 
@@ -86,7 +87,7 @@ public class SheetsConfigController {
             config.setCalendarId(configDetails.getCalendarId());
 
             // Los campos de configuración avanzada (frecuencia, ventana de días) sólo son modificables por administradores
-            if (!"RESOLUTOR".equalsIgnoreCase(user.getRole())) {
+            if (!"RESOLUTOR".equalsIgnoreCase(activeRole)) {
                 config.setSheetName(configDetails.getSheetName());
                 config.setSyncFrequencyMinutes(configDetails.getSyncFrequencyMinutes());
                 config.setSyncWindowDays(configDetails.getSyncWindowDays());

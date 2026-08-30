@@ -11,12 +11,16 @@ const api = axios.create({
     baseURL: getBaseUrl(),
 });
 
-// Add a request interceptor to inject the token if it exists
+// Add a request interceptor to inject the token and active role if they exist
 api.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
         if (token) {
             config.headers['Authorization'] = `Bearer ${token}`;
+        }
+        const activeRole = localStorage.getItem('activeRole');
+        if (activeRole) {
+            config.headers['X-Active-Role'] = activeRole;
         }
         return config;
     },

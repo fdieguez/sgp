@@ -287,4 +287,41 @@ public class TestHelperController {
             return "A" + (char) ('A' + (colIndex - 26));
         }
     }
+
+    @Transactional
+    @PostMapping("/modify-user-dni")
+    public ResponseEntity<?> modifyUserDni(@RequestBody Map<String, String> payload) {
+        String email = payload.get("email");
+        String newDni = payload.get("dni");
+        try {
+            entityManager.createNativeQuery("UPDATE users SET dni = :dni WHERE email = :email")
+                         .setParameter("dni", newDni)
+                         .setParameter("email", email)
+                         .executeUpdate();
+            return ResponseEntity.ok(Map.of("message", "User DNI modified successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/get-user")
+    public ResponseEntity<?> getUser(@RequestParam String email) {
+        try {
+            List<?> results = entityManager.createNativeQuery("SELECT email, dni, role FROM users WHERE email = :email")
+                                           .setParameter("email", email)
+                                           .getResultList();
+            if (results.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            Object[] row = (Object[]) results.get(0);
+            return ResponseEntity.ok(Map.of(
+                "email", row[0] != null ? row[0].toString() : "",
+                "dni", row[1] != null ? row[1].toString() : "",
+                "role", row[2] != null ? row[2].toString() : ""
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+    }
 }
+
