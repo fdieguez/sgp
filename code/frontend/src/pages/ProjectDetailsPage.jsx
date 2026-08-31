@@ -897,9 +897,6 @@ export default function ProjectDetailsPage() {
                             )}
                             {(user?.role === 'ADMINISTRADOR' || isResolutorSubsidio) && (
                                 <>
-                                    <button onClick={handleBulkExport} className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded-full text-xs font-bold transition-colors shadow-sm">
-                                        Exportar
-                                    </button>
                                     <button onClick={handleBulkImport} className="bg-indigo-800 hover:bg-indigo-900 text-white px-3 py-1 rounded-full text-xs font-bold transition-colors shadow-sm">
                                         Importar
                                     </button>

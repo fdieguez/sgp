@@ -37,39 +37,24 @@ export default function DescargarAdjunto() {
         setDescargando(true);
         setError(null);
         try {
-            // Petición de tipo blob al endpoint seguro
-            const res = await api.get(`/api/solicitudes/adjuntos/${adjuntoId}/download`, {
+            // Petición de tipo blob al endpoint de visualización inline (/view)
+            const res = await api.get(`/api/solicitudes/adjuntos/${adjuntoId}/view`, {
                 responseType: 'blob'
             });
 
-            // Crear el blob y simular el click para descargar
-            const contentType = res.headers['content-type'] || 'application/octet-stream';
+            // Crear el blob con el content-type real del archivo
+            const contentType = res.headers['content-type'] || 'application/pdf';
             const blob = new Blob([res.data], { type: contentType });
             const url = window.URL.createObjectURL(blob);
             
-            // Extraer el nombre original del archivo desde las cabeceras si está presente
-            const contentDisposition = res.headers['content-disposition'];
-            let filename = `adjunto_${adjuntoId}`;
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                if (filenameMatch && filenameMatch[1]) {
-                    filename = filenameMatch[1].replace(/['"]/g, '');
-                }
-            }
+            // Reemplazar la ubicación de la pestaña actual por la URL del blob para mostrarlo inline
+            window.location.replace(url);
 
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', filename);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(url);
-
-            toast.success("Archivo descargado correctamente.");
+            toast.success("Archivo cargado correctamente.");
         } catch (err) {
-            console.error("Error al descargar el archivo adjunto:", err);
-            setError("No se pudo descargar el archivo. Es posible que el archivo no exista o que no tenga permisos suficientes.");
-            toast.error("Error al descargar el archivo.");
+            console.error("Error al visualizar el archivo adjunto:", err);
+            setError("No se pudo cargar el archivo. Es posible que el archivo físico no exista o que no tenga permisos suficientes.");
+            toast.error("Error al cargar el archivo.");
         } finally {
             setDescargando(false);
         }
@@ -91,12 +76,12 @@ export default function DescargarAdjunto() {
                     <FileText className="h-8 w-8" />
                 </div>
                 
-                <h2 className="text-2xl font-black tracking-tight">Descarga Segura</h2>
+                <h2 className="text-2xl font-black tracking-tight">Visualizador Seguro</h2>
                 
                 {descargando && (
                     <div className="flex flex-col items-center space-y-3">
                         <Loader2 className="h-8 w-8 text-indigo-500 animate-spin" />
-                        <p className="text-sm text-gray-400">Descargando archivo adjunto...</p>
+                        <p className="text-sm text-gray-400">Cargando archivo adjunto...</p>
                     </div>
                 )}
 
@@ -110,15 +95,15 @@ export default function DescargarAdjunto() {
                             onClick={descargarArchivo}
                             className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 px-4 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2"
                         >
-                            <Download className="h-4 w-4" /> Reintentar Descarga
+                            <Eye className="h-4 w-4" /> Reintentar Visualización
                         </button>
                     </div>
                 )}
 
                 {!descargando && !error && (
                     <div className="space-y-2">
-                        <p className="text-sm text-green-400 font-bold">¡Descarga exitosa!</p>
-                        <p className="text-xs text-gray-400">El archivo se ha transferido a su dispositivo.</p>
+                        <p className="text-sm text-green-400 font-bold">¡Carga exitosa!</p>
+                        <p className="text-xs text-gray-400">El archivo se visualiza inline en su navegador.</p>
                     </div>
                 )}
 
