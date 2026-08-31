@@ -136,17 +136,16 @@ public class DocumentoAdjuntoController {
     
     @DeleteMapping("/adjuntos/{adjuntoId}")
     public ResponseEntity<Void> deleteAdjunto(@PathVariable Long adjuntoId) {
-        DocumentoAdjunto adjunto = documentoAdjuntoRepository.findById(adjuntoId)
-                .orElseThrow(() -> new RuntimeException("Documento no encontrado"));
-                
-        try {
-            fileService.deleteFile(adjunto.getFileName());
-        } catch (Exception e) {
-            System.err.println("Advertencia al borrar archivo del disco: " + e.getMessage());
+        java.util.Optional<DocumentoAdjunto> optionalAdjunto = documentoAdjuntoRepository.findById(adjuntoId);
+        if (optionalAdjunto.isPresent()) {
+            DocumentoAdjunto adjunto = optionalAdjunto.get();
+            try {
+                fileService.deleteFile(adjunto.getFileName());
+            } catch (Exception e) {
+                System.err.println("Advertencia al borrar archivo del disco: " + e.getMessage());
+            }
+            documentoAdjuntoRepository.delete(adjunto);
         }
-        
-        documentoAdjuntoRepository.delete(adjunto);
-        
         return ResponseEntity.ok().build();
     }
 }
