@@ -91,7 +91,7 @@ public class DashboardService {
         long totalSolicitudes = filteredSolicitudes.size();
         long pendingSolicitudes = filteredSolicitudes.stream().filter(s -> s.getStatus() != null && "pendiente".equalsIgnoreCase(s.getStatus().trim())).count();
         long inProgressSolicitudes = filteredSolicitudes.stream().filter(s -> s.getStatus() != null && "en proceso".equalsIgnoreCase(s.getStatus().trim())).count();
-        long inResolutionSolicitudes = filteredSolicitudes.stream().filter(s -> s.getStatus() != null && "en resolucion".equalsIgnoreCase(s.getStatus().trim())).count();
+        long inResolutionSolicitudes = filteredSolicitudes.stream().filter(s -> s.getStatus() != null && ("en resolucion".equalsIgnoreCase(s.getStatus().trim()) || "consideracion".equalsIgnoreCase(s.getStatus().trim()))).count();
         long completedSolicitudes = filteredSolicitudes.stream().filter(s -> s.getStatus() != null && "completadas".equalsIgnoreCase(s.getStatus().trim())).count();
         long rejectedSolicitudes = filteredSolicitudes.stream().filter(s -> s.getStatus() != null && "rechazada".equalsIgnoreCase(s.getStatus().trim())).count();
 

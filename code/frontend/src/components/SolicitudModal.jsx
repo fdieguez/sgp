@@ -222,7 +222,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const handleDeleteAdjunto = async (adjuntoId) => {
         if(!window.confirm("¿Seguro que deseas eliminar este archivo?")) return;
         try {
-            await api.delete(`/api/solicitudes/${formData.id}/adjuntos/${adjuntoId}`);
+            await api.delete(`/api/solicitudes/adjuntos/${adjuntoId}`);
             toast.success("Archivo eliminado");
             fetchAdjuntos();
         } catch (err) {
