@@ -23,6 +23,7 @@ services:
     volumes:
       - ./backend/data:/app/data
       - ./logs/backend:/app/logs
+      - ./backend/uploads:/app/uploads
 
   # Frontend (React + Nginx)
   frontend:
