@@ -96,7 +96,7 @@ public class DashboardService {
         long rejectedSolicitudes = filteredSolicitudes.stream().filter(s -> s.getStatus() != null && "rechazada".equalsIgnoreCase(s.getStatus().trim())).count();
 
         BigDecimal totalDelivered = filteredSolicitudes.stream()
-                .filter(s -> "SUBSIDIO".equalsIgnoreCase(s.getType()) && s.getStatus() != null && "completadas".equalsIgnoreCase(s.getStatus().trim()))
+                .filter(s -> s.getStatus() != null && "completadas".equalsIgnoreCase(s.getStatus().trim()))
                 .map(Solicitud::getAmount)
                 .filter(amount -> amount != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -130,7 +130,7 @@ public class DashboardService {
         // 2. Serie Temporal Mensual de Montos (Solo Subsidios)
         Map<String, BigDecimal> monthlyAmounts = new HashMap<>();
         for (Solicitud s : filteredSolicitudes) {
-            if ("SUBSIDIO".equalsIgnoreCase(s.getType()) && s.getEntryDate() != null && s.getAmount() != null) {
+            if (s.getEntryDate() != null && s.getAmount() != null) {
                 String key = s.getEntryDate().getYear() + "-" + String.format("%02d", s.getEntryDate().getMonthValue());
                 monthlyAmounts.put(key, monthlyAmounts.getOrDefault(key, BigDecimal.ZERO).add(s.getAmount()));
             }

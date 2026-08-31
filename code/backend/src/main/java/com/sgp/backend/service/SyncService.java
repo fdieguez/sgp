@@ -1142,7 +1142,20 @@ public class SyncService {
             log.debug("No se pudo obtener la URL de origen de la petición HTTP actual, usando fallback: {}", sgpFrontendUrl);
         }
 
-        return frontendUrl + "/descargar-adjunto/" + valStr;
+        String adjuntoId = valStr;
+        if (valStr.contains("/adjuntos/") && valStr.contains("/download")) {
+            try {
+                int start = valStr.indexOf("/adjuntos/") + "/adjuntos/".length();
+                int end = valStr.indexOf("/download");
+                if (start < end) {
+                    adjuntoId = valStr.substring(start, end);
+                }
+            } catch (Exception e) {
+                // fallback
+            }
+        }
+
+        return frontendUrl + "/descargar-adjunto/" + adjuntoId;
     }
 
     private String extractIdFromLink(String link) {
