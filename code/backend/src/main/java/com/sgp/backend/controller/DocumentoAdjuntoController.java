@@ -101,8 +101,12 @@ public class DocumentoAdjuntoController {
     @GetMapping("/adjuntos/{adjuntoId}/download")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMINISTRADOR', 'RESOLUTOR', 'RESPONSABLE', 'LECTOR', 'OPERADOR', 'AUDITOR')")
     public ResponseEntity<?> downloadFile(@PathVariable Long adjuntoId) {
-        DocumentoAdjunto adjunto = documentoAdjuntoRepository.findById(adjuntoId)
-                .orElseThrow(() -> new RuntimeException("Documento no encontrado"));
+        java.util.Optional<DocumentoAdjunto> optionalAdjunto = documentoAdjuntoRepository.findById(adjuntoId);
+        if (optionalAdjunto.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("El archivo adjunto solicitado no existe o fue eliminado.");
+        }
+        DocumentoAdjunto adjunto = optionalAdjunto.get();
 
         try {
             Resource resource = fileService.loadFileAsResource(adjunto.getFileName());
@@ -119,8 +123,12 @@ public class DocumentoAdjuntoController {
     @GetMapping("/adjuntos/{adjuntoId}/view")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMINISTRADOR', 'RESOLUTOR', 'RESPONSABLE', 'LECTOR', 'OPERADOR', 'AUDITOR')")
     public ResponseEntity<?> viewFileInline(@PathVariable Long adjuntoId) {
-        DocumentoAdjunto adjunto = documentoAdjuntoRepository.findById(adjuntoId)
-                .orElseThrow(() -> new RuntimeException("Documento no encontrado"));
+        java.util.Optional<DocumentoAdjunto> optionalAdjunto = documentoAdjuntoRepository.findById(adjuntoId);
+        if (optionalAdjunto.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("El archivo adjunto solicitado no existe o fue eliminado.");
+        }
+        DocumentoAdjunto adjunto = optionalAdjunto.get();
 
         try {
             Resource resource = fileService.loadFileAsResource(adjunto.getFileName());

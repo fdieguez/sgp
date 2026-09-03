@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../config/axios';
-import { FileText, Download, Loader2, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { FileText, Eye, Download, Loader2, AlertTriangle, ArrowLeft, LogIn } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 /**
@@ -17,6 +17,7 @@ export default function DescargarAdjunto() {
 
     const [descargando, setDescargando] = useState(false);
     const [error, setError] = useState(null);
+    const [esErrorSesion, setEsErrorSesion] = useState(false);
 
     useEffect(() => {
         // Esperar a que la autenticación del contexto termine de cargar
@@ -36,6 +37,7 @@ export default function DescargarAdjunto() {
     const descargarArchivo = async () => {
         setDescargando(true);
         setError(null);
+        setEsErrorSesion(false);
         try {
             // Petición de tipo blob al endpoint de visualización inline (/view)
             const res = await api.get(`/api/solicitudes/adjuntos/${adjuntoId}/view`, {
@@ -53,7 +55,14 @@ export default function DescargarAdjunto() {
             toast.success("Archivo cargado correctamente.");
         } catch (err) {
             console.error("Error al visualizar el archivo adjunto:", err);
-            setError("No se pudo cargar el archivo. Es posible que el archivo físico no exista o que no tenga permisos suficientes.");
+            if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+                setError("Su sesión no es válida o ha expirado. Inicie sesión nuevamente para visualizar este archivo.");
+                setEsErrorSesion(true);
+            } else if (err.response && err.response.status === 404) {
+                setError("El archivo adjunto solicitado no existe o fue eliminado.");
+            } else {
+                setError("No se pudo cargar el archivo. Es posible que el archivo físico no exista o no tenga permisos suficientes.");
+            }
             toast.error("Error al cargar el archivo.");
         } finally {
             setDescargando(false);
@@ -91,12 +100,21 @@ export default function DescargarAdjunto() {
                             <AlertTriangle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
                             <p className="text-xs text-red-300 leading-relaxed">{error}</p>
                         </div>
-                        <button
-                            onClick={descargarArchivo}
-                            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 px-4 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2"
-                        >
-                            <Eye className="h-4 w-4" /> Reintentar Visualización
-                        </button>
+                        {esErrorSesion ? (
+                            <button
+                                onClick={() => navigate(`/login?redirectTo=${encodeURIComponent(location.pathname)}`)}
+                                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 px-4 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2"
+                            >
+                                <LogIn className="h-4 w-4" /> Iniciar Sesión
+                            </button>
+                        ) : (
+                            <button
+                                onClick={descargarArchivo}
+                                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 px-4 rounded-xl font-bold transition-all shadow-lg text-sm flex items-center justify-center gap-2"
+                            >
+                                <Eye className="h-4 w-4" /> Reintentar Visualización
+                            </button>
+                        )}
                     </div>
                 )}
 
