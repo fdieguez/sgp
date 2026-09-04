@@ -485,8 +485,8 @@ public class DataInitializer implements CommandLineRunner {
         AtributoResolucion attrDecInteres = obtenerOCrearAtributo("Declaración de interés", "SELECT", "si,no");
         AtributoResolucion attrCBU = obtenerOCrearAtributo("Constancia de CBU", "FILE", null);
 
-        // Nuevos atributos específicos de SUBSIDIO para la Etapa 8
-        AtributoResolucion attrTipoPedido = obtenerOCrearAtributo("Tipo de pedido", "SELECT", "Personal,Institucional en dinero,Institucional en especie,Institucional indistinto");
+        // Atributos específicos de SUBSIDIO (Etapa 8 y depuración Etapa 11)
+        AtributoResolucion attrTipoPedido = obtenerOCrearAtributo("Tipo de pedido", "SELECT", "Personal,Institucional en dinero,Institucional en especie");
         AtributoResolucion attrNombreApellido = obtenerOCrearAtributo("Nombre y apellido", "TEXT", null);
         AtributoResolucion attrDni = obtenerOCrearAtributo("DNI", "TEXT", null);
         AtributoResolucion attrTelefono = obtenerOCrearAtributo("Teléfono", "TEXT", null);
@@ -504,11 +504,35 @@ public class DataInitializer implements CommandLineRunner {
         AtributoResolucion attrResp2Cargo = obtenerOCrearAtributo("Responsable 2: Cargo", "TEXT", null);
         AtributoResolucion attrNotaPedido = obtenerOCrearAtributo("Nota de pedido", "FILE", null);
 
-        // Definición de tipos básicos
+        // Atributos específicos de AGENDA para la Etapa 11 (13 campos ordenados)
+        AtributoResolucion attrTipoActividad = obtenerOCrearAtributo("Tipo de actividad", "SELECT", "Reunión,Evento,Acto,Recorrido gestión,Recorrido territorial,Visita,Otro");
+        AtributoResolucion attrOrganizadaNosotros = obtenerOCrearAtributo("Organizada por nosotros?", "SELECT", "si,no");
+        AtributoResolucion attrDescTemario = obtenerOCrearAtributo("Descripción/temario", "TEXTAREA", null);
+        AtributoResolucion attrAsistentes = obtenerOCrearAtributo("Asistentes", "TEXT", null);
+        AtributoResolucion attrAporte = obtenerOCrearAtributo("Aporte?", "SELECT", "si,no");
+        AtributoResolucion attrDescMonto = obtenerOCrearAtributo("Descripción/monto", "TEXT", null);
+        AtributoResolucion attrDia = obtenerOCrearAtributo("Día", "DATE", null);
+        AtributoResolucion attrHora = obtenerOCrearAtributo("Hora", "TIME", null);
+        AtributoResolucion attrLugarLocalidad = obtenerOCrearAtributo("Lugar - Localidad", "SELECT", null);
+        AtributoResolucion attrLugarBarrio = obtenerOCrearAtributo("Lugar - Barrio", "SELECT", null);
+        AtributoResolucion attrResponsable = obtenerOCrearAtributo("Responsable", "TEXT", null);
+        AtributoResolucion attrObservacion = obtenerOCrearAtributo("Observación", "TEXTAREA", null);
+
+        // Definición de tipo AGENDA (Etapa 11)
         upsertTipoResolucion("AGENDA", resolutorDefault, List.of(
-            new AtributoConfig(attrFecha, false, 1),
-            new AtributoConfig(attrDecInteres, false, 2),
-            new AtributoConfig(attrDatoObs, false, 3)
+            new AtributoConfig(attrTipoActividad, true, 1),
+            new AtributoConfig(attrOrganizadaNosotros, true, 2),
+            new AtributoConfig(attrDescTemario, true, 3),
+            new AtributoConfig(attrAsistentes, true, 4),
+            new AtributoConfig(attrDecInteres, true, 5),
+            new AtributoConfig(attrAporte, true, 6),
+            new AtributoConfig(attrDescMonto, false, 7), // Condicional a Aporte? === 'si'
+            new AtributoConfig(attrDia, true, 8),
+            new AtributoConfig(attrHora, true, 9),
+            new AtributoConfig(attrLugarLocalidad, true, 10),
+            new AtributoConfig(attrLugarBarrio, true, 11),
+            new AtributoConfig(attrResponsable, true, 12),
+            new AtributoConfig(attrObservacion, true, 13)
         ));
 
         upsertTipoResolucion("SUBSIDIO", resolutorDefault, List.of(

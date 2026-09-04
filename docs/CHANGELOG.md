@@ -4,6 +4,24 @@
 
 **Versión Actual**: `1.0.0` (Versión Oficial SGP 1.0 - Despliegue, Regresión y Purga de Producción)
 
+## 📅 Septiembre 2026
+
+### 04/09/2026
+- **⭐️ Cierre de la Etapa 11 - Correcciones Finales Pre-Producción (Feedback de Usuario Real):**
+    - **Ampliación Integral de Campos de Agenda (`DataInitializer.java` y `SolicitudModal.jsx`)**:
+        - Redefinición en backend de los 13 campos del tipo de resolución `AGENDA`: `Tipo de actividad` (Reunión, Evento, Acto, Recorrido gestión, Recorrido territorial, Visita, Otro), `Organizada por nosotros?`, `Descripción/temario`, `Asistentes`, `Declaración de interés`, `Aporte?`, `Descripción/monto` (condicional a Aporte = si), `Día` (date), `Hora` (time), `Lugar - Localidad`, `Lugar - Barrio`, `Responsable` y `Observación`.
+        - Precarga automática de Localidad y Barrio en el formulario de Agenda a partir de la ubicación de la solicitud.
+        - Menús desplegables dinámicos de selección para Localidad y Barrio dentro de la tarjeta de Agenda.
+        - Comportamiento reactivo del campo `Descripción/monto`, mostrándose únicamente cuando `Aporte?` es seleccionado como `si`.
+        - Validación estricta en el guardado de la solicitud que exige completar todos los campos obligatorios de la Agenda.
+    - **Depuración de Tipos de Pedido en Subsidios (`DataInitializer.java`)**:
+        - Eliminación definitiva de la opción `"Institucional indistinto"` del atributo `Tipo de pedido`.
+        - Opciones oficiales resultantes: `Personal`, `Institucional en dinero` e `Institucional en especie`.
+    - **Ordenamiento Interactivo por N° Orden (`ProjectDetailsPage.jsx`)**:
+        - Habilitación de interactividad en la cabecera `<th>N° Orden</th>` de la tabla principal, permitiendo alternar orden ascendente (`id,asc`) y descendente (`id,desc`) con indicadores visuales de flechas (`ArrowUp` / `ArrowDown`).
+    - **Validación Automatizada E2E con Playwright (`etapa11_validacion_final.spec.js`)**:
+        - Creación y ejecución de suite integral con 4 casos de prueba (100% aprobados en 30.6s) y generación de 7 capturas de evidencia en `pruebas/pruebaEtapa11/`.
+
 ---
 
 ## 📅 Agosto 2026

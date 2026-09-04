@@ -541,15 +541,91 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             }
         }
 
+        // Validación estricta de campos obligatorios para asignaciones de tipo AGENDA (Etapa 11)
+        for (const a of (formData.assignments || [])) {
+            if (a.tipoResolucion === 'AGENDA') {
+                const det = typeof a.detalle === 'object' && a.detalle !== null ? a.detalle : {};
+                if (!det['Tipo de actividad'] || !det['Tipo de actividad'].trim()) {
+                    toast.error("El campo 'Tipo de actividad' en Agenda es obligatorio.");
+                    return;
+                }
+                if (!det['Organizada por nosotros?'] || !det['Organizada por nosotros?'].trim()) {
+                    toast.error("El campo 'Organizada por nosotros?' en Agenda es obligatorio.");
+                    return;
+                }
+                if (!det['Descripción/temario'] || !det['Descripción/temario'].trim()) {
+                    toast.error("El campo 'Descripción/temario' en Agenda es obligatorio.");
+                    return;
+                }
+                if (!det['Asistentes'] || !det['Asistentes'].trim()) {
+                    toast.error("El campo 'Asistentes' en Agenda es obligatorio.");
+                    return;
+                }
+                if (!det['Declaración de interés'] || !det['Declaración de interés'].trim()) {
+                    toast.error("El campo 'Declaración de interés' en Agenda es obligatorio.");
+                    return;
+                }
+                if (!det['Aporte?'] || !det['Aporte?'].trim()) {
+                    toast.error("El campo 'Aporte?' en Agenda es obligatorio.");
+                    return;
+                }
+                if (det['Aporte?'] === 'si' && (!det['Descripción/monto'] || !det['Descripción/monto'].trim())) {
+                    toast.error("El campo 'Descripción/monto' en Agenda es obligatorio cuando hay aporte.");
+                    return;
+                }
+                if (!det['Día'] || !det['Día'].trim()) {
+                    toast.error("El campo 'Día' en Agenda es obligatorio.");
+                    return;
+                }
+                if (!det['Hora'] || !det['Hora'].trim()) {
+                    toast.error("El campo 'Hora' en Agenda es obligatorio.");
+                    return;
+                }
+                const locAgenda = det['Lugar - Localidad'] || formData.locationName;
+                if (!locAgenda || !locAgenda.trim()) {
+                    toast.error("El campo 'Lugar - Localidad' en Agenda es obligatorio.");
+                    return;
+                }
+                const barAgenda = det['Lugar - Barrio'] || formData.barrio;
+                if (!barAgenda || !barAgenda.trim()) {
+                    toast.error("El campo 'Lugar - Barrio' en Agenda es obligatorio.");
+                    return;
+                }
+                if (!det['Responsable'] || !det['Responsable'].trim()) {
+                    toast.error("El campo 'Responsable' en Agenda es obligatorio.");
+                    return;
+                }
+                if (!det['Observación'] || !det['Observación'].trim()) {
+                    toast.error("El campo 'Observación' en Agenda es obligatorio.");
+                    return;
+                }
+            }
+        }
+
         setLoading(true);
         try {
             // Limpiar asignaciones: filtrar vacías y serializar el detalle
             const assignments = formData.assignments
                 .filter(a => a.resolutorEmail && a.tipoResolucion)
-                .map(a => ({
-                    ...a,
-                    detalle: typeof a.detalle === 'object' ? JSON.stringify(a.detalle) : (a.detalle || '')
-                }));
+                .map(a => {
+                    let detalleFinal = a.detalle;
+                    if (typeof a.detalle === 'object' && a.detalle !== null) {
+                        const copy = { ...a.detalle };
+                        if (a.tipoResolucion === 'AGENDA') {
+                            if (!copy['Lugar - Localidad'] && formData.locationName) {
+                                copy['Lugar - Localidad'] = formData.locationName;
+                            }
+                            if (!copy['Lugar - Barrio'] && formData.barrio) {
+                                copy['Lugar - Barrio'] = formData.barrio;
+                            }
+                        }
+                        detalleFinal = JSON.stringify(copy);
+                    }
+                    return {
+                        ...a,
+                        detalle: detalleFinal || ''
+                    };
+                });
 
             let newId = null;
             if (formData.id) {
@@ -1136,10 +1212,20 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                     const type = e.target.value;
                                                     const config = tiposResolucion.find(c => c.tipo === type);
                                                     const newAssignments = [...formData.assignments];
+                                                    let currentDet = typeof assignment.detalle === 'object' && assignment.detalle !== null ? { ...assignment.detalle } : {};
+                                                    if (type === 'AGENDA') {
+                                                        if (!currentDet['Lugar - Localidad'] && formData.locationName) {
+                                                            currentDet['Lugar - Localidad'] = formData.locationName;
+                                                        }
+                                                        if (!currentDet['Lugar - Barrio'] && formData.barrio) {
+                                                            currentDet['Lugar - Barrio'] = formData.barrio;
+                                                        }
+                                                    }
                                                     newAssignments[index] = { 
                                                         ...assignment, 
                                                         tipoResolucion: type,
-                                                        resolutorEmail: config?.resolutor?.email || ''
+                                                        resolutorEmail: config?.resolutor?.email || '',
+                                                        detalle: currentDet
                                                     };
                                                     setFormData({ ...formData, assignments: newAssignments });
                                                 }}
@@ -1176,7 +1262,15 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                     const canEditThis = !isResolutor || (assignment.resolutorEmail === user?.email);
                                                     if (config && config.atributosConfig && config.atributosConfig.length > 0) {
                                                         const sortedCampos = [...config.atributosConfig].sort((a,b) => a.orden - b.orden);
-                                                    const currentData = typeof assignment.detalle === 'object' && assignment.detalle !== null ? assignment.detalle : {};
+                                                        const currentData = typeof assignment.detalle === 'object' && assignment.detalle !== null ? { ...assignment.detalle } : {};
+                                                    if (assignment.tipoResolucion === 'AGENDA') {
+                                                        if (!currentData['Lugar - Localidad'] && formData.locationName) {
+                                                            currentData['Lugar - Localidad'] = formData.locationName;
+                                                        }
+                                                        if (!currentData['Lugar - Barrio'] && formData.barrio) {
+                                                            currentData['Lugar - Barrio'] = formData.barrio;
+                                                        }
+                                                    }
                                                     return (
                                                         <div className="space-y-4 p-4 bg-gray-800/80 border border-gray-600 rounded-lg shadow-inner">
                                                             {sortedCampos.map(ac => {
@@ -1204,6 +1298,77 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                     }
                                                                 }
 
+                                                                // Lógica condicional específica para AGENDA (Etapa 11)
+                                                                if (assignment.tipoResolucion === 'AGENDA') {
+                                                                    if (campo.nombre === 'Descripción/monto' && currentData['Aporte?'] !== 'si') {
+                                                                        return null;
+                                                                    }
+                                                                }
+
+                                                                // Desplegable de Localidad para AGENDA
+                                                                if (campo.nombre === 'Lugar - Localidad') {
+                                                                    return (
+                                                                        <div key={campo.id}>
+                                                                            <label className="block text-[11px] text-gray-400 mb-1 uppercase tracking-wider font-semibold">
+                                                                                {campo.nombre} {ac.requerido && <span className="text-red-400">*</span>}
+                                                                            </label>
+                                                                            <select
+                                                                                value={currentData['Lugar - Localidad'] || ''}
+                                                                                onChange={e => {
+                                                                                    const newAssignments = [...formData.assignments];
+                                                                                    newAssignments[index].detalle = { 
+                                                                                        ...currentData, 
+                                                                                        'Lugar - Localidad': e.target.value,
+                                                                                        'Lugar - Barrio': '' 
+                                                                                    };
+                                                                                    setFormData({ ...formData, assignments: newAssignments });
+                                                                                }}
+                                                                                className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
+                                                                                disabled={!canEditThis}
+                                                                            >
+                                                                                <option value="">Seleccionar Localidad...</option>
+                                                                                {availableCities.map(c => (
+                                                                                    <option key={c.id} value={c.name}>{c.name}</option>
+                                                                                ))}
+                                                                            </select>
+                                                                        </div>
+                                                                    );
+                                                                }
+
+                                                                // Desplegable de Barrio para AGENDA
+                                                                if (campo.nombre === 'Lugar - Barrio') {
+                                                                    const agendaCityName = (currentData['Lugar - Localidad'] || '').trim().toLowerCase();
+                                                                    const selectedAgendaCity = availableCities.find(c => c.name.toLowerCase() === agendaCityName);
+                                                                    const agendaNeighborhoods = selectedAgendaCity ? locations.filter(l => {
+                                                                        const parentId = typeof l.parent === 'object' ? l.parent?.id : l.parent;
+                                                                        return l.type === 'NEIGHBORHOOD' && parentId === selectedAgendaCity.id;
+                                                                    }) : [];
+
+                                                                    return (
+                                                                        <div key={campo.id}>
+                                                                            <label className="block text-[11px] text-gray-400 mb-1 uppercase tracking-wider font-semibold">
+                                                                                {campo.nombre} {ac.requerido && <span className="text-red-400">*</span>}
+                                                                            </label>
+                                                                            <select
+                                                                                value={currentData['Lugar - Barrio'] || ''}
+                                                                                onChange={e => {
+                                                                                    const newAssignments = [...formData.assignments];
+                                                                                    newAssignments[index].detalle = { ...currentData, 'Lugar - Barrio': e.target.value };
+                                                                                    setFormData({ ...formData, assignments: newAssignments });
+                                                                                }}
+                                                                                className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
+                                                                                disabled={!canEditThis || !agendaCityName}
+                                                                            >
+                                                                                <option value="">Seleccionar Barrio...</option>
+                                                                                {agendaNeighborhoods.map(b => (
+                                                                                    <option key={b.id} value={b.name}>{b.name}</option>
+                                                                                ))}
+                                                                                <option value="Otro">Otro</option>
+                                                                            </select>
+                                                                        </div>
+                                                                    );
+                                                                }
+
                                                                 return (
                                                                 <div key={campo.id}>
                                                                     <label className="block text-[11px] text-gray-400 mb-1 uppercase tracking-wider font-semibold">
@@ -1213,8 +1378,13 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                         <select
                                                                             value={currentData[campo.nombre] || ''}
                                                                             onChange={e => {
+                                                                                const val = e.target.value;
+                                                                                const newDetalle = { ...currentData, [campo.nombre]: val };
+                                                                                if (campo.nombre === 'Aporte?' && val !== 'si') {
+                                                                                    delete newDetalle['Descripción/monto'];
+                                                                                }
                                                                                 const newAssignments = [...formData.assignments];
-                                                                                newAssignments[index].detalle = { ...currentData, [campo.nombre]: e.target.value };
+                                                                                newAssignments[index].detalle = newDetalle;
                                                                                 setFormData({ ...formData, assignments: newAssignments });
                                                                             }}
                                                                             className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
@@ -1308,7 +1478,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                         </div>
                                                                     ) : (
                                                                         <input
-                                                                            type={campo.tipoDato === 'DATE' ? 'date' : campo.tipoDato === 'NUMBER' ? 'number' : 'text'}
+                                                                            type={campo.tipoDato === 'DATE' || campo.nombre === 'Día' ? 'date' : (campo.tipoDato === 'TIME' || campo.nombre === 'Hora' ? 'time' : (campo.tipoDato === 'NUMBER' ? 'number' : 'text'))}
                                                                             value={currentData[campo.nombre] || ''}
                                                                             onChange={e => {
                                                                                 const newAssignments = [...formData.assignments];

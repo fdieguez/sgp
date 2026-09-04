@@ -968,7 +968,9 @@ export default function ProjectDetailsPage() {
                                                 />
                                             </th>
                                         )}
-                                        <th className="p-3">N° Orden</th>
+                                        <th onClick={() => handleSort('id')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                            N° Orden {sortConfig.key === 'id' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        </th>
                                         <th onClick={() => handleSort('entryDate')} className="p-3 cursor-pointer hover:text-white transition-colors">
                                             Fecha {sortConfig.key === 'entryDate' && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
                                         </th>
