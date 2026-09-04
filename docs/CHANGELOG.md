@@ -14,13 +14,17 @@
         - Menús desplegables dinámicos de selección para Localidad y Barrio dentro de la tarjeta de Agenda.
         - Comportamiento reactivo del campo `Descripción/monto`, mostrándose únicamente cuando `Aporte?` es seleccionado como `si`.
         - Validación estricta en el guardado de la solicitud que exige completar todos los campos obligatorios de la Agenda.
+    - **Incorporación Integral de Campos de Declaración de Interés (`DataInitializer.java` y `SolicitudModal.jsx`)**:
+        - Definición sembrada en base de datos de los 13 campos del tipo de resolución `DECLARACION DE INTERES`: `Nombre completo del evento` (text, req), `Actividad` (text, req), `Institución a declarar` (text, req), `Tipo` (select: cultural, educativo, científico, deportivo, social, otro, req), `Descripción` (textarea, req), `Localidad` (select, req, precargada automáticamente), `Fecha` (date, req), `Hora` (time, opcional), `Dirección` (text, req), `Fundamentos` (textarea, req), `Flyer/nota` (file: jpg/pdf, opcional), `Observaciones` (textarea, opcional) y `Responsable` (text, req).
+        - Precarga automática de la localidad de la solicitud al seleccionar el área `DECLARACION DE INTERES`.
+        - Validación estricta en el guardado que exige los 10 campos requeridos y permite vacíos `Hora`, `Observaciones` y `Flyer/nota`.
     - **Depuración de Tipos de Pedido en Subsidios (`DataInitializer.java`)**:
         - Eliminación definitiva de la opción `"Institucional indistinto"` del atributo `Tipo de pedido`.
         - Opciones oficiales resultantes: `Personal`, `Institucional en dinero` e `Institucional en especie`.
     - **Ordenamiento Interactivo por N° Orden (`ProjectDetailsPage.jsx`)**:
         - Habilitación de interactividad en la cabecera `<th>N° Orden</th>` de la tabla principal, permitiendo alternar orden ascendente (`id,asc`) y descendente (`id,desc`) con indicadores visuales de flechas (`ArrowUp` / `ArrowDown`).
-    - **Validación Automatizada E2E con Playwright (`etapa11_validacion_final.spec.js`)**:
-        - Creación y ejecución de suite integral con 4 casos de prueba (100% aprobados en 30.6s) y generación de 7 capturas de evidencia en `pruebas/pruebaEtapa11/`.
+    - **Validación Automatizada E2E con Playwright (`etapa11_validacion_final.spec.js` y `etapa11_declaracion_interes.spec.js`)**:
+        - Creación y ejecución de suites integrales sumando 7 casos de prueba (100% aprobados) y generación de 12 capturas de evidencia en `pruebas/pruebaEtapa11/`.
 
 ---
 
