@@ -1,7 +1,6 @@
 # Resumen de Correcciones y Mejoras — SGP v1.0
-**Documento de Presentación al Cliente (Fase Pre-Producción)**
+
 **Fecha:** Septiembre 2026  
-**Idioma:** Español (Regla Global 1)  
 
 ---
 
@@ -59,8 +58,7 @@
 ---
 
 ### 5. Certificación de Calidad y Estabilidad (QA)
-* **Validación Automatizada Playwright:** Se diseñaron y ejecutaron dos suites completas de pruebas de regresión End-to-End (`etapa11_validacion_final.spec.js` y `etapa11_declaracion_interes.spec.js`) cubriendo 7 escenarios críticos.
+* **Validación Automatizada:** Se diseñaron y ejecutaron dos suites completas de pruebas de regresión End-to-End (`etapa11_validacion_final.spec.js` y `etapa11_declaracion_interes.spec.js`) cubriendo 7 escenarios críticos.
 * **Tasa de Éxito del 100%:** Los 7 tests finalizaron aprobados:
   * Suite Agenda, Subsidios y Ordenamiento: 4/4 casos aprobados (30.6s).
   * Suite Declaración de Interés: 3/3 casos aprobados (23.3s), verificando el despliegue de los 13 campos, precarga de localidad, flexibilidad de los 3 campos opcionales y el dictamen y firma digital del Resolutor Eduardo Alfaro.
-* **Respaldo con Evidencias:** Se generaron 12 capturas de pantalla de respaldo en alta resolución en el directorio `pruebas/pruebaEtapa11/` que acreditan visualmente el cumplimiento funcional y técnico del sistema.
