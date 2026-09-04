@@ -559,7 +559,32 @@ public class DataInitializer implements CommandLineRunner {
             new AtributoConfig(attrDatoObs, false, 21)
         ));
 
-        upsertTipoResolucion("DECLARACION DE INTERES", resolutorDefault, List.of());
+        // Atributos específicos de DECLARACION DE INTERES para la Etapa 11 (13 campos ordenados)
+        AtributoResolucion attrNombreEvento = obtenerOCrearAtributo("Nombre completo del evento", "TEXT", null);
+        AtributoResolucion attrActividadDec = obtenerOCrearAtributo("Actividad", "TEXT", null);
+        AtributoResolucion attrInstitucionDec = obtenerOCrearAtributo("Institución a declarar", "TEXT", null);
+        AtributoResolucion attrTipoDec = obtenerOCrearAtributo("Tipo", "SELECT", "cultural,educativo,científico,deportivo,social,otro");
+        AtributoResolucion attrDescripcionDec = obtenerOCrearAtributo("Descripción", "TEXTAREA", null);
+        AtributoResolucion attrLocalidadDec = obtenerOCrearAtributo("Localidad", "SELECT", null);
+        AtributoResolucion attrDireccionDec = obtenerOCrearAtributo("Dirección", "TEXT", null);
+        AtributoResolucion attrFundamentosDec = obtenerOCrearAtributo("Fundamentos", "TEXTAREA", null);
+        AtributoResolucion attrFlyerNotaDec = obtenerOCrearAtributo("Flyer/nota", "FILE", null);
+
+        upsertTipoResolucion("DECLARACION DE INTERES", resolutorDefault, List.of(
+            new AtributoConfig(attrNombreEvento, true, 1),
+            new AtributoConfig(attrActividadDec, true, 2),
+            new AtributoConfig(attrInstitucionDec, true, 3),
+            new AtributoConfig(attrTipoDec, true, 4),
+            new AtributoConfig(attrDescripcionDec, true, 5),
+            new AtributoConfig(attrLocalidadDec, true, 6),
+            new AtributoConfig(attrFecha, true, 7),
+            new AtributoConfig(attrHora, false, 8), // Opcional
+            new AtributoConfig(attrDireccionDec, true, 9),
+            new AtributoConfig(attrFundamentosDec, true, 10),
+            new AtributoConfig(attrFlyerNotaDec, false, 11), // Opcional
+            new AtributoConfig(attrDatoObs, false, 12), // Opcional
+            new AtributoConfig(attrResponsable, true, 13)
+        ));
 
         AtributoResolucion attrDescCorta = obtenerOCrearAtributo("Descripción corta", "TEXT", null);
         AtributoResolucion attrDetalleResolucion = obtenerOCrearAtributo("Detalle de resolución", "TEXTAREA", null);

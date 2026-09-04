@@ -600,6 +600,52 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     return;
                 }
             }
+
+            // Validación estricta de campos obligatorios para asignaciones de tipo DECLARACION DE INTERES (Etapa 11)
+            if (a.tipoResolucion === 'DECLARACION DE INTERES' || a.tipoResolucion === 'DECLARACIÓN DE INTERÉS') {
+                const det = typeof a.detalle === 'object' && a.detalle !== null ? a.detalle : {};
+                if (!det['Nombre completo del evento'] || !det['Nombre completo del evento'].trim()) {
+                    toast.error("El campo 'Nombre completo del evento' en Declaración de Interés es obligatorio.");
+                    return;
+                }
+                if (!det['Actividad'] || !det['Actividad'].trim()) {
+                    toast.error("El campo 'Actividad' en Declaración de Interés es obligatorio.");
+                    return;
+                }
+                if (!det['Institución a declarar'] || !det['Institución a declarar'].trim()) {
+                    toast.error("El campo 'Institución a declarar' en Declaración de Interés es obligatorio.");
+                    return;
+                }
+                if (!det['Tipo'] || !det['Tipo'].trim()) {
+                    toast.error("El campo 'Tipo' en Declaración de Interés es obligatorio.");
+                    return;
+                }
+                if (!det['Descripción'] || !det['Descripción'].trim()) {
+                    toast.error("El campo 'Descripción' en Declaración de Interés es obligatorio.");
+                    return;
+                }
+                const locDec = det['Localidad'] || formData.locationName;
+                if (!locDec || !locDec.trim()) {
+                    toast.error("El campo 'Localidad' en Declaración de Interés es obligatorio.");
+                    return;
+                }
+                if (!det['Fecha'] || !det['Fecha'].trim()) {
+                    toast.error("El campo 'Fecha' en Declaración de Interés es obligatorio.");
+                    return;
+                }
+                if (!det['Dirección'] || !det['Dirección'].trim()) {
+                    toast.error("El campo 'Dirección' en Declaración de Interés es obligatorio.");
+                    return;
+                }
+                if (!det['Fundamentos'] || !det['Fundamentos'].trim()) {
+                    toast.error("El campo 'Fundamentos' en Declaración de Interés es obligatorio.");
+                    return;
+                }
+                if (!det['Responsable'] || !det['Responsable'].trim()) {
+                    toast.error("El campo 'Responsable' en Declaración de Interés es obligatorio.");
+                    return;
+                }
+            }
         }
 
         setLoading(true);
@@ -1221,6 +1267,11 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                             currentDet['Lugar - Barrio'] = formData.barrio;
                                                         }
                                                     }
+                                                    if (type === 'DECLARACION DE INTERES' || type === 'DECLARACIÓN DE INTERÉS') {
+                                                        if (!currentDet['Localidad'] && formData.locationName) {
+                                                            currentDet['Localidad'] = formData.locationName;
+                                                        }
+                                                    }
                                                     newAssignments[index] = { 
                                                         ...assignment, 
                                                         tipoResolucion: type,
@@ -1271,6 +1322,11 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                             currentData['Lugar - Barrio'] = formData.barrio;
                                                         }
                                                     }
+                                                    if (assignment.tipoResolucion === 'DECLARACION DE INTERES' || assignment.tipoResolucion === 'DECLARACIÓN DE INTERÉS') {
+                                                        if (!currentData['Localidad'] && formData.locationName) {
+                                                            currentData['Localidad'] = formData.locationName;
+                                                        }
+                                                    }
                                                     return (
                                                         <div className="space-y-4 p-4 bg-gray-800/80 border border-gray-600 rounded-lg shadow-inner">
                                                             {sortedCampos.map(ac => {
@@ -1305,22 +1361,22 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                     }
                                                                 }
 
-                                                                // Desplegable de Localidad para AGENDA
-                                                                if (campo.nombre === 'Lugar - Localidad') {
+                                                                // Desplegable de Localidad para AGENDA y DECLARACION DE INTERES
+                                                                if (campo.nombre === 'Lugar - Localidad' || ((assignment.tipoResolucion === 'DECLARACION DE INTERES' || assignment.tipoResolucion === 'DECLARACIÓN DE INTERÉS') && campo.nombre === 'Localidad')) {
                                                                     return (
                                                                         <div key={campo.id}>
                                                                             <label className="block text-[11px] text-gray-400 mb-1 uppercase tracking-wider font-semibold">
                                                                                 {campo.nombre} {ac.requerido && <span className="text-red-400">*</span>}
                                                                             </label>
                                                                             <select
-                                                                                value={currentData['Lugar - Localidad'] || ''}
+                                                                                value={currentData[campo.nombre] || ''}
                                                                                 onChange={e => {
                                                                                     const newAssignments = [...formData.assignments];
-                                                                                    newAssignments[index].detalle = { 
-                                                                                        ...currentData, 
-                                                                                        'Lugar - Localidad': e.target.value,
-                                                                                        'Lugar - Barrio': '' 
-                                                                                    };
+                                                                                    const updated = { ...currentData, [campo.nombre]: e.target.value };
+                                                                                    if (campo.nombre === 'Lugar - Localidad') {
+                                                                                        updated['Lugar - Barrio'] = '';
+                                                                                    }
+                                                                                    newAssignments[index].detalle = updated;
                                                                                     setFormData({ ...formData, assignments: newAssignments });
                                                                                 }}
                                                                                 className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
