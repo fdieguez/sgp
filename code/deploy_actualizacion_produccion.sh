@@ -8,14 +8,16 @@ set -e
 
 DEPLOY_DIR="/root/deploy/sgp/sgp/code"
 BACKUP_DIR="/root/backups"
-DB_NAME="sgp_db"
-DB_USER="sgp_user"
+DB_NAME=$(grep -E "^DB_NAME=" "${DEPLOY_DIR}/.env" 2>/dev/null | cut -d '=' -f2- | tr -d '\r' || echo "sgp_db")
+DB_USER=$(grep -E "^DB_USER=" "${DEPLOY_DIR}/.env" 2>/dev/null | cut -d '=' -f2- | tr -d '\r' || echo "sgp_admin")
+DB_PASS=$(grep -E "^DB_PASSWORD=" "${DEPLOY_DIR}/.env" 2>/dev/null | cut -d '=' -f2- | tr -d '\r' || echo "P10xmK2vL9qRnW5z")
 DATE=$(date +"%Y-%m-%d_%H%M%S")
 BACKUP_FILE="${BACKUP_DIR}/sgp_prod_pre_update_${DATE}.sql"
 
 echo "======================================================================="
 echo "🚀 SGP - INICIANDO DESPLIEGUE EN PRODUCCIÓN"
 echo "Fecha y hora: $(date)"
+echo "Base de datos: ${DB_NAME} | Usuario: ${DB_USER}"
 echo "======================================================================="
 
 # ------------------------------------------------------------------------------
@@ -25,22 +27,8 @@ echo ""
 echo "📦 [1/5] Realizando backup de la base de datos ${DB_NAME}..."
 mkdir -p "$BACKUP_DIR"
 
-if command -v mysqldump &> /dev/null; then
-    echo "💾 Ejecutando mysqldump en el host..."
-    # Intenta sin contraseña o usando .my.cnf / credenciales del sistema
-    if ! mysqldump --no-tablespaces --single-transaction --quick --routines --triggers -h 127.0.0.1 -u "$DB_USER" "$DB_NAME" > "$BACKUP_FILE" 2>/dev/null; then
-        echo "⚠️  Solicitando o extrayendo contraseña de MySQL desde .env..."
-        DB_PASS=$(grep -E "^DB_PASSWORD=" "${DEPLOY_DIR}/.env" 2>/dev/null | cut -d '=' -f2- || true)
-        if [ -n "$DB_PASS" ]; then
-            mysqldump --no-tablespaces --single-transaction --quick --routines --triggers -h 127.0.0.1 -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" > "$BACKUP_FILE"
-        else
-            mysqldump --no-tablespaces --single-transaction --quick --routines --triggers "$DB_NAME" > "$BACKUP_FILE"
-        fi
-    fi
-else
-    echo "🐳 Ejecutando mysqldump dentro del contenedor MySQL..."
-    docker exec -i sgp_db mysqldump --no-tablespaces --single-transaction --quick --routines --triggers -u "$DB_USER" "$DB_NAME" > "$BACKUP_FILE"
-fi
+echo "💾 Ejecutando mysqldump..."
+mysqldump --no-tablespaces --single-transaction --quick --routines --triggers -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" > "$BACKUP_FILE"
 
 gzip -f "$BACKUP_FILE"
 if gzip -t "${BACKUP_FILE}.gz"; then
@@ -56,6 +44,7 @@ fi
 echo ""
 echo "📥 [2/5] Actualizando código desde repositorio Git (main)..."
 cd "$DEPLOY_DIR"
+git checkout -- .
 git checkout main
 git pull origin main
 echo "✅ Código actualizado a la última versión: $(git log -n 1 --oneline)"
