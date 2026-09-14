@@ -142,7 +142,7 @@ export default function ProjectDetailsPage() {
         totalSubsidios: 0
     });
 
-    const SPREADSHEET_ID = config?.spreadsheetId || "1jPw9ni4BW_bRfw_M9ajA7jO5RGX5IFq8w43T3WOXz6g";
+    const SPREADSHEET_ID = config?.spreadsheetId || "1jPw9ni4BW_bRfw_M9aja7jO5RGX5IFq8w43T3W0Xz6g";
     const isResolutorSubsidio = user?.role === 'RESOLUTOR' && user?.tiposResolucion?.some(t => t.tipo.toUpperCase() === 'SUBSIDIO');
 
     const handleExportPlanilla = async () => {
@@ -896,11 +896,9 @@ export default function ProjectDetailsPage() {
                                 </button>
                             )}
                             {(user?.role === 'ADMINISTRADOR' || isResolutorSubsidio) && (
-                                <>
-                                    <button onClick={handleBulkImport} className="bg-indigo-800 hover:bg-indigo-900 text-white px-3 py-1 rounded-full text-xs font-bold transition-colors shadow-sm">
-                                        Importar
-                                    </button>
-                                </>
+                                <button onClick={handleBulkImport} className="bg-indigo-800 hover:bg-indigo-900 text-white px-3 py-1 rounded-full text-xs font-bold transition-colors shadow-sm">
+                                    Importar
+                                </button>
                             )}
                             {user?.role === 'ADMINISTRADOR' && (
                                 <button onClick={handleBulkDelete} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold transition-colors shadow-sm">

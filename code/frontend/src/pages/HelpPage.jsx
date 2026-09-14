@@ -1,12 +1,24 @@
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Book, HelpCircle, FileText, Database, Users, Filter, FileSpreadsheet, Calendar } from 'lucide-react';
+import { 
+    ArrowLeft, 
+    HelpCircle, 
+    FileText, 
+    Database, 
+    Users, 
+    Filter, 
+    FileSpreadsheet, 
+    Calendar, 
+    Download, 
+    BookOpen,
+    CheckCircle2
+} from 'lucide-react';
 
 export default function HelpPage() {
     return (
         <div className="min-h-screen bg-gray-900 text-white p-8">
             <div className="max-w-4xl mx-auto space-y-8">
                 {/* Header */}
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <Link to="/dashboard" className="inline-flex items-center text-gray-400 hover:text-white transition-colors mb-4 group">
                             <ArrowLeft className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform" />
@@ -17,6 +29,55 @@ export default function HelpPage() {
                             Centro de Ayuda SGP
                         </h1>
                         <p className="text-gray-400 mt-2 text-lg">Manual rápido de uso y preguntas frecuentes.</p>
+                    </div>
+
+                    <div className="sm:self-end">
+                        <a
+                            href="/Manual_de_Usuario_SGP.pdf"
+                            download="Manual_de_Usuario_SGP.pdf"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 border border-indigo-400/30 transition-all hover:scale-105 active:scale-95"
+                            title="Descargar Manual Oficial SGP en formato PDF"
+                        >
+                            <Download className="h-5 w-5 text-indigo-200" />
+                            <span>Descargar Manual Oficial (PDF)</span>
+                        </a>
+                    </div>
+                </div>
+
+                {/* Banner Destacado Descarga Manual Oficial */}
+                <div className="relative overflow-hidden bg-gradient-to-r from-gray-800 via-indigo-950/50 to-gray-800 rounded-3xl border border-indigo-500/30 p-6 sm:p-8 shadow-2xl">
+                    <div className="absolute top-0 right-0 -mt-6 -mr-6 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                    <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                        <div className="space-y-3 max-w-2xl">
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                <span>Documentación Oficial Actualizada</span>
+                            </div>
+                            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                                <BookOpen className="h-7 w-7 text-indigo-400" />
+                                Manual de Usuario SGP
+                            </h2>
+                            <p className="text-gray-300 text-sm sm:text-base leading-relaxed">
+                                Guía oficial paso a paso por roles (Operador, Distribuidor, Responsable y Resolutores).
+                            </p>
+                            <p className="text-gray-400 text-xs sm:text-sm">
+                                Incluye flujos operativos completos, sincronización bidireccional con Google Sheets, integración con Google Calendar, asignación por zonas y formato dinámico de resoluciones.
+                            </p>
+                        </div>
+                        <div className="flex-shrink-0 w-full sm:w-auto">
+                            <a
+                                href="/Manual_de_Usuario_SGP.pdf"
+                                download="Manual_de_Usuario_SGP.pdf"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-xl shadow-emerald-900/30 border border-emerald-400/30 transition-all hover:scale-105 active:scale-95 group"
+                            >
+                                <Download className="h-5 w-5 group-hover:translate-y-0.5 transition-transform" />
+                                <span>Descargar Manual Completo (PDF)</span>
+                            </a>
+                        </div>
                     </div>
                 </div>
 

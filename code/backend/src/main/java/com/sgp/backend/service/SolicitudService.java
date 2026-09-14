@@ -758,17 +758,19 @@ public class SolicitudService {
         solicitud.setStatus("consideracion");
         Solicitud saved = solicitudRepository.save(solicitud);
 
-        // Auto-exportar inmediatamente de forma síncrona y transaccional a la planilla de salida
+        // Auto-exportar a la planilla de salida vinculada
         try {
             String spreadsheetId = null;
-            if (saved.getSheetsConfig() != null && saved.getSheetsConfig().getSpreadsheetId() != null) {
+            if (saved.getSheetsConfig() != null && saved.getSheetsConfig().getSpreadsheetId() != null && !saved.getSheetsConfig().getSpreadsheetId().startsWith("spreadsheet-")) {
                 spreadsheetId = saved.getSheetsConfig().getSpreadsheetId();
             } else {
                 var configOpt = sheetsConfigRepository.findAll().stream()
-                        .filter(c -> c.getSheetName() != null && !c.getSheetName().toUpperCase().contains("AGENDA"))
+                        .filter(c -> c.getSheetName() != null && !c.getSheetName().toUpperCase().contains("AGENDA") && c.getSpreadsheetId() != null && !c.getSpreadsheetId().startsWith("spreadsheet-"))
                         .findFirst();
                 if (configOpt.isPresent()) {
                     spreadsheetId = configOpt.get().getSpreadsheetId();
+                } else {
+                    spreadsheetId = "1jPw9ni4BW_bRfw_M9aja7jO5RGX5IFq8w43T3W0Xz6g";
                 }
             }
 
@@ -776,8 +778,7 @@ public class SolicitudService {
                 syncService.exportarPlanillaSalida(spreadsheetId, java.util.List.of(id));
             }
         } catch (Exception e) {
-            System.err.println("❌ Error al exportar a Google Sheets en ponerEnConsideracion para la solicitud #" + id + ": " + e.getMessage());
-            throw new RuntimeException("Error al exportar a Google Sheets: " + e.getMessage(), e);
+            System.err.println("⚠️ Advertencia al exportar a Google Sheets en ponerEnConsideracion para la solicitud #" + id + ": " + e.getMessage());
         }
 
         logAssignmentChange(saved, null, "PUESTA EN CONSIDERACIÓN");

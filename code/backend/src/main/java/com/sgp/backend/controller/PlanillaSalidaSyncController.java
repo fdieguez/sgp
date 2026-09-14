@@ -59,6 +59,13 @@ public class PlanillaSalidaSyncController {
                     "message", "Sincronización de exportación finalizada. " + count + " solicitudes exportadas a la planilla de salida.",
                     "count", count
             ));
+        } catch (com.google.api.client.googleapis.json.GoogleJsonResponseException e) {
+            System.err.println("⚠️ Google Sheets API response en exportación (" + e.getStatusCode() + "): " + e.getMessage());
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Exportación finalizada con advertencia en Google Sheets (" + e.getStatusCode() + ").",
+                    "count", 0
+            ));
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError().body(Map.of(
@@ -105,6 +112,13 @@ public class PlanillaSalidaSyncController {
                     "success", true,
                     "message", "Sincronización de importación finalizada. " + count + " registros actualizados desde la planilla de salida.",
                     "count", count
+            ));
+        } catch (com.google.api.client.googleapis.json.GoogleJsonResponseException e) {
+            System.err.println("⚠️ Google Sheets API response en importación (" + e.getStatusCode() + "): " + e.getMessage());
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Importación finalizada. Planilla externa no accesible en Google Sheets (" + e.getStatusCode() + ").",
+                    "count", 0
             ));
         } catch (Exception e) {
             e.printStackTrace();

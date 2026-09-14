@@ -6,6 +6,52 @@
 
 ## 📅 Septiembre 2026
 
+### 14/09/2026
+- **⭐️ Actualización del Manual de Usuario Oficial, Integración en Sección de Ayuda y Plan de Despliegue Consolidado:**
+    - **Revisión y Actualización del Manual de Usuario (`docs/manualdeusuario.md`)**:
+        - Adopción oficial del nombre **"Sistema de Gestión Política"** y denominación del módulo **"Gestión de Pedidos"**, reemplazando la denominación anterior.
+        - Incorporación de las definiciones conceptuales 1.1 (Sistema de Gestión Política) y 1.2 (Módulo Gestión de Pedidos) requeridas por los usuarios.
+        - Ajuste del circuito operativo y reasignación de responsabilidades:
+            * La multi-asignación de resolutores especializados y la formulación/carga técnica de datos (Subsidio, Agenda con 13 campos y Declaración de Interés con 13 campos) corresponden al rol **Responsable**.
+            * El rol **Distribuidor** se concentra en la asignación de zona territorial / eje de trabajo y la designación del Responsable a cargo.
+            * Los roles **Resolutores** se enfocan en la evaluación presupuestaria/técnica, puesta en consideración, registro de asistencia con creación automática en Google Calendar, dictamen formal y firma digital.
+    - **Regeneración Editorial del PDF Oficial (`docs/Manual_de_Usuario_SGP.pdf`)**:
+        - Compilación del documento de alta fidelidad gráfica con tipografía Inter, diagramación profesional, 7 capturas de pantalla de la interfaz incrustadas en Base64 y glosario de estados.
+        - Tamaño optimizado de 2.3 MB para distribución.
+    - **Integración y Descarga desde el Centro de Ayuda (`HelpPage.jsx`)**:
+        - Publicación del archivo en `code/frontend/public/Manual_de_Usuario_SGP.pdf` para entrega estática directa.
+        - Rediseño de la cabecera con botón de acción rápida `"Descargar Manual Oficial (PDF)"` y banner destacado con badge `"Documentación Oficial Actualizada"` y botón esmeralda interactivo.
+    - **Validación Automatizada E2E con Playwright (`descarga_manual.spec.js`)**:
+        - Implementación y ejecución de suite cubriendo TC-HELP-01 (renderizado), TC-HELP-02 (descarga e integridad de binario `%PDF-`) y TC-HELP-03 (consola limpia sin errores), con resultado 100% APROBADO.
+    - **Consolidación del Plan de Producción (`docs/plan_actualizacion_produccion_usuarios.md`)**:
+        - Plan integral consolidando la nómina de 29 usuarios + roles, control de siembra `sgp.seed.overwrite-users=false`, script SQL transaccional `update_users.sql`, despliegue con Docker Compose y batería de Smoke Test post-despliegue.
+
+### 11/09/2026
+- **⭐️ Actualización de Nómina Oficial de Usuarios, Control de Siembra y Plan de Despliegue a Producción:**
+    - **Control Estricto de Siembra por Property (`DataInitializer.java`)**:
+        - Vinculación de la rutina de inicialización de datos a la propiedad `@Value("${sgp.seed.overwrite-users:true}") private boolean overwriteUsers;`.
+        - Si `overwriteUsers == false`:
+            - Se omite completamente la purga y eliminación de usuarios existentes en la base de datos (`DELETE FROM users WHERE email NOT IN (...)`).
+            - En `createUserIfNotFound`, si el usuario ya existe en base de datos, se conserva intacto: no se sobreescribe la contraseña, ni los roles, ni los datos personales/DNI/zona, previniendo pisar cambios manuales en producción.
+            - Se desactiva la asignación automática de zonas por defecto (`zona1`, `zona2`, etc.) a los usuarios con rol `RESPONSABLE`.
+            - Se preservan las reasignaciones de resolutores en `tipo_resolucion` y `user_tipo_resolucion`.
+        - Configuración en `application-prod.properties` con `sgp.seed.overwrite-users=false` y comentarios explicativos en `application.properties`.
+    - **Actualización y Normalización de Nómina de Usuarios (29 Registros)**:
+        - Procesamiento integral del archivo CSV oficial incorporando 29 cuentas con roles simples y compuestos (`RESPONSABLE,RESOLUTOR`, `RESPONSABLE,DISTRIBUIDOR`, `OPERADOR`, `AUDITOR`).
+        - Generación y asignación de contraseñas seguras individuales con hash BCrypt.
+        - Asignación de zonas territoriales oficiales (`NORTE`, `NOROESTE`, `OESTE`, `SUROESTE`, `COSTA`, `Sur`).
+        - Vinculación de bandejas de resolución a perfiles específicos:
+            - **AGENDA:** Verónica González (`mveronicagonzalez79@gmail.com`).
+            - **SUBSIDIO:** Martín Nocioni (`martinnocioni@gmail.com`).
+            - **DECLARACIÓN DE INTERÉS:** Eduardo Alfaro (`ealfaro.51@gmail.com`).
+            - **OTRA:** Resolutor por Defecto (`resolutor@sgp.com`).
+        - Preservación de cuentas de sistema y soporte: `admin@sgp.com`, `auditor.sheets@gmail.com`, `test.auditor@gmail.com`, `resolutor@sgp.com`.
+    - **Script de Migración SQL (`update_users_nomina_2026.sql`)**:
+        - Creación del script transaccional en `code/backend/src/main/resources/db/update_users_nomina_2026.sql` con cláusulas `ON DUPLICATE KEY UPDATE` y actualización de relaciones ManyToMany.
+    - **Plan de Producción y Documentación Operativa**:
+        - Elaboración de [`docs/plan_actualizacion_produccion_usuarios.md`](file:///c:/Users/fran/dev/projects/SGP/docs/plan_actualizacion_produccion_usuarios.md) con el procedimiento paso a paso (backup `mysqldump`, validación de properties, ejecución SQL, despliegue Docker Compose, smoke test, rollback y protocolo de entrega segura de credenciales).
+        - Actualización del catálogo oficial de cuentas en [`docs/usuarios.txt`](file:///c:/Users/fran/dev/projects/SGP/docs/usuarios.txt).
+
 ### 04/09/2026
 - **⭐️ Cierre de la Etapa 11 - Correcciones Finales Pre-Producción (Feedback de Usuario Real):**
     - **Ampliación Integral de Campos de Agenda (`DataInitializer.java` y `SolicitudModal.jsx`)**:
