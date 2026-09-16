@@ -9,14 +9,14 @@ export default function SelectRolPage() {
     const roleDetails = {
         'ADMINISTRADOR': {
             title: 'Administrador',
-            description: 'Gestión global del sistema, configuraciones de planillas y control de usuarios.',
+            description: 'Gestión global del sistema, parametrización territorial, módulos y control de usuarios.',
             icon: Shield,
             color: 'from-pink-500 to-rose-600',
             glow: 'shadow-rose-500/20'
         },
         'ADMIN': {
             title: 'Administrador',
-            description: 'Gestión global del sistema, configuraciones de planillas y control de usuarios.',
+            description: 'Gestión global del sistema, parametrización territorial, módulos y control de usuarios.',
             icon: Shield,
             color: 'from-pink-500 to-rose-600',
             glow: 'shadow-rose-500/20'
@@ -65,8 +65,8 @@ export default function SelectRolPage() {
             {/* Encabezado */}
             <div className="flex items-center justify-between max-w-5xl mx-auto w-full pt-4 z-10">
                 <div className="flex items-center gap-3">
-                    <div className="bg-gradient-to-tr from-indigo-500 to-rose-500 p-2 rounded-xl text-white font-bold text-lg tracking-wider shadow-lg">SGP</div>
-                    <span className="text-gray-400 font-bold text-sm tracking-widest uppercase">Sistema de Gestión</span>
+                    <img src="/logo-sgp.svg" alt="SGP Logo" className="h-9 w-9 drop-shadow-md" />
+                    <span className="text-gray-300 font-bold text-sm tracking-widest uppercase">Sistema de Gestión Política</span>
                 </div>
                 <button
                     onClick={() => {
