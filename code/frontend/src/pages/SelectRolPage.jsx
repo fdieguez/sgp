@@ -105,6 +105,7 @@ export default function SelectRolPage() {
                         return (
                             <button
                                 key={role}
+                                data-testid={`select-role-${role.toLowerCase()}`}
                                 onClick={() => handleSelect(role)}
                                 className={`group relative bg-gray-900/40 border border-gray-800/80 hover:border-gray-700/80 p-8 rounded-[2rem] text-left transition-all duration-300 backdrop-blur-xl shadow-xl hover:${details.glow} hover:-translate-y-1 active:scale-98 flex flex-col justify-between min-h-[220px]`}
                             >

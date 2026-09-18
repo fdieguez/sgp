@@ -31,11 +31,11 @@ if (!fs.existsSync(mockJpg)) {
 
 // Matriz de usuarios y credenciales de prueba
 const CREDENTIALS = {
-  OPERADOR: { email: 'celestesolari19@gmail.com', pass: 'Celeste_SGP_2026#' },
+  OPERADOR: { email: 'celeste_solari19@hotmail.com', pass: 'Celeste_SGP_2026#' },
   DISTRIBUIDOR: { email: 'matias.ippolito@gmail.com', pass: 'Matias_Dist_SGP_2026!' },
   RESPONSABLE: { email: 'matias.ippolito@gmail.com', pass: 'Matias_Dist_SGP_2026!' },
   RESOLUTOR_SUBSIDIO: { email: 'martinnocioni@gmail.com', pass: 'Martin_SGP_2026*' },
-  RESOLUTOR_AGENDA: { email: 'mvgonza79@gmail.com', pass: 'Maria_SGP_2026%' },
+  RESOLUTOR_AGENDA: { email: 'mveronicagonzalez79@gmail.com', pass: 'Maria_SGP_2026%' },
   RESOLUTOR_DECLARACION: { email: 'ealfaro.51@gmail.com', pass: 'Eduardo_SGP_2026^' },
   ADMIN: { email: 'admin@sgp.com', pass: 'SGP_Admin_#2026_Prod_Secure_!' }
 };
@@ -88,7 +88,8 @@ async function login(page, email, password, roleToSelect = null) {
   // Si requiere seleccionar rol debido a múltiples roles asignados
   if (page.url().includes('/select-rol')) {
     if (roleToSelect) {
-      const btn = page.locator('button').filter({ hasText: roleToSelect }).first();
+      const targetRole = roleToSelect.toLowerCase();
+      const btn = page.locator(`[data-testid="select-role-${targetRole}"]`).or(page.locator('button').filter({ hasText: roleToSelect })).first();
       await btn.click();
     } else {
       await page.locator('button').first().click();

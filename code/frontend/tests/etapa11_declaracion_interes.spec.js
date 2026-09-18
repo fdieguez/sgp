@@ -23,7 +23,14 @@ const EVIDENCIAS_DIR = path.resolve(__dirname, '../../../pruebas/pruebaEtapa11')
  */
 const iniciarSesion = async (page, email, password, rolASeleccionar = null) => {
   await page.goto(`${BASE_URL}/login`, { timeout: 15000, waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(300);
+
+  // Limpiar tokens de sesión previa para aislamiento estricto
+  await page.evaluate(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('activeRole');
+  });
 
   const logoutBtn = page.locator('button:has-text("Salir")');
   if (await logoutBtn.count() > 0) {
@@ -31,15 +38,28 @@ const iniciarSesion = async (page, email, password, rolASeleccionar = null) => {
     await page.waitForURL(/.*login.*/, { timeout: 10000 });
   }
 
-  await page.locator('input[type="email"]').fill(email);
-  await page.locator('input[type="password"]').fill(password);
+  const emailInput = page.locator('input[type="email"]');
+  const passInput = page.locator('input[type="password"]');
+
+  await emailInput.click({ clickCount: 3 });
+  await page.keyboard.press('Control+A');
+  await page.keyboard.press('Backspace');
+  await emailInput.fill(email);
+
+  await passInput.click({ clickCount: 3 });
+  await page.keyboard.press('Control+A');
+  await page.keyboard.press('Backspace');
+  await passInput.fill(password);
+
   await page.click('button:has-text("Ingresar")');
   await page.waitForURL(/.*(dashboard|mis-solicitudes|settings|select-rol).*/, { timeout: 15000 });
   await page.waitForTimeout(500);
 
   if (page.url().includes('/select-rol')) {
     if (rolASeleccionar) {
-      await page.click(`button:has-text("${rolASeleccionar}")`);
+      const targetRole = rolASeleccionar.toLowerCase();
+      const roleBtn = page.locator(`[data-testid="select-role-${targetRole}"]`).or(page.locator(`button:has(h3:has-text("${rolASeleccionar}"))`)).first();
+      await roleBtn.click();
     } else {
       await page.locator('.grid button').first().click();
     }
