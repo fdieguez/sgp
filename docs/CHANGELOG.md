@@ -6,6 +6,36 @@
 
 ## 📅 Septiembre 2026
 
+### 18/09/2026
+- **⭐️ Reseteo de Secuencias en Mantenimiento, Nueva Solicitud para Rol Responsable y Despliegue Oficial en Producción:**
+    - **Reseteo de AUTO_INCREMENT en Mantenimiento (`MaintenanceService.java`)**:
+        - Incorporación del reseteo explícito de contadores secuenciales e índices (`AUTO_INCREMENT = 1`) tras la ejecución del vaciado transaccional seguro.
+        - Soporte de compatibilidad dual: sentencia estándar para MySQL/MariaDB (`ALTER TABLE ... AUTO_INCREMENT = 1`) y fallback para H2 Database (`ALTER TABLE ... ALTER COLUMN id RESTART WITH 1`).
+        - Tablas alcanzadas: `solicitudes`, `ticket_seguimiento`, `documento_adjunto`, `solicitud_resolutor_assignment`, `asignacion_historial`, `pedidos`, `subsidios`.
+        - Al limpiar datos con la palabra clave `LIMPIAR` y clave de administrador, la próxima solicitud creada inicia nuevamente con `ID = 1`.
+    - **Habilitación de Alta de Solicitudes para el Rol Responsable (`ProjectDetailsPage.jsx` y `SolicitudModal.jsx`)**:
+        - En [`ProjectDetailsPage.jsx`](file:///c:/Users/fran/dev/projects/SGP/code/frontend/src/pages/ProjectDetailsPage.jsx): se actualizó la condición visual para que los usuarios con rol `RESPONSABLE` dispongan del botón *"Nueva Solicitud"*.
+        - En [`SolicitudModal.jsx`](file:///c:/Users/fran/dev/projects/SGP/code/frontend/src/components/SolicitudModal.jsx): al abrir el modal como `RESPONSABLE`, se realiza la pre-asignación automática e inmediata de su identificador (`responsableId`) y su zona territorial asignada (`zone` y `selectedZone`), permitiéndole registrar solicitudes territoriales sin bloqueos de validación.
+    - **Seguridad y Exclusión en Repositorio (`.gitignore`)**:
+        - Adición de reglas de seguridad en [`.gitignore`](file:///c:/Users/fran/dev/projects/SGP/.gitignore) para ignorar de forma permanente archivos locales de credenciales y nóminas (`usuarios_contrasenas*.txt`, `update_users*.sql`, `videos_demo/`).
+        - Purgado forzado de la rama `main` en GitHub mediante `git push --force origin main` con el commit limpio `8de656e`.
+    - **Despliegue Exitoso en Servidor VPS de Producción (`149.50.128.168`)**:
+        - Sincronización del repositorio con `git fetch origin main && git reset --hard origin/main` en `/root/deploy/sgp/sgp/`.
+        - Reconstrucción y recreación de contenedores con `docker compose up -d --build`.
+        - Verificación de arranque de Spring Boot 3 con perfil `prod` y Frontend Nginx (`HTTP 200 OK`).
+        - Optimización de almacenamiento con `docker image prune -f`.
+    - **Consolidación de Credenciales por Rol**:
+        - Generación de nómina de accesos clasificada y tabulada por roles en [`usuarios_contrasenas_sgp.txt`](file:///c:/Users/fran/dev/projects/SGP/usuarios_contrasenas_sgp.txt) (estrictamente local).
+
+### 16/09/2026
+- **⭐️ Nueva Identidad Visual Institucional y Pantalla de Bienvenida SGP:**
+    - **Rediseño Integral de Pantalla de Bienvenida / Login (`LoginPage.jsx`)**:
+        - Reemplazo de leyendas genéricas anteriores por la denominación oficial institucional: **"Sistema de Gestión Política"** y subtítulo **"SGP — Módulo Gestión de Pedidos"**.
+        - Diseño moderno acorde a Dark Mode de Tailwind CSS (`bg-gray-900`, `bg-gray-800`, acentos índigo y esmeralda).
+    - **Isotipo y Favicon Vectorial Oficial (`logo-sgp.svg`)**:
+        - Diseño e incorporación del isotipo vectorial con escudo estilizado y nodos de articulación institucional en `code/frontend/public/logo-sgp.svg` y `code/frontend/src/assets/logo-sgp.svg`.
+        - Actualización del `<title>` y favicon en [`index.html`](file:///c:/Users/fran/dev/projects/SGP/code/frontend/index.html).
+
 ### 14/09/2026
 - **⭐️ Actualización del Manual de Usuario Oficial, Integración en Sección de Ayuda y Plan de Despliegue Consolidado:**
     - **Revisión y Actualización del Manual de Usuario (`docs/manualdeusuario.md`)**:
