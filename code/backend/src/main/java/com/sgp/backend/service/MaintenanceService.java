@@ -76,5 +76,29 @@ public class MaintenanceService {
         entityManager.createQuery("DELETE FROM SolicitudResolutorAssignment").executeUpdate();
         entityManager.createQuery("DELETE FROM AsignacionHistorial").executeUpdate();
         entityManager.createQuery("DELETE FROM Solicitud").executeUpdate();
+
+        // 5. Reiniciar los contadores de secuencia e índices AUTO_INCREMENT para que la próxima solicitud inicie en ID = 1
+        String[] transactionalTables = {
+            "solicitudes",
+            "ticket_seguimiento",
+            "documento_adjunto",
+            "solicitud_resolutor_assignment",
+            "asignacion_historial",
+            "pedidos",
+            "subsidios"
+        };
+
+        for (String table : transactionalTables) {
+            try {
+                // Sentencia estándar para MySQL / MariaDB en producción
+                entityManager.createNativeQuery("ALTER TABLE " + table + " AUTO_INCREMENT = 1").executeUpdate();
+            } catch (Exception e) {
+                // Manejo de compatibilidad para H2 Database en entornos de pruebas
+                try {
+                    entityManager.createNativeQuery("ALTER TABLE " + table + " ALTER COLUMN id RESTART WITH 1").executeUpdate();
+                } catch (Exception ignored) {
+                }
+            }
+        }
     }
 }

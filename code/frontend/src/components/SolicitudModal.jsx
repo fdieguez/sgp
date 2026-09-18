@@ -384,6 +384,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 setSelectedZone(initialData.responsable?.zone || '');
                 setAsistencia(initialData.asistencia || '');
             } else {
+                const myRespId = isResponsable ? (user?.responsable?.id || user?.id || '') : '';
+                const myZone = isResponsable ? (user?.responsable?.zone || user?.zone || '') : '';
                 setFormData({
                     type: configId ? (configId.toString() === '1' ? 'AGENDA' : 'SUBSIDIO') : 'PEDIDO',
                     description: '',
@@ -393,11 +395,11 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     person: { name: '', phone: '' },
                     locationName: 'Santa Fe',
                     barrio: '',
-                    responsableId: (isResponsable && user?.responsable?.id) ? user.responsable.id : '',
+                    responsableId: myRespId,
                     amount: '',
                     grantDate: '',
                     subsidioType: '',
-                    zone: (isResponsable && user?.responsable?.zone) ? user.responsable.zone : '',
+                    zone: myZone,
                     contactDate: '',
                     resolutionDate: '',
                     observation: '',
@@ -411,7 +413,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     googleEventId: '',
                     assignments: []
                 });
-                setSelectedZone('');
+                setSelectedZone(myZone);
                 setAsistencia('');
                 setActiveTab('detalles');
             }
@@ -448,7 +450,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             setAsistencia('');
             setActiveTab('detalles');
         }
-    }, [isOpen, initialData?.id, fetchResponsables, fetchLocations, fetchTiposResolucion, isResponsable, user?.responsable?.id, user?.responsable?.zone]);
+    }, [isOpen, initialData?.id, fetchResponsables, fetchLocations, fetchTiposResolucion, isResponsable, user?.responsable?.id, user?.responsable?.zone, user?.id, user?.zone]);
 
     // Computar listas dinámicas
     const availableCities = locations.filter(l => l.type === 'CITY' || l.type === 'LOCALITY');

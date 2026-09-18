@@ -65,4 +65,7 @@ code/frontend/test-results/
 # Copias de seguridad de la base de datos locales
 db_bkp/
 
-
+# Archivos locales con credenciales y nominas sensibles
+usuarios_contrasenas*.txt
+update_users*.sql
+videos_demo/

@@ -623,7 +623,7 @@ export default function ProjectDetailsPage() {
                         >
                             <Filter className="h-5 w-5" />
                         </button>
-                        {(user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN' || user?.role === 'OPERADOR') && (
+                        {(user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN' || user?.role === 'OPERADOR' || user?.role === 'RESPONSABLE') && (
                             <button
                                 onClick={() => handleOpenABM()}
                                 className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
