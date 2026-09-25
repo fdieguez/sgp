@@ -477,10 +477,15 @@ public class SolicitudService {
             }
         }
 
+        String safeActionType = actionType != null ? actionType : "UPDATED";
+        if (safeActionType.length() > 250) {
+            safeActionType = safeActionType.substring(0, 247) + "...";
+        }
+
         AsignacionHistorial history = AsignacionHistorial.builder()
                 .solicitud(solicitud)
                 .responsable(responsable) // Incluso para UNASSIGNED, registra quién fue desasignado
-                .actionType(actionType)
+                .actionType(safeActionType)
                 .assignedByUsername(username)
                 .actionDate(LocalDateTime.now())
                 .build();

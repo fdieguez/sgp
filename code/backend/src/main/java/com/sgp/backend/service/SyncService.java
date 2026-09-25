@@ -41,6 +41,7 @@ public class SyncService {
     private final com.sgp.backend.repository.PersonRepository personRepository;
     private final com.sgp.backend.repository.LocationRepository locationRepository;
     private final AsignacionHistorialRepository asignacionHistorialRepository;
+    private final com.sgp.backend.repository.TipoResolucionRepository tipoResolucionRepository;
 
     // EntityManager for session management
     private final jakarta.persistence.EntityManager entityManager;
@@ -304,8 +305,20 @@ public class SyncService {
         if (amountStr == null || amountStr.trim().isEmpty())
             return null;
         try {
-            // Remove $ and spaces, replace comma with dot if needed
-            String clean = amountStr.replace("$", "").replace(".", "").replace(",", ".").trim();
+            String clean = amountStr.trim().replace("$", "").replace("ARS", "").replace(" ", "");
+            if (clean.equalsIgnoreCase("-") || clean.equalsIgnoreCase("rechazado") || clean.equalsIgnoreCase("pendiente") || clean.equalsIgnoreCase("postergado")) {
+                return null;
+            }
+            if (clean.contains(".") && clean.contains(",")) {
+                clean = clean.replace(".", "").replace(",", ".");
+            } else if (clean.contains(",") && !clean.contains(".")) {
+                clean = clean.replace(",", ".");
+            } else if (clean.contains(".") && !clean.contains(",")) {
+                int lastDotIdx = clean.lastIndexOf(".");
+                if (clean.length() - lastDotIdx - 1 == 3) {
+                    clean = clean.replace(".", "");
+                }
+            }
             return new java.math.BigDecimal(clean);
         } catch (Exception e) {
             return null;
@@ -472,17 +485,7 @@ public class SyncService {
      */
     @Transactional
     public int exportarPlanillaSalida(String spreadsheetId, List<Long> ids) throws Exception {
-        SheetsConfig config = sheetsConfigRepository.findBySpreadsheetId(spreadsheetId)
-                .stream()
-                .filter(c -> c.getSheetName() != null && 
-                             !c.getSheetName().toUpperCase().contains("AGENDA") && 
-                             !c.getSheetName().toUpperCase().contains("DECLARACION") && 
-                             !c.getSheetName().toUpperCase().contains("DECLARACIÓN"))
-                .findFirst()
-                .orElseGet(() -> sheetsConfigRepository.findBySpreadsheetId(spreadsheetId)
-                        .stream().findFirst()
-                        .orElseThrow(() -> new RuntimeException("No se encontró la configuración para el spreadsheetId: " + spreadsheetId)));
-        String sheetName = config.getSheetName();
+        String sheetName = resolveSheetName(spreadsheetId);
 
         boolean isSelective = ids != null && !ids.isEmpty();
         log.info("Iniciando exportación de solicitudes en CONSIDERACION a la planilla de salida (selectiva: {}): {}", isSelective, spreadsheetId);
@@ -668,17 +671,7 @@ public class SyncService {
      */
     @Transactional
     public int importarPlanillaSalida(String spreadsheetId, List<Long> ids) throws Exception {
-        SheetsConfig config = sheetsConfigRepository.findBySpreadsheetId(spreadsheetId)
-                .stream()
-                .filter(c -> c.getSheetName() != null && 
-                             !c.getSheetName().toUpperCase().contains("AGENDA") && 
-                             !c.getSheetName().toUpperCase().contains("DECLARACION") && 
-                             !c.getSheetName().toUpperCase().contains("DECLARACIÓN"))
-                .findFirst()
-                .orElseGet(() -> sheetsConfigRepository.findBySpreadsheetId(spreadsheetId)
-                        .stream().findFirst()
-                        .orElseThrow(() -> new RuntimeException("No se encontró la configuración para el spreadsheetId: " + spreadsheetId)));
-        String sheetName = config.getSheetName();
+        String sheetName = resolveSheetName(spreadsheetId);
 
         log.info("Iniciando importación desde la planilla de salida (selectiva: {}): {}", ids != null && !ids.isEmpty(), spreadsheetId);
         // Simular éxito para planillas ficticias usadas en tests de integración locales
@@ -693,7 +686,23 @@ public class SyncService {
         }
 
         String range = "'" + sheetName + "'!A:AD";
-        List<List<Object>> rawData = googleSheetsService.readSheet(spreadsheetId, range);
+        List<List<Object>> rawData = null;
+        try {
+            rawData = googleSheetsService.readSheet(spreadsheetId, range);
+        } catch (Exception e) {
+            log.warn("Fallo al leer con el rango '{}': {}. Intentando consultar la primera hoja de la planilla...", range, e.getMessage());
+            try {
+                List<String> titles = googleSheetsService.getSheetTitles(spreadsheetId);
+                if (titles != null && !titles.isEmpty()) {
+                    sheetName = titles.get(0);
+                    range = "'" + sheetName + "'!A:AD";
+                    rawData = googleSheetsService.readSheet(spreadsheetId, range);
+                }
+            } catch (Exception ex) {
+                log.error("Error definitivo al intentar leer Google Sheets: {}", ex.getMessage());
+                throw ex;
+            }
+        }
 
         if (rawData == null || rawData.size() <= 2) {
             log.info("No hay datos en la planilla para importar (mínimo 2 filas de cabecera y 1 de datos).");
@@ -752,7 +761,8 @@ public class SyncService {
                 String descVal = getValue(row, descCol);
                 if (!descVal.isEmpty() && !descVal.equals(solicitud.getDescription() != null ? solicitud.getDescription() : "")) {
                     solicitud.setDescription(descVal);
-                    logAssignmentChange(solicitud, null, "Descripción actualizada desde planilla externa a: " + descVal);
+                    String snippet = descVal.length() > 60 ? descVal.substring(0, 57) + "..." : descVal;
+                    logAssignmentChange(solicitud, null, "Descripción actualizada desde planilla externa: " + snippet);
                     isModified = true;
                 }
             }
@@ -873,10 +883,26 @@ public class SyncService {
                         .findFirst()
                         .orElse(null);
 
-                // Si no existe la asignación de resolutor de SUBSIDIO, la creamos en caliente
+                // Si no existe la asignación de resolutor de SUBSIDIO, la creamos en caliente con un resolutor válido
                 if (assignment == null) {
+                    com.sgp.backend.entity.User resolutorSubsidio = null;
+                    try {
+                        var tipoOpt = tipoResolucionRepository.findByTipoIgnoreCase("SUBSIDIO");
+                        if (tipoOpt.isPresent() && tipoOpt.get().getResolutor() != null) {
+                            resolutorSubsidio = tipoOpt.get().getResolutor();
+                        } else if (solicitud.getResponsable() != null) {
+                            resolutorSubsidio = solicitud.getResponsable();
+                        } else {
+                            resolutorSubsidio = userRepository.findByEmail("martinnocioni@gmail.com")
+                                    .orElseGet(() -> userRepository.findAll().stream().findFirst().orElse(null));
+                        }
+                    } catch (Exception ex) {
+                        log.warn("No se pudo obtener el resolutor por defecto para la asignación SUBSIDIO: {}", ex.getMessage());
+                    }
+
                     assignment = SolicitudResolutorAssignment.builder()
                             .solicitud(solicitud)
+                            .resolutor(resolutorSubsidio)
                             .tipoResolucion("SUBSIDIO")
                             .approved(false)
                             .detalle("{}")
@@ -964,8 +990,12 @@ public class SyncService {
             String val1 = getCleanHeaderVal(h1, j);
             String val2 = getCleanHeaderVal(h2, j);
 
-            if ("id".equals(val1) || "id".equals(val2) || containsAny(val1, "identificador") || containsAny(val2, "identificador")) {
-                mapping.put("id", j);
+            if ("id".equals(val1) || "id".equals(val2) || 
+                containsAny(val1, "identificador", "identificacion", "nro orden", "n° orden", "orden", "expediente", "solicitud #", "nro solicitud") || 
+                containsAny(val2, "identificador", "identificacion", "nro orden", "n° orden", "orden", "expediente", "solicitud #", "nro solicitud")) {
+                if (!mapping.containsKey("id")) {
+                    mapping.put("id", j);
+                }
             }
             else if (containsAny(val1, "responsable") || containsAny(val2, "responsable")) {
                 if (!containsAny(val1, "cargo", "dni") && !containsAny(val2, "cargo", "dni")) {
@@ -1177,14 +1207,72 @@ public class SyncService {
             username = auth.getName();
         }
 
+        String safeActionType = actionType != null ? actionType : "UPDATED";
+        if (safeActionType.length() > 250) {
+            safeActionType = safeActionType.substring(0, 247) + "...";
+        }
+
         AsignacionHistorial history = AsignacionHistorial.builder()
                 .solicitud(solicitud)
                 .responsable(responsable)
-                .actionType(actionType)
+                .actionType(safeActionType)
                 .assignedByUsername(username)
                 .actionDate(LocalDateTime.now())
                 .build();
         
         asignacionHistorialRepository.save(history);
+    }
+
+    /**
+     * Resuelve de forma inteligente y resiliente el nombre de la hoja de cálculo de Google Sheets.
+     */
+    private String resolveSheetName(String spreadsheetId) {
+        if (spreadsheetId == null || spreadsheetId.trim().isEmpty()) {
+            return "Respuestas de formulario 1";
+        }
+        
+        // 1. Buscar coincidencia exacta por spreadsheetId en SheetsConfig
+        String foundSheetName = sheetsConfigRepository.findBySpreadsheetId(spreadsheetId.trim())
+                .stream()
+                .filter(c -> c.getSheetName() != null && 
+                             !c.getSheetName().toUpperCase().contains("AGENDA") && 
+                             !c.getSheetName().toUpperCase().contains("DECLARACION") && 
+                             !c.getSheetName().toUpperCase().contains("DECLARACIÓN"))
+                .map(SheetsConfig::getSheetName)
+                .findFirst()
+                .orElse(null);
+
+        if (foundSheetName != null && !foundSheetName.trim().isEmpty()) {
+            return foundSheetName.trim();
+        }
+
+        // 2. Buscar cualquier configuración activa de tipo general
+        foundSheetName = sheetsConfigRepository.findAll().stream()
+                .filter(c -> c.getSheetName() != null && 
+                             !c.getSheetName().toUpperCase().contains("AGENDA") && 
+                             !c.getSheetName().toUpperCase().contains("DECLARACION") && 
+                             !c.getSheetName().toUpperCase().contains("DECLARACIÓN"))
+                .map(SheetsConfig::getSheetName)
+                .findFirst()
+                .orElse(null);
+
+        if (foundSheetName != null && !foundSheetName.trim().isEmpty()) {
+            return foundSheetName.trim();
+        }
+
+        // 3. Consultar dinámicamente títulos de pestañas a través de la API de Google Sheets
+        try {
+            List<String> titles = googleSheetsService.getSheetTitles(spreadsheetId);
+            if (titles != null && !titles.isEmpty()) {
+                return titles.stream()
+                        .filter(t -> t.toLowerCase().contains("salida") || t.toLowerCase().contains("subsidio") || t.toLowerCase().contains("respuesta"))
+                        .findFirst()
+                        .orElse(titles.get(0));
+            }
+        } catch (Exception e) {
+            log.warn("No se pudieron consultar dinámicamente los títulos de las hojas de Google Sheets: {}", e.getMessage());
+        }
+
+        return "Respuestas de formulario 1";
     }
 }

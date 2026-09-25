@@ -28,7 +28,7 @@ public class AsignacionHistorial {
     @JoinColumn(name = "responsable_user_id")
     private User responsable; // The one being assigned/unassigned. Null if unassigned.
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String actionType; // e.g., "ASSIGNED", "UNASSIGNED", "REASSIGNED"
 
     @Column(nullable = false)
