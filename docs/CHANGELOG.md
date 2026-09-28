@@ -6,6 +6,22 @@
 
 ## 📅 Septiembre 2026
 
+### 28/09/2026
+- **⭐️ Sincronización de Producción, Fix Frontend y Carga Masiva:**
+    - **Sincronización Local**: Backup de la DB de producción y restauración en entorno local.
+    - **Fix Truncamiento `action_type` en Producción**: Resolución de error de truncamiento `Data truncation: Data too long for column 'action_type'` detectado el 23 de septiembre en la importación de `SyncService.importarPlanillaSalida`. Se actualizó la columna `action_type` de la tabla `asignacion_historial` a `TEXT` directamente en la base de datos de producción (alineándolo con la entidad JPA que ya había sido corregida en código) para prevenir futuros crasheos.
+    - **Fix Frontend (`DescargarAdjunto.jsx`)**: Resolución de crasheo (pantalla blanca) añadiendo el import faltante del icono `Eye` y mejorando el manejo de errores HTTP (401/403/404) con redirección al login.
+    - **Carga Masiva y Normalización (SQL)**: Carga masiva de 15 usuarios nuevos y normalización de 14 zonas tanto en local como en producción (`update_users_zones_2026.sql`), limpiando registros y zonas de prueba.
+    - **Documentación de Cuentas**: Actualización del catálogo de usuarios oficiales y sus contraseñas generadas (BCrypt) en `docs/usuarios.txt`.
+
+- **⭐️ Distribución Oficial de Credenciales y Actualización de Seguridad:**
+    - **Actualización de Contraseñas (Seguridad Mejorada)**: Se modificó el script de generación de credenciales para reemplazar el sufijo predecible (`2026`) por un código alfanumérico aleatorio de 4 caracteres para todos los usuarios de la nómina real.
+    - **Refinamiento de Correos Electrónicos**:
+        - Reemplazo de la firma de los correos automáticos por "Implementación y Desarrollo" e incorporación de la firma profesional "Ing. Francisco Dieguez".
+        - Resolución de saludo dinámico asegurando que el nombre reflejado corresponda a la cuenta notificada.
+        - Inclusión explícita de un enlace directo al Centro de Ayuda / Instructivo para facilitar la adopción por parte de los usuarios.
+    - **Sincronización Local y Producción**: Se generó el archivo consolidado de usuarios `usuarios_contrasenas_sgp.txt` y se actualizó la base de datos sincronizando las contraseñas nuevas, para posteriormente enviar los correos masivos a la nómina oficial.
+
 ### 18/09/2026
 - **⭐️ Reseteo de Secuencias en Mantenimiento, Nueva Solicitud para Rol Responsable y Despliegue Oficial en Producción:**
     - **Reseteo de AUTO_INCREMENT en Mantenimiento (`MaintenanceService.java`)**:

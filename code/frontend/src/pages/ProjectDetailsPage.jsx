@@ -142,7 +142,7 @@ export default function ProjectDetailsPage() {
         totalSubsidios: 0
     });
 
-    const SPREADSHEET_ID = config?.spreadsheetId || "1jPw9ni4BW_bRfw_M9aja7jO5RGX5IFq8w43T3W0Xz6g";
+    const SPREADSHEET_ID = config?.spreadsheetId || "1jPw9ni4BW_bRfw_M9ajA7jO5RGX5IFq8w43T3WOXz6g";
     const isResolutorSubsidio = user?.role === 'RESOLUTOR' && user?.tiposResolucion?.some(t => t.tipo.toUpperCase() === 'SUBSIDIO');
 
     const handleExportPlanilla = async () => {

@@ -67,5 +67,11 @@ db_bkp/
 
 # Archivos locales con credenciales y nominas sensibles
 usuarios_contrasenas*.txt
+usuarios_credenciales_envio*.csv
+smtp_credentials*.env
 update_users*.sql
+scripts/actualizar_contrasenas*.sql
+scripts/*.class
+scripts/registro_envios*.log
 videos_demo/
+prueba_correo_*.html
