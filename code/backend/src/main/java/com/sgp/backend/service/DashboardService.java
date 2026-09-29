@@ -47,14 +47,16 @@ public class DashboardService {
                         }
                         if (userRole.contains("RESPONSABLE")) {
                             final String zoneStr = user.getZone();
-                            jakarta.persistence.criteria.Predicate zonePredicate = cb.disjunction();
-                            if (zoneStr != null && !zoneStr.trim().isEmpty()) {
-                                zonePredicate = cb.equal(
-                                        cb.lower(cb.trim(root.get("zone"))),
-                                        zoneStr.trim().toLowerCase());
-                            }
                             jakarta.persistence.criteria.Predicate respPredicate = cb.equal(root.get("responsable"), user);
-                            orPredicates.add(cb.or(zonePredicate, respPredicate));
+                            if (zoneStr != null && !zoneStr.trim().isEmpty()) {
+                                jakarta.persistence.criteria.Predicate unassignedInZone = cb.and(
+                                        cb.isNull(root.get("responsable")),
+                                        cb.equal(cb.lower(cb.trim(root.get("zone"))), zoneStr.trim().toLowerCase())
+                                );
+                                orPredicates.add(cb.or(respPredicate, unassignedInZone));
+                            } else {
+                                orPredicates.add(respPredicate);
+                            }
                         }
                         if (userRole.contains("RESOLUTOR")) {
                             Subquery<Long> subquery = query.subquery(Long.class);

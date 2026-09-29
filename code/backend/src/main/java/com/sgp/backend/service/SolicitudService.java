@@ -151,7 +151,17 @@ public class SolicitudService {
                             orPredicates.add(cb.equal(root.get("createdBy"), user));
                         }
                         if (userRole.contains("RESPONSABLE")) {
-                            orPredicates.add(cb.equal(root.get("responsable"), user));
+                            jakarta.persistence.criteria.Predicate isAssignedToMe = cb.equal(root.get("responsable"), user);
+                            final String zoneStr = user.getZone();
+                            if (zoneStr != null && !zoneStr.trim().isEmpty()) {
+                                jakarta.persistence.criteria.Predicate isUnassignedInMyZone = cb.and(
+                                    cb.isNull(root.get("responsable")),
+                                    cb.equal(cb.lower(cb.trim(root.get("zone"))), zoneStr.trim().toLowerCase())
+                                );
+                                orPredicates.add(cb.or(isAssignedToMe, isUnassignedInMyZone));
+                            } else {
+                                orPredicates.add(isAssignedToMe);
+                            }
                         }
                         if (userRole.contains("RESOLUTOR")) {
                             List<String> tiposAsignados = user.getTiposResolucion().stream()
@@ -799,6 +809,67 @@ public class SolicitudService {
             }
         }
         return result;
+    }
+
+    /**
+     * Permite a un usuario con rol RESPONSABLE auto-asignarse una solicitud que se encuentre
+     * sin responsable asignado dentro de su zona territorial (o a un Administrador).
+     * Controla la concurrencia de forma transaccional y registra el movimiento en el historial.
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public Solicitud tomarSolicitud(Long id) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED, "Usuario no autenticado");
+        }
+
+        User currentUser = userRepository.findByEmail(auth.getName())
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+
+        String activeRole = com.sgp.backend.security.SecurityUtils.getActiveRole(currentUser);
+        boolean isAuthorized = activeRole != null && (activeRole.contains("RESPONSABLE") || activeRole.contains("ADMIN"));
+        if (!isAuthorized) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "No tienes permisos para tomar esta solicitud");
+        }
+
+        Solicitud solicitud = solicitudRepository.findById(id)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Solicitud no encontrada"));
+
+        // Comprobar si ya fue tomada por otro responsable
+        if (solicitud.getResponsable() != null) {
+            if (solicitud.getResponsable().getId().equals(currentUser.getId())) {
+                return solicitud; // Ya pertenece a este usuario
+            }
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT,
+                    "La solicitud ya fue tomada por otro responsable: " + solicitud.getResponsable().getName());
+        }
+
+        // Validar compatibilidad de zona geográfica si el usuario no es Administrador
+        if (!activeRole.contains("ADMIN")) {
+            if (solicitud.getZone() != null && !solicitud.getZone().trim().isEmpty()
+                    && currentUser.getZone() != null && !currentUser.getZone().trim().isEmpty()) {
+                if (!solicitud.getZone().trim().equalsIgnoreCase(currentUser.getZone().trim())) {
+                    throw new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.FORBIDDEN,
+                            "La solicitud pertenece a la zona " + solicitud.getZone() + " y tu zona asignada es " + currentUser.getZone());
+                }
+            }
+        }
+
+        // Asignar el responsable actual y actualizar el estado
+        solicitud.setResponsable(currentUser);
+        updateSolicitudStatus(solicitud);
+        Solicitud saved = solicitudRepository.save(solicitud);
+
+        // Registrar en el historial de asignaciones
+        logAssignmentChange(saved, currentUser, "AUTOASIGNADO");
+
+        return saved;
     }
 
     private void updateSolicitudStatus(Solicitud solicitud) {

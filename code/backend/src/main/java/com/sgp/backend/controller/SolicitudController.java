@@ -122,6 +122,11 @@ public class SolicitudController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/{id}/tomar")
+    public ResponseEntity<Solicitud> tomarSolicitud(@PathVariable Long id) {
+        return ResponseEntity.ok(solicitudService.tomarSolicitud(id));
+    }
+
     @PostMapping("/{id}/consideracion")
     public ResponseEntity<Solicitud> ponerEnConsideracion(@PathVariable Long id) {
         Solicitud saved = solicitudService.ponerEnConsideracion(id);

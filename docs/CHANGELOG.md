@@ -6,6 +6,27 @@
 
 ## 📅 Septiembre 2026
 
+### 29/09/2026
+- **⭐️ Implementación del Pool Territorial y Autoasignación de Solicitudes (Etapa 2):**
+    - **Distribución por Zona sin Responsable Fijo (Backend & Frontend)**:
+        - El Distribuidor y Administrador ahora pueden asignar solicitudes únicamente seleccionando la **Zona Territorial** y eligiendo la opción `-- Sin Asignar (Pool de Zona) --`, sin necesidad de designar un responsable específico inmediatamente.
+        - `SolicitudModal.jsx`: Conservación y propagación estricta del campo `zone` hacia el backend en endpoints PUT y POST aún cuando `responsableId` es `0` o `null`.
+    - **Visibilidad Inteligente de Pool Territorial (`SolicitudService.java` y `DashboardService.java`)**:
+        - Actualización del predicado de especificación JPA (`buildSpecification`): los usuarios con rol `RESPONSABLE` ahora tienen acceso a sus solicitudes asignadas directas **más** todas aquellas solicitudes sin responsable asignado que pertenezcan a su misma zona geográfica.
+        - Aislamiento territorial asegurado: los responsables no visualizan solicitudes en pool de zonas que no corresponden a su jurisdicción.
+    - **Endpoint Atómico de Autoasignación (`POST /api/solicitudes/{id}/tomar`)**:
+        - Creación del endpoint seguro y transaccional `tomarSolicitud(Long id)` en `SolicitudService.java` y `SolicitudController.java`.
+        - Valida compatibilidad territorial, adjudica la solicitud al usuario autenticado, transiciona automáticamente el estado a `"en proceso"` (Asignadas) y genera un evento en `AsignacionHistorial` con `actionType = "AUTOASIGNADO"`.
+        - Control de concurrencia: si dos usuarios intentan tomar la misma solicitud simultáneamente, responde con `HTTP 409 Conflict`.
+    - **Experiencia de Usuario y Acciones Rápidas (`ProjectDetailsPage.jsx` y `SolicitudModal.jsx`)**:
+        - Visualización en grilla del badge destacado `Pool: <ZONA>` para solicitudes no adjudicadas.
+        - Botón de acción rápida con icono `UserCheck` ("Tomar Solicitud") tanto en la tabla principal como en el modal de detalle para que los responsables tomen solicitudes con un solo clic.
+    - **Pruebas y Documentación Operativa**:
+        - Suite de pruebas unitarias en Spring Boot (`SolicitudWorkflowTest.java`) cubriendo el 100% de los casos de pool y toma concurrente (13/13 tests en verde).
+        - Suite de pruebas E2E en Playwright: `code/frontend/tests/etapa12_pool_responsables_zona.spec.js`.
+        - Documento de Plan de Pruebas para QA: `docs/plan_de_pruebas_pool_responsables_zona.md`.
+        - Documento de Plan de Implementación y Despliegue para DevOps: `docs/plan_de_implementacion_pool_responsables_zona.md`.
+
 ### 28/09/2026
 - **⭐️ Sincronización de Producción, Fix Frontend y Carga Masiva:**
     - **Sincronización Local**: Backup de la DB de producción y restauración en entorno local.

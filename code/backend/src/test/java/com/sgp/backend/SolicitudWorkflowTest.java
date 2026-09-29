@@ -184,4 +184,61 @@ public class SolicitudWorkflowTest {
         assertNotNull(reloaded.getAmount(), "El monto en BD no debe ser nulo");
         assertEquals(0, new java.math.BigDecimal("75000").compareTo(reloaded.getAmount()), "El monto recuperado de BD debe ser 75000");
     }
+
+    @Test
+    void testPoolZonaYTomarSolicitud() {
+        // 1. Crear dos responsables en zonas diferentes
+        User respNorte1 = userRepository.save(User.builder().email("resp.norte1@test.com").password("123").firstName("Resp").lastName("Norte 1").role("RESPONSABLE").zone("NORTE").phone("111").build());
+        User respNorte2 = userRepository.save(User.builder().email("resp.norte2@test.com").password("123").firstName("Resp").lastName("Norte 2").role("RESPONSABLE").zone("NORTE").phone("222").build());
+        User respSur = userRepository.save(User.builder().email("resp.sur@test.com").password("123").firstName("Resp").lastName("Sur").role("RESPONSABLE").zone("SUR").phone("333").build());
+
+        // 2. Crear solicitud con zona NORTE pero sin responsable asignado
+        Solicitud s = new Solicitud();
+        s.setType("PEDIDO");
+        s.setDescription("Solicitud territorial para la zona norte");
+        s.setZone("NORTE");
+        s.setPerson(person);
+        Solicitud saved = solicitudService.createSolicitud(s);
+
+        assertNull(saved.getResponsable(), "Inicialmente no debe tener responsable asignado");
+        assertEquals("pendiente", saved.getStatus());
+
+        // 3. Simular sesión de respNorte1: debe ver la solicitud en el pool de su zona
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken(respNorte1.getEmail(), null, new ArrayList<>()));
+        org.springframework.data.domain.Page<Solicitud> solicitudesNorte1 = solicitudService.getAllSolicitudes(
+                null, null, null, null, null, null, null, org.springframework.data.domain.PageRequest.of(0, 10));
+        assertTrue(solicitudesNorte1.getContent().stream().anyMatch(sol -> sol.getId().equals(saved.getId())),
+                "El responsable de la zona NORTE debe ver la solicitud disponible en su pool");
+
+        // 4. Simular sesión de respSur: NO debe ver la solicitud de zona NORTE
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken(respSur.getEmail(), null, new ArrayList<>()));
+        org.springframework.data.domain.Page<Solicitud> solicitudesSur = solicitudService.getAllSolicitudes(
+                null, null, null, null, null, null, null, org.springframework.data.domain.PageRequest.of(0, 10));
+        assertFalse(solicitudesSur.getContent().stream().anyMatch(sol -> sol.getId().equals(saved.getId())),
+                "El responsable de la zona SUR NO debe ver solicitudes del pool de zona NORTE");
+
+        // 5. respNorte1 toma la solicitud
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken(respNorte1.getEmail(), null, new ArrayList<>()));
+        Solicitud tomada = solicitudService.tomarSolicitud(saved.getId());
+
+        assertNotNull(tomada.getResponsable(), "Debe quedar asignada");
+        assertEquals(respNorte1.getId(), tomada.getResponsable().getId(), "El responsable asignado debe ser respNorte1");
+        assertEquals("en proceso", tomada.getStatus(), "El estado debe pasar a 'en proceso'");
+
+        // 6. respNorte2 ya NO debe ver la solicitud porque ya fue tomada por respNorte1
+        SecurityContextHolder.getContext().setAuthentication(
+            new UsernamePasswordAuthenticationToken(respNorte2.getEmail(), null, new ArrayList<>()));
+        org.springframework.data.domain.Page<Solicitud> solicitudesNorte2 = solicitudService.getAllSolicitudes(
+                null, null, null, null, null, null, null, org.springframework.data.domain.PageRequest.of(0, 10));
+        assertFalse(solicitudesNorte2.getContent().stream().anyMatch(sol -> sol.getId().equals(saved.getId())),
+                "El otro responsable de la misma zona ya NO debe ver la solicitud una vez tomada por su compañero");
+
+        // 7. Si respNorte2 intenta tomarla, debe arrojar conflicto (HTTP 409)
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> {
+            solicitudService.tomarSolicitud(saved.getId());
+        }, "Debe lanzar excepción por conflicto al intentar tomar una solicitud ya asignada");
+    }
 }

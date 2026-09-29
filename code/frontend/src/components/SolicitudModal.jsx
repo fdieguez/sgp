@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar, Users, Plus, Trash2, History, FileText, UploadCloud, Download, ArrowRight, MessageSquare, Check, Eye, LayoutDashboard } from 'lucide-react';
+import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar, Users, Plus, Trash2, History, FileText, UploadCloud, Download, ArrowRight, MessageSquare, Check, Eye, LayoutDashboard, UserCheck } from 'lucide-react';
 import api from '../config/axios';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -57,6 +57,23 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     // Condición de autorización para seleccionar/ver la opción 'Consideración' (Administrador, Responsable o Resolutor de Subsidio, o si ya está en consideración).
     // Se desplaza esta declaración después de formData para evitar ReferenceError por acceso previo a la inicialización de formData.
     const canPonerConsideracion = user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN' || user?.role === 'RESPONSABLE' || isResolutorSubsidio === true || formData.status === 'consideracion';
+    const canTomar = Boolean(formData.id && !formData.responsableId && (user?.role === 'RESPONSABLE' || user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN') && (!formData.zone || !user?.zone || formData.zone.toLowerCase() === user?.zone.toLowerCase() || user?.role?.includes('ADMIN')));
+
+    const handleTomar = async () => {
+        if (!formData.id) return;
+        setLoading(true);
+        try {
+            await api.post(`/api/solicitudes/${formData.id}/tomar`);
+            toast.success("¡Solicitud tomada y asignada a tu bandeja con éxito!");
+            onSuccess();
+            onClose();
+        } catch (err) {
+            console.error("Error al tomar la solicitud:", err);
+            toast.error(err.response?.data?.message || err.response?.data?.error || "Error al tomar la solicitud.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const [responsables, setResponsables] = useState([]);
     const [selectedZone, setSelectedZone] = useState('');
@@ -350,7 +367,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         amount: initialData.amount || '',
                         grantDate: formatDateISO(initialData.grantDate),
                         subsidioType: initialData.subsidioType || '',
-                        zone: initialData.zone || '',
+                        zone: initialData.zone || initialData.responsable?.zone || '',
                         contactDate: formatDateISO(initialData.contactDate),
                         resolutionDate: formatDateISO(initialData.resolutionDate),
                         entryDate: formatDateISO(initialData.entryDate),
@@ -381,7 +398,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         }) || []
                     };
                 });
-                setSelectedZone(initialData.responsable?.zone || '');
+                setSelectedZone(initialData.zone || initialData.responsable?.zone || '');
                 setAsistencia(initialData.asistencia || '');
             } else {
                 const myRespId = isResponsable ? (user?.responsable?.id || user?.id || '') : '';
@@ -689,7 +706,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     person: formData.person,
                     locationName: formData.locationName,
                     barrio: formData.barrio,
-                    zone: formData.zone,
+                    zone: formData.zone || selectedZone || null,
                     contactDate: formData.contactDate || null,
                     resolutionDate: formData.resolutionDate || null,
                     resolution: formData.resolution,
@@ -712,6 +729,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 // POST mantiene el formato original con polimorfismo (entidad completa)
                 const createPayload = {
                     ...formData,
+                    zone: formData.zone || selectedZone || null,
                     responsable: formData.responsableId ? { id: Number(formData.responsableId) } : null,
                     assignments
                 };
@@ -1180,11 +1198,11 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                             setFormData({ 
                                                 ...formData, 
                                                 responsableId: respId,
-                                                zone: selectedResp ? (selectedResp.zone || '') : ''
+                                                zone: selectedResp ? (selectedResp.zone || selectedZone) : selectedZone
                                             });
                                         }}
                                     >
-                                        <option value="">Seleccionar Responsable...</option>
+                                        <option value="">-- Sin Asignar (Pool de Zona) --</option>
                                         {filteredResponsables.map(r => (
                                             <option key={r.id} value={r.id}>{r.name}</option>
                                         ))}
@@ -1762,6 +1780,18 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             >
                                 <Save className="h-4 w-4" />
                                 Aprobar Resolución
+                            </button>
+                        )}
+                        {!isReadOnly && canTomar && (
+                            <button
+                                type="button"
+                                onClick={handleTomar}
+                                disabled={loading}
+                                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold transition-all shadow-lg flex items-center gap-2"
+                                title="Tomar y auto-asignarme esta solicitud"
+                            >
+                                <UserCheck className="h-4 w-4" />
+                                Tomar Solicitud
                             </button>
                         )}
                     </div>

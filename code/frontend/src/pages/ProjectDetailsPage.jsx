@@ -24,7 +24,8 @@ import {
     Eye,
     Check,
     Settings,
-    Download
+    Download,
+    UserCheck
 } from 'lucide-react';
 import {
     BarChart,
@@ -237,6 +238,22 @@ export default function ProjectDetailsPage() {
         } catch (err) {
             console.error("Error al poner en consideración:", err);
             toast.error("Error al poner la solicitud en consideración.");
+        }
+    };
+
+    const handleTomarSolicitud = async (id) => {
+        if (!window.confirm(`¿Deseas tomar y asignarte la solicitud #${id}?`)) return;
+        setLoading(true);
+        try {
+            await api.post(`/api/solicitudes/${id}/tomar`);
+            toast.success(`¡Solicitud #${id} asignada a tu bandeja con éxito!`);
+            fetchData();
+        } catch (err) {
+            console.error("Error al tomar solicitud:", err);
+            const errorMsg = err.response?.data?.message || err.response?.data?.error || "Error al tomar la solicitud.";
+            toast.error(errorMsg);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -1099,8 +1116,16 @@ export default function ProjectDetailsPage() {
                                                 <td className="p-3 text-gray-300 max-w-[200px] truncate" title={s.description}>
                                                     {s.description || '-'}
                                                 </td>
-                                                <td className="p-3 text-indigo-300 font-bold uppercase">
-                                                    {s.responsable?.name || '-'}
+                                                <td className="p-3 whitespace-nowrap">
+                                                    {s.responsable ? (
+                                                        <span className="text-indigo-300 font-bold uppercase">{s.responsable.name}</span>
+                                                    ) : s.zone ? (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950/60 text-amber-400 border border-amber-800/80">
+                                                            Pool: {s.zone}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-500 italic text-[11px]">Sin Asignar</span>
+                                                    )}
                                                 </td>
                                                 <td className="p-3 text-emerald-400 font-bold">
                                                     ${s.amount || '0'}
@@ -1131,6 +1156,12 @@ export default function ProjectDetailsPage() {
                                                 <td className="p-3 text-indigo-300 font-mono font-bold">{s.porDonde || '-'}</td>
                                                 <td className="p-3 sticky right-0 bg-gray-900/90 shadow-xl group-hover:bg-gray-800 transition-colors">
                                                     <div className="flex justify-end gap-1 opacity-60 group-hover:opacity-100">
+                                                        {/* Botón Tomar Solicitud */}
+                                                        {!s.responsable && (user?.role === 'RESPONSABLE' || user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN') && (!s.zone || !user?.zone || s.zone.toLowerCase() === user?.zone.toLowerCase() || user?.role?.includes('ADMIN')) && (
+                                                            <button onClick={() => handleTomarSolicitud(s.id)} title="Tomar Solicitud (Asignármela)" className="p-1.5 hover:bg-emerald-600 bg-emerald-900/40 rounded text-emerald-400 hover:text-white transition-colors">
+                                                                <UserCheck className="h-4 w-4" />
+                                                            </button>
+                                                        )}
                                                         {/* Botón Poner en Consideración: se muestra únicamente si el usuario es Administrador (ADMINISTRADOR o ADMIN), Responsable (RESPONSABLE) o Resolutor de Subsidio (isResolutorSubsidio === true) */}
                                                         {s.type === 'SUBSIDIO' && (user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN' || user?.role === 'RESPONSABLE' || isResolutorSubsidio === true) && s.status !== 'completadas' && s.status !== 'rechazada' && (
                                                             <button onClick={() => handleConsideracion(s.id)} title="Poner en Consideración" className="p-1.5 hover:bg-orange-600 bg-orange-900/30 rounded text-orange-400 hover:text-white transition-colors">
@@ -1178,9 +1209,19 @@ export default function ProjectDetailsPage() {
                                                 <td className="p-3 text-gray-300 font-medium leading-snug">
                                                     <div className="line-clamp-2" title={s.description}>{s.description}</div>
                                                 </td>
-                                                <td className="p-3 text-indigo-300 font-bold uppercase whitespace-nowrap">
-                                                    {s.responsable?.name || '-'}<br/>
-                                                    <span className="text-indigo-500/50 text-[10px]">{s.zone || ''}</span>
+                                                <td className="p-3 whitespace-nowrap">
+                                                    {s.responsable ? (
+                                                        <>
+                                                            <span className="text-indigo-300 font-bold uppercase">{s.responsable.name}</span><br/>
+                                                            <span className="text-indigo-500/50 text-[10px]">{s.zone || ''}</span>
+                                                        </>
+                                                    ) : s.zone ? (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950/60 text-amber-400 border border-amber-800/80">
+                                                            Pool: {s.zone}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-500 italic text-[11px]">Sin Asignar</span>
+                                                    )}
                                                 </td>
                                                 <td className="p-3 text-gray-300">
                                                     <StatusBadge status={s.status} />
@@ -1193,6 +1234,12 @@ export default function ProjectDetailsPage() {
                                                         {hasPendingApproval && (
                                                             <button onClick={() => handleAprobarRapido(s.id)} title="Aprobar Rápidamente" className="p-1.5 hover:bg-emerald-600 bg-emerald-900/30 rounded text-emerald-400 hover:text-white transition-colors">
                                                                 <Check className="h-4 w-4" />
+                                                            </button>
+                                                        )}
+                                                        {/* Botón Tomar Solicitud */}
+                                                        {!s.responsable && (user?.role === 'RESPONSABLE' || user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN') && (!s.zone || !user?.zone || s.zone.toLowerCase() === user?.zone.toLowerCase() || user?.role?.includes('ADMIN')) && (
+                                                            <button onClick={() => handleTomarSolicitud(s.id)} title="Tomar Solicitud (Asignármela)" className="p-1.5 hover:bg-emerald-600 bg-emerald-900/40 rounded text-emerald-400 hover:text-white transition-colors">
+                                                                <UserCheck className="h-4 w-4" />
                                                             </button>
                                                         )}
                                                         {/* Botón Poner en Consideración: se muestra únicamente si el usuario es Administrador (ADMINISTRADOR o ADMIN), Responsable (RESPONSABLE) o Resolutor de Subsidio (isResolutorSubsidio === true) */}
