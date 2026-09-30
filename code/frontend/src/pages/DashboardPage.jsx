@@ -213,6 +213,7 @@ export default function DashboardPage() {
         const dailyDataRaw = stats.solicitudesDiarias || [];
         const dailyDataFiltered = dailyDaysRange > 0 ? dailyDataRaw.slice(-dailyDaysRange) : dailyDataRaw;
         const rankingCargas = stats.rankingCargasUsuarios || [];
+        const rankingDistribuidores = stats.rankingDistribuidores || [];
         const rankingResponsables = stats.rankingResponsables || [];
         const rankingResolutores = stats.rankingResolutores || [];
 
@@ -482,10 +483,20 @@ export default function DashboardPage() {
                                     📥 Creadores ({rankingCargas.length})
                                 </button>
                                 <button
+                                    onClick={() => setProductivityTab('distribuidores')}
+                                    className={`pb-2 border-b-2 transition-colors flex items-center gap-1.5 ${
+                                        productivityTab === 'distribuidores'
+                                            ? 'border-purple-500 text-purple-400 font-bold'
+                                            : 'border-transparent text-gray-400 hover:text-gray-200'
+                                    }`}
+                                >
+                                    🔄 Distribuidores ({rankingDistribuidores.length})
+                                </button>
+                                <button
                                     onClick={() => setProductivityTab('responsables')}
                                     className={`pb-2 border-b-2 transition-colors flex items-center gap-1.5 ${
                                         productivityTab === 'responsables'
-                                            ? 'border-indigo-500 text-indigo-400 font-bold'
+                                            ? 'border-blue-500 text-blue-400 font-bold'
                                             : 'border-transparent text-gray-400 hover:text-gray-200'
                                     }`}
                                 >
@@ -495,7 +506,7 @@ export default function DashboardPage() {
                                     onClick={() => setProductivityTab('resolutores')}
                                     className={`pb-2 border-b-2 transition-colors flex items-center gap-1.5 ${
                                         productivityTab === 'resolutores'
-                                            ? 'border-indigo-500 text-indigo-400 font-bold'
+                                            ? 'border-emerald-500 text-emerald-400 font-bold'
                                             : 'border-transparent text-gray-400 hover:text-gray-200'
                                     }`}
                                 >
@@ -530,6 +541,33 @@ export default function DashboardPage() {
                                     ))
                                 ) : (
                                     <div className="h-full flex items-center justify-center text-xs text-gray-500">Sin datos de cargas por usuario.</div>
+                                )
+                            )}
+
+                            {productivityTab === 'distribuidores' && (
+                                rankingDistribuidores.length > 0 ? (
+                                    rankingDistribuidores.map((d, idx) => (
+                                        <div key={idx} className="bg-gray-900/50 p-2.5 rounded-xl border border-gray-700/40 flex flex-col gap-1.5">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2 truncate pr-2">
+                                                    <div className="w-5 h-5 rounded-full bg-purple-900/70 border border-purple-500/40 text-purple-300 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                                                        {idx + 1}
+                                                    </div>
+                                                    <span className="text-xs font-bold text-white truncate" title={d.nombre}>{d.nombre}</span>
+                                                    <span className="text-[9px] px-1.5 py-0.2 bg-purple-950 text-purple-300 rounded uppercase font-mono">{d.rol}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                    <span className="text-xs font-black text-purple-400">{d.cantidad}</span>
+                                                    <span className="text-[10px] text-gray-500">derivaciones</span>
+                                                </div>
+                                            </div>
+                                            <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
+                                                <div className="bg-purple-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Math.max((d.cantidad / (total || 1)) * 100, 4))}%` }}></div>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="h-full flex items-center justify-center text-xs text-gray-500">Sin derivaciones registradas por distribuidores.</div>
                                 )
                             )}
 

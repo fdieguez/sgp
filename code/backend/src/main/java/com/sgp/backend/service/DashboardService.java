@@ -26,6 +26,7 @@ public class DashboardService {
 
     private final SolicitudRepository solicitudRepository;
     private final UserRepository userRepository;
+    private final com.sgp.backend.repository.AsignacionHistorialRepository asignacionHistorialRepository;
 
     public DashboardStatsDTO getStats(String type, Integer year) {
         Specification<Solicitud> spec = Specification.where(null);
@@ -267,7 +268,37 @@ public class DashboardService {
                 .sorted((a, b) -> Long.compare((long) b.get("cantidad"), (long) a.get("cantidad")))
                 .collect(java.util.stream.Collectors.toList());
 
-        // 8. Ranking de Resolutores (Aprobadas vs Pendientes)
+        // 8. Ranking de Distribuidores (Asignaciones y derivaciones)
+        Map<String, Map<String, Object>> distribuidorStats = new HashMap<>();
+        List<com.sgp.backend.entity.AsignacionHistorial> allHistory = asignacionHistorialRepository.findAll();
+        for (com.sgp.backend.entity.AsignacionHistorial h : allHistory) {
+            String assignedBy = h.getAssignedByUsername();
+            if (assignedBy == null || assignedBy.trim().isEmpty() || "Sistema".equalsIgnoreCase(assignedBy) || "anonymousUser".equalsIgnoreCase(assignedBy)) {
+                continue;
+            }
+            if ("ASSIGNED".equalsIgnoreCase(h.getActionType()) || "REASSIGNED".equalsIgnoreCase(h.getActionType())) {
+                String email = assignedBy.trim();
+                User distUser = userRepository.findByEmail(email).orElse(null);
+                String name = (distUser != null)
+                        ? ((distUser.getFirstName() != null ? distUser.getFirstName() : "") + " " + (distUser.getLastName() != null ? distUser.getLastName() : "")).trim()
+                        : email;
+                if (name.isEmpty()) name = email;
+                String role = (distUser != null && distUser.getRole() != null) ? distUser.getRole() : "DISTRIBUIDOR";
+
+                Map<String, Object> dMap = distribuidorStats.getOrDefault(email, new HashMap<>());
+                long count = (long) dMap.getOrDefault("cantidad", 0L) + 1;
+                dMap.put("nombre", name);
+                dMap.put("email", email);
+                dMap.put("rol", role);
+                dMap.put("cantidad", count);
+                distribuidorStats.put(email, dMap);
+            }
+        }
+        java.util.List<Map<String, Object>> rankingDistribuidores = distribuidorStats.values().stream()
+                .sorted((a, b) -> Long.compare((long) b.get("cantidad"), (long) a.get("cantidad")))
+                .collect(java.util.stream.Collectors.toList());
+
+        // 9. Ranking de Resolutores (Aprobadas vs Pendientes)
         Map<String, Map<String, Object>> resolutorStats = new HashMap<>();
         for (Solicitud s : filteredSolicitudes) {
             if (s.getResolutorAssignments() != null) {
@@ -297,7 +328,7 @@ public class DashboardService {
                 .sorted((a, b) -> Long.compare((long) b.get("aprobadas"), (long) a.get("aprobadas")))
                 .collect(java.util.stream.Collectors.toList());
 
-        // 9. Ranking de Responsables (Asignadas vs Completadas)
+        // 10. Ranking de Responsables (Asignadas vs Completadas)
         Map<String, Map<String, Object>> respStats = new HashMap<>();
         for (Solicitud s : filteredSolicitudes) {
             User resp = s.getResponsable();
@@ -337,6 +368,7 @@ public class DashboardService {
                 .estadisticasPorTipoSubsidio(estadisticasPorTipoSubsidio)
                 .solicitudesDiarias(solicitudesDiarias)
                 .rankingCargasUsuarios(rankingCargasUsuarios)
+                .rankingDistribuidores(rankingDistribuidores)
                 .rankingResolutores(rankingResolutores)
                 .rankingResponsables(rankingResponsables)
                 .build();

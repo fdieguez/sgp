@@ -24,9 +24,10 @@ public class DashboardStatsDTO {
     private Map<String, Long> solicitudesPorBarrioSantaFe;
     private java.util.List<Map<String, Object>> estadisticasPorTipoSubsidio;
 
-    // Métricas de productividad diaria y ranking de usuarios
+    // Métricas de productividad diaria y ranking de usuarios por rol
     private java.util.List<Map<String, Object>> solicitudesDiarias;
     private java.util.List<Map<String, Object>> rankingCargasUsuarios;
-    private java.util.List<Map<String, Object>> rankingResolutores;
+    private java.util.List<Map<String, Object>> rankingDistribuidores;
     private java.util.List<Map<String, Object>> rankingResponsables;
+    private java.util.List<Map<String, Object>> rankingResolutores;
 }
