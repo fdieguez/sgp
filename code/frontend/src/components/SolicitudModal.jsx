@@ -759,7 +759,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             onClose();
         } catch (err) {
             console.error("Error saving solicitud", err);
-            toast.error("Error al guardar la solicitud");
+            const errMsg = err.response?.data?.message || err.response?.data?.error || (typeof err.response?.data === 'string' ? err.response?.data : "Error al guardar la solicitud");
+            toast.error(errMsg);
         } finally {
             setLoading(false);
         }
