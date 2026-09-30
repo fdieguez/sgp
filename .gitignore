@@ -75,3 +75,5 @@ scripts/*.class
 scripts/registro_envios*.log
 videos_demo/
 prueba_correo_*.html
+sgp-*-logs*.txt
+*-logs-*.txt
