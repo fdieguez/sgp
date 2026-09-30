@@ -18,7 +18,10 @@ import {
     TrendingUp,
     PieChart as PieIcon,
     BarChart3,
-    Share2
+    Share2,
+    CalendarDays,
+    Trophy,
+    Users
 } from 'lucide-react';
 
 import {
@@ -56,6 +59,8 @@ export default function DashboardPage() {
     const [showResultsDropdown, setShowResultsDropdown] = useState(false);
     const [selectedSolicitud, setSelectedSolicitud] = useState(null);
     const [isSolicitudModalOpen, setIsSolicitudModalOpen] = useState(false);
+    const [productivityTab, setProductivityTab] = useState('cargas');
+    const [dailyDaysRange, setDailyDaysRange] = useState(14);
 
     const isAuditor = user?.role === 'AUDITOR';
     const isAdmin = user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN';
@@ -204,6 +209,12 @@ export default function DashboardPage() {
             cantidad: s.cantidad,
             monto: parseFloat(s.monto || 0)
         }));
+
+        const dailyDataRaw = stats.solicitudesDiarias || [];
+        const dailyDataFiltered = dailyDaysRange > 0 ? dailyDataRaw.slice(-dailyDaysRange) : dailyDataRaw;
+        const rankingCargas = stats.rankingCargasUsuarios || [];
+        const rankingResponsables = stats.rankingResponsables || [];
+        const rankingResolutores = stats.rankingResolutores || [];
 
         return (
             <div className="space-y-8 mt-6">
@@ -383,6 +394,197 @@ export default function DashboardPage() {
                                 </ResponsiveContainer>
                             ) : (
                                 <div className="h-full flex items-center justify-center text-xs text-gray-500">Sin datos de montos entregados para este período.</div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Gráfico 2.1: Cargas Diarias de Solicitudes (Barras) */}
+                    <div className="bg-gray-800/40 border border-gray-700/60 p-6 rounded-2xl shadow-xl backdrop-blur-md space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                    <CalendarDays className="h-5 w-5 text-cyan-400" /> Cargas de Solicitudes por Día
+                                </h3>
+                                <p className="text-xs text-gray-500 font-medium">Volumen diario ingresado al sistema</p>
+                            </div>
+                            <div className="flex items-center gap-1 bg-gray-900/80 p-1 rounded-lg border border-gray-700/60">
+                                {[
+                                    { label: '7d', val: 7 },
+                                    { label: '14d', val: 14 },
+                                    { label: '30d', val: 30 },
+                                    { label: 'Todos', val: 0 }
+                                ].map(r => (
+                                    <button
+                                        key={r.val}
+                                        onClick={() => setDailyDaysRange(r.val)}
+                                        className={`px-2.5 py-1 rounded text-xs font-bold transition-colors ${
+                                            dailyDaysRange === r.val
+                                                ? 'bg-cyan-500 text-gray-950 shadow-sm'
+                                                : 'text-gray-400 hover:text-white'
+                                        }`}
+                                    >
+                                        {r.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="h-72">
+                            {dailyDataFiltered.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={dailyDataFiltered} margin={{ top: 15, right: 10, left: -20, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="colorDaily" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.9}/>
+                                                <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                                        <XAxis dataKey="diaNombre" stroke="#9ca3af" fontSize={10} />
+                                        <YAxis stroke="#9ca3af" fontSize={10} allowDecimals={false} />
+                                        <Tooltip 
+                                            contentStyle={{ backgroundColor: '#111827', borderColor: '#374151', borderRadius: '12px' }}
+                                            formatter={(val) => [`${val} solicitudes`, 'Cargadas']}
+                                            labelFormatter={(lbl, payload) => payload?.[0]?.payload?.fecha || lbl}
+                                        />
+                                        <Bar dataKey="cantidad" fill="url(#colorDaily)" radius={[4, 4, 0, 0]}>
+                                            <LabelList dataKey="cantidad" position="top" fill="#67e8f9" fontSize={10} />
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-xs text-gray-500">Sin datos de cargas diarias registradas.</div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Tarjeta 2.2: Ranking de Desempeño y Productividad por Usuario */}
+                    <div className="bg-gray-800/40 border border-gray-700/60 p-6 rounded-2xl shadow-xl backdrop-blur-md space-y-4 flex flex-col justify-between">
+                        <div>
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                <div>
+                                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                        <Trophy className="h-5 w-5 text-amber-400" /> Desempeño y Cargas por Usuario
+                                    </h3>
+                                    <p className="text-xs text-gray-500 font-medium">Productividad y distribución del equipo</p>
+                                </div>
+                            </div>
+                            
+                            {/* Selector de Pestañas de Productividad */}
+                            <div className="flex border-b border-gray-700/70 mb-4 gap-4 text-xs font-semibold">
+                                <button
+                                    onClick={() => setProductivityTab('cargas')}
+                                    className={`pb-2 border-b-2 transition-colors flex items-center gap-1.5 ${
+                                        productivityTab === 'cargas'
+                                            ? 'border-indigo-500 text-indigo-400 font-bold'
+                                            : 'border-transparent text-gray-400 hover:text-gray-200'
+                                    }`}
+                                >
+                                    📥 Creadores ({rankingCargas.length})
+                                </button>
+                                <button
+                                    onClick={() => setProductivityTab('responsables')}
+                                    className={`pb-2 border-b-2 transition-colors flex items-center gap-1.5 ${
+                                        productivityTab === 'responsables'
+                                            ? 'border-indigo-500 text-indigo-400 font-bold'
+                                            : 'border-transparent text-gray-400 hover:text-gray-200'
+                                    }`}
+                                >
+                                    👥 Responsables ({rankingResponsables.length})
+                                </button>
+                                <button
+                                    onClick={() => setProductivityTab('resolutores')}
+                                    className={`pb-2 border-b-2 transition-colors flex items-center gap-1.5 ${
+                                        productivityTab === 'resolutores'
+                                            ? 'border-indigo-500 text-indigo-400 font-bold'
+                                            : 'border-transparent text-gray-400 hover:text-gray-200'
+                                    }`}
+                                >
+                                    ✅ Resolutores ({rankingResolutores.length})
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Listado con barras de progreso */}
+                        <div className="h-60 overflow-y-auto space-y-2.5 pr-1">
+                            {productivityTab === 'cargas' && (
+                                rankingCargas.length > 0 ? (
+                                    rankingCargas.map((u, idx) => (
+                                        <div key={idx} className="bg-gray-900/50 p-2.5 rounded-xl border border-gray-700/40 flex flex-col gap-1.5">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2 truncate pr-2">
+                                                    <div className="w-5 h-5 rounded-full bg-indigo-900/70 border border-indigo-500/40 text-indigo-300 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                                                        {idx + 1}
+                                                    </div>
+                                                    <span className="text-xs font-bold text-white truncate" title={u.nombre}>{u.nombre}</span>
+                                                    <span className="text-[9px] px-1.5 py-0.2 bg-gray-800 text-gray-400 rounded uppercase font-mono">{u.rol}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                    <span className="text-xs font-black text-indigo-400">{u.cantidad}</span>
+                                                    <span className="text-[10px] text-gray-500">({u.porcentaje}%)</span>
+                                                </div>
+                                            </div>
+                                            <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
+                                                <div className="bg-indigo-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.max(u.porcentaje, 4)}%` }}></div>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="h-full flex items-center justify-center text-xs text-gray-500">Sin datos de cargas por usuario.</div>
+                                )
+                            )}
+
+                            {productivityTab === 'responsables' && (
+                                rankingResponsables.length > 0 ? (
+                                    rankingResponsables.map((r, idx) => (
+                                        <div key={idx} className="bg-gray-900/50 p-2.5 rounded-xl border border-gray-700/40 flex flex-col gap-1.5">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2 truncate pr-2">
+                                                    <div className="w-5 h-5 rounded-full bg-blue-900/70 border border-blue-500/40 text-blue-300 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                                                        {idx + 1}
+                                                    </div>
+                                                    <span className="text-xs font-bold text-white truncate" title={r.nombre}>{r.nombre}</span>
+                                                    <span className="text-[9px] px-1.5 py-0.2 bg-blue-950 text-blue-300 rounded uppercase font-mono">{r.zona}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 flex-shrink-0 text-xs">
+                                                    <span className="text-blue-400 font-bold">{r.total} asignadas</span>
+                                                    <span className="text-emerald-400 font-bold">({r.completadas} resueltas)</span>
+                                                </div>
+                                            </div>
+                                            <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
+                                                <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Math.max((r.total / (total || 1)) * 100, 4))}%` }}></div>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="h-full flex items-center justify-center text-xs text-gray-500">Sin datos de responsables asignados.</div>
+                                )
+                            )}
+
+                            {productivityTab === 'resolutores' && (
+                                rankingResolutores.length > 0 ? (
+                                    rankingResolutores.map((res, idx) => (
+                                        <div key={idx} className="bg-gray-900/50 p-2.5 rounded-xl border border-gray-700/40 flex flex-col gap-1.5">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2 truncate pr-2">
+                                                    <div className="w-5 h-5 rounded-full bg-emerald-900/70 border border-emerald-500/40 text-emerald-300 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                                                        {idx + 1}
+                                                    </div>
+                                                    <span className="text-xs font-bold text-white truncate" title={res.nombre}>{res.nombre}</span>
+                                                    <span className="text-[9px] px-1.5 py-0.2 bg-emerald-950 text-emerald-300 rounded uppercase font-mono">{res.tipoResolucion}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 flex-shrink-0 text-xs">
+                                                    <span className="text-emerald-400 font-bold">{res.aprobadas} aprobadas</span>
+                                                    <span className="text-yellow-400 text-[11px]">({res.pendientes} pendientes)</span>
+                                                </div>
+                                            </div>
+                                            <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
+                                                <div className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${res.total > 0 ? Math.max((res.aprobadas / res.total) * 100, 4) : 0}%` }}></div>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="h-full flex items-center justify-center text-xs text-gray-500">Sin datos de resolutores registrados.</div>
+                                )
                             )}
                         </div>
                     </div>

@@ -220,6 +220,107 @@ public class DashboardService {
         }
         java.util.List<Map<String, Object>> estadisticasPorTipoSubsidio = new java.util.ArrayList<>(typeStats.values());
 
+        // 6. Serie Temporal Diaria de Cantidades (Cargas por Día)
+        Map<java.time.LocalDate, Long> dailyCounts = new HashMap<>();
+        for (Solicitud s : filteredSolicitudes) {
+            if (s.getEntryDate() != null) {
+                dailyCounts.put(s.getEntryDate(), dailyCounts.getOrDefault(s.getEntryDate(), 0L) + 1);
+            }
+        }
+        java.util.List<Map<String, Object>> solicitudesDiarias = dailyCounts.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("fecha", entry.getKey().toString());
+                    map.put("diaNombre", String.format("%02d/%02d", entry.getKey().getDayOfMonth(), entry.getKey().getMonthValue()));
+                    map.put("cantidad", entry.getValue());
+                    return map;
+                })
+                .collect(java.util.stream.Collectors.toList());
+
+        // 7. Ranking de Cargas por Usuario (Creadores / Operadores)
+        Map<String, Map<String, Object>> creatorStats = new HashMap<>();
+        for (Solicitud s : filteredSolicitudes) {
+            User creator = s.getCreatedBy();
+            String key = (creator != null) ? creator.getEmail() : "sin_creador";
+            String name = (creator != null) 
+                    ? ((creator.getFirstName() != null ? creator.getFirstName() : "") + " " + (creator.getLastName() != null ? creator.getLastName() : "")).trim()
+                    : "Carga Inicial / Sistema";
+            if (name.isEmpty() && creator != null) name = creator.getEmail();
+            String role = (creator != null && creator.getRole() != null) ? creator.getRole() : "SISTEMA";
+
+            Map<String, Object> userMap = creatorStats.getOrDefault(key, new HashMap<>());
+            long count = (long) userMap.getOrDefault("cantidad", 0L) + 1;
+            userMap.put("nombre", name);
+            userMap.put("email", (creator != null) ? creator.getEmail() : "sistema@sgp.com");
+            userMap.put("rol", role);
+            userMap.put("cantidad", count);
+            creatorStats.put(key, userMap);
+        }
+        java.util.List<Map<String, Object>> rankingCargasUsuarios = creatorStats.values().stream()
+                .map(u -> {
+                    long cant = (long) u.get("cantidad");
+                    int pct = totalSolicitudes > 0 ? (int) Math.round((cant * 100.0) / totalSolicitudes) : 0;
+                    u.put("porcentaje", pct);
+                    return u;
+                })
+                .sorted((a, b) -> Long.compare((long) b.get("cantidad"), (long) a.get("cantidad")))
+                .collect(java.util.stream.Collectors.toList());
+
+        // 8. Ranking de Resolutores (Aprobadas vs Pendientes)
+        Map<String, Map<String, Object>> resolutorStats = new HashMap<>();
+        for (Solicitud s : filteredSolicitudes) {
+            if (s.getResolutorAssignments() != null) {
+                for (SolicitudResolutorAssignment a : s.getResolutorAssignments()) {
+                    User res = a.getResolutor();
+                    if (res == null) continue;
+                    String email = res.getEmail();
+                    String name = ((res.getFirstName() != null ? res.getFirstName() : "") + " " + (res.getLastName() != null ? res.getLastName() : "")).trim();
+                    if (name.isEmpty()) name = email;
+
+                    Map<String, Object> rMap = resolutorStats.getOrDefault(email, new HashMap<>());
+                    long total = (long) rMap.getOrDefault("total", 0L) + 1;
+                    long aprobadas = (long) rMap.getOrDefault("aprobadas", 0L) + (Boolean.TRUE.equals(a.getApproved()) ? 1 : 0);
+                    long pendientes = total - aprobadas;
+
+                    rMap.put("nombre", name);
+                    rMap.put("email", email);
+                    rMap.put("tipoResolucion", a.getTipoResolucion() != null ? a.getTipoResolucion() : "GENERAL");
+                    rMap.put("total", total);
+                    rMap.put("aprobadas", aprobadas);
+                    rMap.put("pendientes", pendientes);
+                    resolutorStats.put(email, rMap);
+                }
+            }
+        }
+        java.util.List<Map<String, Object>> rankingResolutores = resolutorStats.values().stream()
+                .sorted((a, b) -> Long.compare((long) b.get("aprobadas"), (long) a.get("aprobadas")))
+                .collect(java.util.stream.Collectors.toList());
+
+        // 9. Ranking de Responsables (Asignadas vs Completadas)
+        Map<String, Map<String, Object>> respStats = new HashMap<>();
+        for (Solicitud s : filteredSolicitudes) {
+            User resp = s.getResponsable();
+            if (resp == null) continue;
+            String email = resp.getEmail();
+            String name = ((resp.getFirstName() != null ? resp.getFirstName() : "") + " " + (resp.getLastName() != null ? resp.getLastName() : "")).trim();
+            if (name.isEmpty()) name = email;
+
+            Map<String, Object> respMap = respStats.getOrDefault(email, new HashMap<>());
+            long total = (long) respMap.getOrDefault("total", 0L) + 1;
+            long completadas = (long) respMap.getOrDefault("completadas", 0L) + ("completadas".equalsIgnoreCase(s.getStatus()) ? 1 : 0);
+
+            respMap.put("nombre", name);
+            respMap.put("email", email);
+            respMap.put("zona", resp.getZone() != null ? resp.getZone() : (s.getZone() != null ? s.getZone() : "Sin Zona"));
+            respMap.put("total", total);
+            respMap.put("completadas", completadas);
+            respStats.put(email, respMap);
+        }
+        java.util.List<Map<String, Object>> rankingResponsables = respStats.values().stream()
+                .sorted((a, b) -> Long.compare((long) b.get("total"), (long) a.get("total")))
+                .collect(java.util.stream.Collectors.toList());
+
         return DashboardStatsDTO.builder()
                 .totalSolicitudes(totalSolicitudes)
                 .pendingSolicitudes(pendingSolicitudes)
@@ -234,6 +335,10 @@ public class DashboardService {
                 .solicitudesPorLocalidad(solicitudesPorLocalidad)
                 .solicitudesPorBarrioSantaFe(solicitudesPorBarrioSantaFe)
                 .estadisticasPorTipoSubsidio(estadisticasPorTipoSubsidio)
+                .solicitudesDiarias(solicitudesDiarias)
+                .rankingCargasUsuarios(rankingCargasUsuarios)
+                .rankingResolutores(rankingResolutores)
+                .rankingResponsables(rankingResponsables)
                 .build();
     }
 }
