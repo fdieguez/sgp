@@ -51,6 +51,7 @@ public class SolicitudUpdateDTO {
     /* ── Subsidio (solo aplica si type == "SUBSIDIO") ────────────────── */
     private java.math.BigDecimal amount;
     private java.time.LocalDate grantDate;
+    private String subsidioType;
 
     /* ── Agenda y Planilla de Salida (Etapa 8) ───────────────────────── */
     // Almacena si la reunión de agenda fue "con asistencia" o "sin asistencia"

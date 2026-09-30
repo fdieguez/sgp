@@ -417,12 +417,10 @@ public class SolicitudService {
         }
 
         // 4. Campos específicos de Subsidio
-        if (dto.getAmount() != null) {
-            existing.setAmount(dto.getAmount());
-        }
-        if (dto.getGrantDate() != null) {
-            existing.setGrantDate(dto.getGrantDate());
-        }
+        // 4. Campos específicos
+        if (dto.getAmount() != null) existing.setAmount(dto.getAmount());
+        if (dto.getGrantDate() != null) existing.setGrantDate(dto.getGrantDate());
+        if (dto.getSubsidioType() != null) existing.setSubsidioType(dto.getSubsidioType());
 
         // 5. Flujo de sugerencia de resolución
         String newSuggestedType = dto.getSuggestedResolutionType();
@@ -506,7 +504,7 @@ public class SolicitudService {
     private void processAssignments(Solicitud solicitud, List<ResolutorAssignmentDTO> dtos) {
         if (dtos == null) return;
         
-        // Limpiar asignaciones existentes si las hay (lógica de sincronización)
+        List<SolicitudResolutorAssignment> existingAssignments = new java.util.ArrayList<>(solicitud.getResolutorAssignments());
         solicitud.getResolutorAssignments().clear();
         
         for (ResolutorAssignmentDTO dto : dtos) {
@@ -514,13 +512,23 @@ public class SolicitudService {
             
             User resolutor = userRepository.findByEmail(dto.getResolutorEmail()).orElse(null);
             if (resolutor != null) {
-                SolicitudResolutorAssignment assignment = SolicitudResolutorAssignment.builder()
-                        .solicitud(solicitud)
-                        .resolutor(resolutor)
-                        .tipoResolucion(dto.getTipoResolucion())
-                        .detalle(dto.getDetalle())
-                        .build();
-                solicitud.getResolutorAssignments().add(assignment);
+                SolicitudResolutorAssignment existing = existingAssignments.stream()
+                        .filter(a -> a.getResolutor().getId().equals(resolutor.getId()) && a.getTipoResolucion().equalsIgnoreCase(dto.getTipoResolucion()))
+                        .findFirst()
+                        .orElse(null);
+                        
+                if (existing != null) {
+                    existing.setDetalle(dto.getDetalle());
+                    solicitud.getResolutorAssignments().add(existing);
+                } else {
+                    SolicitudResolutorAssignment assignment = SolicitudResolutorAssignment.builder()
+                            .solicitud(solicitud)
+                            .resolutor(resolutor)
+                            .tipoResolucion(dto.getTipoResolucion())
+                            .detalle(dto.getDetalle())
+                            .build();
+                    solicitud.getResolutorAssignments().add(assignment);
+                }
             }
 
             if (dto.getTipoResolucion() != null && dto.getTipoResolucion().equalsIgnoreCase("AGENDA")) {

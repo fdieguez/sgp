@@ -58,12 +58,15 @@ test.describe('📋 Plan de Pruebas: Etapa 2 - Pool Territorial y Autoasignació
 
     // Abrir modal de nueva solicitud
     await page.click('button:has-text("Nueva Solicitud")');
-    await page.waitForSelector('text=Crear Solicitud');
+    await page.waitForSelector('button:has-text("Guardar Solicitud")');
 
     // Completar datos básicos
-    await page.locator('input[placeholder="Nombre completo o institución"]').fill(nombreBeneficiario);
-    await page.locator('input[placeholder="Ej: 3424123456"]').fill('3424000111');
-    await page.locator('textarea').first().fill('Solicitud de prueba para pool de zona territorial');
+    await page.locator('label:text-is("Nombre Completo / Institución") + input').fill(nombreBeneficiario);
+    await page.locator('label:text-is("Teléfono") + input').fill('3424000111');
+    await page.locator('label:text-is("Tipo Solicitante") + select').selectOption('Club');
+    await page.locator('label:text-is("Localidad") + select').selectOption({ index: 1 });
+    await page.locator('label:text-is("Barrio") + select').selectOption({ index: 1 });
+    await page.locator('label:text-is("Descripción / Pedido") + textarea').fill('Solicitud de prueba para pool de zona territorial');
 
     // Seleccionar Zona y dejar Responsable en Pool
     const zoneSelect = page.locator('select').filter({ hasText: 'Seleccionar Zona' }).or(page.locator('label:has-text("Zona Territorial") + select'));
@@ -89,20 +92,22 @@ test.describe('📋 Plan de Pruebas: Etapa 2 - Pool Territorial y Autoasignació
   });
 
   test('TC-POOL-02: Endpoint atómico de autoasignación (/api/solicitudes/{id}/tomar) funciona correctamente', async ({ request }) => {
-    // Buscar la solicitud recién creada por la API
-    const res = await request.get(`${BACKEND_URL}/api/solicitudes?search=${encodeURIComponent(nombreBeneficiario)}`);
-    expect(res.ok()).toBeTruthy();
-    const data = await res.json();
-    expect(data.content.length).toBeGreaterThan(0);
-    solicitudIdCreada = data.content[0].id;
-
-    // Login como admin para probar endpoint
+    // Login como admin para probar endpoint y buscar la solicitud
     const loginRes = await request.post(`${BACKEND_URL}/api/auth/login`, {
       data: { email: CREDENTIALS.ADMIN.email, password: CREDENTIALS.ADMIN.pass }
     });
     expect(loginRes.ok()).toBeTruthy();
     const loginData = await loginRes.json();
     const token = loginData.token;
+
+    // Buscar la solicitud recién creada por la API
+    const res = await request.get(`${BACKEND_URL}/api/solicitudes?search=${encodeURIComponent(nombreBeneficiario)}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    expect(res.ok()).toBeTruthy();
+    const data = await res.json();
+    expect(data.content.length).toBeGreaterThan(0);
+    solicitudIdCreada = data.content[0].id;
 
     // Tomar solicitud
     const tomarRes = await request.post(`${BACKEND_URL}/api/solicitudes/${solicitudIdCreada}/tomar`, {
@@ -115,7 +120,16 @@ test.describe('📋 Plan de Pruebas: Etapa 2 - Pool Territorial y Autoasignació
   });
 
   test('TC-POOL-03: Auditoría registra la acción AUTOASIGNADO', async ({ request }) => {
-    const resHistorial = await request.get(`${BACKEND_URL}/api/solicitudes/${solicitudIdCreada}/historial`);
+    // Login
+    const loginRes = await request.post(`${BACKEND_URL}/api/auth/login`, {
+      data: { email: CREDENTIALS.ADMIN.email, password: CREDENTIALS.ADMIN.pass }
+    });
+    const loginData = await loginRes.json();
+    const token = loginData.token;
+
+    const resHistorial = await request.get(`${BACKEND_URL}/api/solicitudes/${solicitudIdCreada}/historial`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
     expect(resHistorial.ok()).toBeTruthy();
     const historial = await resHistorial.json();
     const autoasignadoEvent = historial.find(h => h.actionType === 'AUTOASIGNADO');

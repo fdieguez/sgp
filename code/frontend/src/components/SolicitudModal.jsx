@@ -27,7 +27,27 @@ const formatDateISO = (dateVal) => {
     }
 };
 
-export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData, configId }) {
+// Catálogo de localidades oficiales de respaldo por si la red/API demora al abrir el formulario
+const DEFAULT_CITIES = [
+    { id: 1, name: "Santa Fe", type: "CITY" },
+    { id: 2, name: "Santo Tomé", type: "CITY" },
+    { id: 3, name: "Sauce Viejo", type: "CITY" },
+    { id: 4, name: "Recreo", type: "CITY" },
+    { id: 5, name: "San José del Rincón", type: "CITY" },
+    { id: 6, name: "Laguna Paiva", type: "CITY" },
+    { id: 7, name: "Monte Vera", type: "CITY" },
+    { id: 8, name: "Nelson", type: "CITY" },
+    { id: 9, name: "Llambi Campbell", type: "CITY" },
+    { id: 10, name: "Candioti", type: "CITY" },
+    { id: 11, name: "Emilia", type: "CITY" },
+    { id: 12, name: "Arroyo Leyes", type: "CITY" },
+    { id: 13, name: "Arroyo Aguiar", type: "CITY" },
+    { id: 14, name: "Cabal", type: "CITY" },
+    { id: 15, name: "Campo Andino", type: "CITY" },
+    { id: 16, name: "Otra", type: "CITY" }
+];
+
+export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData, configId, cachedLocations = [] }) {
     const { user } = useAuth();
     const isResponsable = user?.role === 'RESPONSABLE' || user?.role === 'RESOLUTOR';
     const isReadOnly = user?.role === 'AUDITOR';
@@ -469,8 +489,10 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         }
     }, [isOpen, initialData?.id, fetchResponsables, fetchLocations, fetchTiposResolucion, isResponsable, user?.responsable?.id, user?.responsable?.zone, user?.id, user?.zone]);
 
-    // Computar listas dinámicas
-    const availableCities = locations.filter(l => l.type === 'CITY' || l.type === 'LOCALITY');
+    // Computar listas dinámicas con resiliencia ante demoras de red
+    const sourceLocations = locations.length > 0 ? locations : (cachedLocations.length > 0 ? cachedLocations : DEFAULT_CITIES);
+    const citiesFromSource = sourceLocations.filter(l => l.type?.toUpperCase() === 'CITY' || l.type?.toUpperCase() === 'LOCALITY');
+    const availableCities = citiesFromSource.length > 0 ? citiesFromSource : DEFAULT_CITIES;
     const selectedCity = availableCities.find(c => c.name.toLowerCase() === (formData.locationName || '').trim().toLowerCase());
     const availableNeighborhoods = selectedCity
         ? [
@@ -481,7 +503,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             }),
             { id: 'OTRO', name: 'Otro' }
           ]
-        : [];
+        : [{ id: 'OTRO', name: 'Otro' }];
 
 
     const handleSubmit = async (e) => {
@@ -535,10 +557,6 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         });
         if (!validBarrio) {
             toast.error("El barrio ingresado no es válido. Debe elegir una de la lista oficial.");
-            return;
-        }
-        if (user?.role !== 'OPERADOR' && user?.role !== 'DISTRIBUIDOR' && (!formData.zone || !formData.zone.trim())) {
-            toast.error("La zona / eje de la solicitud es obligatoria.");
             return;
         }
         if (user?.role !== 'OPERADOR' && user?.role !== 'DISTRIBUIDOR' && formData.id && !formData.responsableId) {

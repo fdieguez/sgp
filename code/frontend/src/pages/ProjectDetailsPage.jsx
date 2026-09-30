@@ -1296,6 +1296,7 @@ export default function ProjectDetailsPage() {
                 onSuccess={fetchData}
                 initialData={selectedSolicitud}
                 configId={configId}
+                cachedLocations={locationsList}
             />
             <AsociarPlanillaModal
                 isOpen={isAsociarModalOpen}
