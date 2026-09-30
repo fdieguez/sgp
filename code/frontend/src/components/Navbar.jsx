@@ -17,11 +17,14 @@ export default function Navbar() {
         <nav className="bg-gray-800 border-b border-gray-700">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
-                    <div className="flex items-center">
+                    <div className="flex items-center gap-2">
                         <Briefcase className="h-8 w-8 text-indigo-500" />
                         <Link to="/dashboard" className="ml-2 text-xl font-bold text-white hover:text-indigo-400 transition-colors tracking-tight">
                             Panel SGP
                         </Link>
+                        <span className="ml-2 text-[10px] bg-indigo-950/80 text-indigo-300 font-mono font-bold px-2 py-0.5 rounded border border-indigo-500/40 tracking-wider">
+                            v1.0.1
+                        </span>
                     </div>
                     <div className="flex items-center gap-4">
                         {user && (

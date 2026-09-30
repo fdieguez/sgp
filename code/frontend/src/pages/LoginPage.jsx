@@ -174,8 +174,8 @@ export default function LoginPage() {
             </div>
 
             {/* Pie de Página */}
-            <div className="text-center text-[10px] font-mono tracking-widest text-gray-600 mt-6 z-10">
-                SGP PLATFORM • v1.0 • GOBIERNO TERRITORIAL
+            <div className="text-center text-[10px] font-mono tracking-widest text-gray-500 mt-6 z-10">
+                SGP PLATFORM • v1.0.1 • GOBIERNO TERRITORIAL
             </div>
         </div>
     );
