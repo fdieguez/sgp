@@ -6,6 +6,12 @@
 
 ## 📅 Septiembre 2026
 
+### 30/09/2026
+- **⭐️ Sincronización Integral Local y Corrección de Sobrescritura de Credenciales en Desarrollo:**
+    - **Prevención de Sobrescritura de Usuarios (`DataInitializer.java` & Config)**: Se configuró `sgp.seed.overwrite-users=false` en `application-dev.properties` y `application.properties` para evitar que `DataInitializer` sobreescriba en cada reinicio local los hashes BCrypt actualizados con contraseñas antiguas hardcodeadas o purgue usuarios sincronizados desde producción.
+    - **Sincronización Completa de Producción a Local**: Volcado en caliente (`mysqldump`), compresión y restauración de la base de datos de producción `sgp_db` en el MySQL local.
+    - **Validación Automatizada E2E con Playwright (`validar_logins_usuarios.spec.js`)**: Creación y ejecución de suite E2E validando inicio de sesión exitoso y redirecciones por rol en localhost (`admin@sgp.com`, `juanm.dieguez@gmail.com`, `celeste_solari19@hotmail.com`, `matias.ippolito@gmail.com`, `martinnocioni@gmail.com`, `adflucha@gmail.com`) con 6/6 tests pasando en verde.
+
 ### 29/09/2026
 - **⭐️ Implementación del Pool Territorial y Autoasignación de Solicitudes (Etapa 2):**
     - **Distribución por Zona sin Responsable Fijo (Backend & Frontend)**:
