@@ -109,10 +109,7 @@ function App() {
           </Routes>
         </Router>
 
-        <div className="fixed bottom-4 right-4 z-[9999] pointer-events-none opacity-60 px-3 py-1 bg-black/40 backdrop-blur-md rounded-full text-white text-[10px] font-mono tracking-widest flex items-center gap-2 border border-white/5">
-          <span className="font-bold text-indigo-400">SGP</span>
-          <span className="text-[10px] font-mono text-indigo-300 bg-indigo-950/60 px-2 py-0.5 rounded-full border border-indigo-500/30">v1.0.1</span>
-        </div>
+
         <Toaster position="bottom-right" toastOptions={{
           style: {
             background: '#1f2937',
