@@ -504,30 +504,46 @@ public class SolicitudService {
     private void processAssignments(Solicitud solicitud, List<ResolutorAssignmentDTO> dtos) {
         if (dtos == null) return;
         
-        List<SolicitudResolutorAssignment> existingAssignments = new java.util.ArrayList<>(solicitud.getResolutorAssignments());
-        solicitud.getResolutorAssignments().clear();
+        List<SolicitudResolutorAssignment> currentAssignments = solicitud.getResolutorAssignments();
+        if (currentAssignments == null) {
+            currentAssignments = new java.util.ArrayList<>();
+            solicitud.setResolutorAssignments(currentAssignments);
+        }
+
+        // 1. Eliminar asignaciones que ya no están presentes en el listado recibido del cliente
+        currentAssignments.removeIf(existing -> dtos.stream().noneMatch(dto ->
+                dto.getResolutorEmail() != null &&
+                dto.getTipoResolucion() != null &&
+                existing.getResolutor() != null &&
+                dto.getResolutorEmail().equalsIgnoreCase(existing.getResolutor().getEmail()) &&
+                dto.getTipoResolucion().equalsIgnoreCase(existing.getTipoResolucion())
+        ));
         
+        // 2. Actualizar las asignaciones existentes o agregar las nuevas sin reiniciar la colección
         for (ResolutorAssignmentDTO dto : dtos) {
             if (dto.getResolutorEmail() == null || dto.getTipoResolucion() == null) continue;
             
             User resolutor = userRepository.findByEmail(dto.getResolutorEmail()).orElse(null);
             if (resolutor != null) {
-                SolicitudResolutorAssignment existing = existingAssignments.stream()
-                        .filter(a -> a.getResolutor().getId().equals(resolutor.getId()) && a.getTipoResolucion().equalsIgnoreCase(dto.getTipoResolucion()))
+                SolicitudResolutorAssignment existing = currentAssignments.stream()
+                        .filter(a -> a.getResolutor() != null &&
+                                a.getResolutor().getId().equals(resolutor.getId()) &&
+                                a.getTipoResolucion().equalsIgnoreCase(dto.getTipoResolucion()))
                         .findFirst()
                         .orElse(null);
                         
                 if (existing != null) {
+                    // Actualizar el detalle de la asignación existente de forma directa
                     existing.setDetalle(dto.getDetalle());
-                    solicitud.getResolutorAssignments().add(existing);
                 } else {
+                    // Crear y agregar una nueva asignación
                     SolicitudResolutorAssignment assignment = SolicitudResolutorAssignment.builder()
                             .solicitud(solicitud)
                             .resolutor(resolutor)
                             .tipoResolucion(dto.getTipoResolucion())
                             .detalle(dto.getDetalle())
                             .build();
-                    solicitud.getResolutorAssignments().add(assignment);
+                    currentAssignments.add(assignment);
                 }
             }
 
