@@ -83,6 +83,22 @@ public class SecurityConfig {
                                                 .hasRole("ADMINISTRADOR")
                                                 // Endpoints Asegurados (Cualquier otra solicitud autenticada)
                                                 .anyRequest().authenticated())
+                                .exceptionHandling(exceptions -> exceptions
+                                                // Manejador para solicitudes no autenticadas o con token vencido / inválido (401)
+                                                .authenticationEntryPoint((request, response, authException) -> {
+                                                        response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+                                                        response.setContentType("application/json");
+                                                        response.setCharacterEncoding("UTF-8");
+                                                        response.getWriter().write("{\"error\": \"Unauthorized\", \"message\": \"Token inválido o sesión expirada\"}");
+                                                })
+                                                // Manejador para usuarios autenticados sin permisos de rol suficientes (403)
+                                                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                                                        response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_FORBIDDEN);
+                                                        response.setContentType("application/json");
+                                                        response.setCharacterEncoding("UTF-8");
+                                                        response.getWriter().write("{\"error\": \"Forbidden\", \"message\": \"Acceso no autorizado al recurso solicitado\"}");
+                                                })
+                                )
                                 .sessionManagement(session -> session
                                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                                 .authenticationProvider(authenticationProvider())
