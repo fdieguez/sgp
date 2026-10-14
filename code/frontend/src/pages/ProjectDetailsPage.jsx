@@ -131,6 +131,7 @@ export default function ProjectDetailsPage() {
                 .then(res => {
                     if (res.data) {
                         setSelectedSolicitud(res.data);
+                        setIsABMOpen(true);
                     }
                 })
                 .catch(err => {
