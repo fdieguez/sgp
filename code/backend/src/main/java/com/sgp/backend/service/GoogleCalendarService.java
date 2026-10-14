@@ -62,6 +62,13 @@ public class GoogleCalendarService {
      * Crea un evento en el Google Calendar especificado con los datos customizados desde el frontend.
      */
     public void createEvent(String calendarId, String title, String description, String location, String dateStr, String timeStr, Long agendaId) throws Exception {
+        createEvent(calendarId, title, description, location, dateStr, timeStr, agendaId, null);
+    }
+
+    /**
+     * Crea un evento en el Google Calendar especificado con los datos customizados e invitados seleccionados (CDU-15).
+     */
+    public void createEvent(String calendarId, String title, String description, String location, String dateStr, String timeStr, Long agendaId, List<String> attendeeEmails) throws Exception {
         System.out.println("📅 Iniciando creación de evento en Google Calendar para la Agenda #" + agendaId);
         Calendar calendarService = getCalendarService();
 
@@ -69,6 +76,19 @@ public class GoogleCalendarService {
                 .setSummary(title)
                 .setDescription(description)
                 .setLocation(location);
+
+        if (attendeeEmails != null && !attendeeEmails.isEmpty()) {
+            java.util.List<com.google.api.services.calendar.model.EventAttendee> attendees = new java.util.ArrayList<>();
+            for (String email : attendeeEmails) {
+                if (email != null && !email.trim().isEmpty()) {
+                    attendees.add(new com.google.api.services.calendar.model.EventAttendee().setEmail(email.trim()));
+                }
+            }
+            if (!attendees.isEmpty()) {
+                event.setAttendees(attendees);
+                System.out.println("👥 Se asignaron " + attendees.size() + " invitados al evento de Google Calendar.");
+            }
+        }
 
         if (timeStr != null && !timeStr.trim().isEmpty()) {
             // Evento con hora específica

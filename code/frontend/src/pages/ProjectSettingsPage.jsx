@@ -15,6 +15,7 @@ import {
     CheckCircle,
     FileSpreadsheet
 } from 'lucide-react';
+import AgendaGuestsManager from '../components/AgendaGuestsManager';
 
 export default function ProjectSettingsPage() {
     const { configId } = useParams();
@@ -158,6 +159,10 @@ export default function ProjectSettingsPage() {
                                         placeholder="Ej: tu-correo@gmail.com"
                                     />
                                     <p className="text-xs text-gray-500 mt-2">El ID de tu calendario para la generación automática de eventos de Agenda.</p>
+                                </div>
+
+                                <div className="pt-2">
+                                    <AgendaGuestsManager configId={configId} />
                                 </div>
 
                                 <div className="h-px bg-gray-700 my-6"></div>

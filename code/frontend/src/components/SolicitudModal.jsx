@@ -111,6 +111,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const [calendarTime, setCalendarTime] = useState('');
     const [calendarLocation, setCalendarLocation] = useState('');
     const [calendarDescription, setCalendarDescription] = useState('');
+    const [availableGuests, setAvailableGuests] = useState([]);
+    const [selectedGuests, setSelectedGuests] = useState([]);
 
     // Pestañas y estados adicionales
     const [activeTab, setActiveTab] = useState('detalles');
@@ -804,7 +806,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 date: calendarDate,
                 time: calendarTime,
                 location: calendarLocation,
-                description: calendarDescription
+                description: calendarDescription,
+                guestEmails: createCalendarEvent ? selectedGuests : []
             });
             toast.success("Resolución aprobada");
             onSuccess();
@@ -817,6 +820,23 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             setShowApproveConfirm(false);
         }
     };
+
+    // Cargar invitados frecuentes de Agenda al habilitar la creación del evento (CDU-15)
+    useEffect(() => {
+        if (createCalendarEvent && availableGuests.length === 0) {
+            const endpoint = configId ? `/api/config/${configId}/guests` : '/api/config/agenda/guests';
+            api.get(endpoint)
+                .then(res => {
+                    const guests = res.data || [];
+                    setAvailableGuests(guests);
+                    // Por defecto preseleccionamos a todos los contactos frecuentes configurados
+                    setSelectedGuests(guests.map(g => g.email));
+                })
+                .catch(err => {
+                    console.error('Error cargando invitados para evento de agenda:', err);
+                });
+        }
+    }, [createCalendarEvent, configId]);
 
     useEffect(() => {
         if (showApproveConfirm && (myAssignment?.tipoResolucion === 'AGENDA' || formData.type === 'AGENDA')) {
@@ -1947,6 +1967,65 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                     onChange={(e) => setCalendarDescription(e.target.value)}
                                                     className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-white text-xs outline-none focus:ring-2 focus:ring-blue-500"
                                                 />
+                                            </div>
+
+                                            {/* Selector de Invitados Frecuentes (CDU-15) */}
+                                            <div className="pt-2 border-t border-blue-500/20">
+                                                <div className="flex items-center justify-between mb-1.5">
+                                                    <label className="text-[10px] text-blue-300 uppercase font-bold flex items-center gap-1">
+                                                        <Users className="h-3.5 w-3.5" /> Invitados al evento ({selectedGuests.length})
+                                                    </label>
+                                                    {availableGuests.length > 0 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                if (selectedGuests.length === availableGuests.length) {
+                                                                    setSelectedGuests([]);
+                                                                } else {
+                                                                    setSelectedGuests(availableGuests.map(g => g.email));
+                                                                }
+                                                            }}
+                                                            className="text-[10px] text-indigo-400 hover:text-indigo-300 underline font-semibold"
+                                                        >
+                                                            {selectedGuests.length === availableGuests.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                {availableGuests.length === 0 ? (
+                                                    <p className="text-[11px] text-gray-400 italic bg-gray-900/60 p-2 rounded-lg border border-gray-800">
+                                                        No hay invitados frecuentes configurados en la Agenda. Puede registrarlos desde la Configuración de Agenda.
+                                                    </p>
+                                                ) : (
+                                                    <div className="space-y-1 max-h-36 overflow-y-auto pr-1 bg-gray-900/70 p-2 rounded-lg border border-gray-800">
+                                                        {availableGuests.map(guest => {
+                                                            const isChecked = selectedGuests.includes(guest.email);
+                                                            return (
+                                                                <label
+                                                                    key={guest.id}
+                                                                    className="flex items-center justify-between p-1 rounded hover:bg-gray-800/60 cursor-pointer text-xs"
+                                                                >
+                                                                    <div className="flex items-center gap-2 min-w-0 pr-2">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={isChecked}
+                                                                            onChange={(e) => {
+                                                                                if (e.target.checked) {
+                                                                                    setSelectedGuests(prev => [...prev, guest.email]);
+                                                                                } else {
+                                                                                    setSelectedGuests(prev => prev.filter(em => em !== guest.email));
+                                                                                }
+                                                                            }}
+                                                                            className="w-3.5 h-3.5 text-blue-500 bg-gray-950 border-gray-700 rounded focus:ring-blue-500"
+                                                                        />
+                                                                        <span className="text-gray-200 font-medium truncate">{guest.name}</span>
+                                                                    </div>
+                                                                    <span className="text-[10px] text-gray-500 font-mono truncate">{guest.email}</span>
+                                                                </label>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     )}

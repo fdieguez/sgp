@@ -16,6 +16,7 @@ import {
     X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import AgendaGuestsManager from '../components/AgendaGuestsManager';
 
 export default function ResolutorSettingsPage() {
     const { user } = useAuth();
@@ -282,6 +283,9 @@ export default function ResolutorSettingsPage() {
                                                                 <Save className="h-4 w-4" />
                                                                 {savingId === p.id ? 'Guardando...' : 'Guardar Agenda'}
                                                             </button>
+                                                        </div>
+                                                        <div className="pt-3 border-t border-gray-700/60">
+                                                            <AgendaGuestsManager configId={p.sheetsConfig?.id} />
                                                         </div>
                                                     </form>
                                                 </div>

@@ -114,9 +114,9 @@ public class SolicitudController {
     }
 
     @PostMapping("/{id}/aprobar")
-    public ResponseEntity<Void> aprobarSolicitud(@PathVariable Long id, @RequestBody java.util.Map<String, String> body) {
-        String observaciones = body.getOrDefault("observaciones", "");
-        String asistencia = body.get("asistencia");
+    public ResponseEntity<Void> aprobarSolicitud(@PathVariable Long id, @RequestBody java.util.Map<String, Object> body) {
+        String observaciones = body.get("observaciones") != null ? body.get("observaciones").toString() : "";
+        String asistencia = body.get("asistencia") != null ? body.get("asistencia").toString() : null;
         org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         solicitudService.aprobarAsignacion(id, auth.getName(), observaciones, asistencia, body);
         return ResponseEntity.ok().build();
