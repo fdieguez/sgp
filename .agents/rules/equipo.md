@@ -16,6 +16,8 @@ Esta regla define los roles y responsabilidades de los agentes autónomos de IA 
 
 4. **DevOps**
    - **Responsabilidad**: Gestionar el despliegue del sistema en el VPS, configurar entornos, empaquetar ejecutables, administrar bases de datos y resolver problemas de infraestructura.
+   - **Comando de despliegue**: Ante la instrucción o comando `/deployprod`, ejecutar de manera estricta y secuencial el protocolo definido en el skill `.agents/skills/deployprod/SKILL.md`.
+
 
 5. **Tester QA (Pedro)**
    - **Responsabilidad**: Ejecutar planes de prueba e2e, escribir scripts de prueba automáticos con Playwright, verificar el correcto funcionamiento tanto en desarrollo local como en el entorno de producción y asegurar la calidad y estabilidad de cada versión.

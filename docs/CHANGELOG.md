@@ -4,6 +4,14 @@
 
 **Versión Actual**: `1.0.0` (Versión Oficial SGP 1.0 - Despliegue, Regresión y Purga de Producción)
 
+## 📅 Octubre 2026
+
+### 14/10/2026
+- **⭐️ Automatización de Renovación SSL con Docker Hooks en Producción:**
+    - **Implementación de Renewal Hooks de Certbot**: Se configuraron scripts ejecutables en `/etc/letsencrypt/renewal-hooks/pre/01-stop-frontend.sh` y `/etc/letsencrypt/renewal-hooks/post/01-start-frontend.sh` en el VPS de producción.
+    - **Resolución de Conflicto en Puerto 80**: Al renovar en modo `standalone`, Certbot ahora detiene de forma transparente el contenedor `sgp-frontend` durante los 3-5 segundos que dura el handshake con Let's Encrypt y lo reinicia automáticamente al concluir, garantizando la recarga de los certificados renovados sin intervención manual.
+    - **Renovación Exitosa y Verificación**: Se ejecutó la renovación real de los certificados para `solicitudes.ultrasoft.website` y `megabares.ultrasoft.website`, extendiendo su validez por 90 días (vencimiento: **12 de Enero de 2027**). Se comprobó la reactivación inmediata del servicio Nginx respondiendo `HTTP 200 OK` en HTTPS.
+
 ## 📅 Septiembre 2026
 
 ### 30/09/2026

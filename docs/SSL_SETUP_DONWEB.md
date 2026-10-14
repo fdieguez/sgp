@@ -79,20 +79,29 @@ docker-compose up -d --build
 ```
 ---
 
-## Renovación Automática
-Los certificados de Let's Encrypt duran 90 días. Para renovar automáticamente:
+## Renovación Automática (Configuración Implementada con Renewal Hooks de Docker)
+Los certificados de Let's Encrypt tienen una validez de 90 días y se renuevan cuando restan menos de 30 días.
+En el VPS productivo, el daemon `certbot.timer` de systemd corre dos veces al día. Para resolver el conflicto del puerto 80 con el contenedor Docker de Nginx (`sgp-frontend`), se implementaron hooks automáticos en:
 
-1. Crea un script en el VPS (ej: `renew_certs.sh`):
+1. **Pre-Hook (`/etc/letsencrypt/renewal-hooks/pre/01-stop-frontend.sh`)**:
    ```bash
    #!/bin/bash
-   certbot renew --quiet
-   cd /ruta/a/tu/proyecto && docker-compose restart frontend
+   # Detiene sgp-frontend momentáneamente para liberar el puerto 80
+   if /usr/bin/docker ps -q -f name=sgp-frontend | grep -q .; then
+       /usr/bin/docker stop sgp-frontend
+   fi
    ```
-2. Agregalo al cron (`crontab -e`):
+
+2. **Post-Hook (`/etc/letsencrypt/renewal-hooks/post/01-start-frontend.sh`)**:
+   ```bash
+   #!/bin/bash
+   # Reinicia sgp-frontend tras obtener los nuevos certificados
+   if /usr/bin/docker ps -a -q -f name=sgp-frontend | grep -q .; then
+       /usr/bin/docker start sgp-frontend
+   fi
    ```
-   0 3 1 * * /ruta/a/renew_certs.sh
-   ```
-   *(Esto ejecutará la renovación el día 1 de cada mes a las 3 AM)*.
+
+De este modo, Certbot detiene Nginx solo durante los 3-5 segundos que dura la renovación y lo levanta inmediatamente sin requerir intervención manual ni scripts adicionales en el cron.
 
 ---
 
