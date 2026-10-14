@@ -2,11 +2,45 @@
 
 > **Propósito**: Este archivo registra todos los cambios, mejoras y decisiones técnicas del proyecto SGP para facilitar la continuidad entre sesiones de desarrollo.
 
-**Versión Actual**: `1.0.0` (Versión Oficial SGP 1.0 - Despliegue, Regresión y Purga de Producción)
+**Versión Actual**: `1.1.0` (Versión 1.1.0 - Búsqueda Flexible, Prevención de Duplicados, Emails al Responsable y Gestión de Invitados en Agenda)
 
 ## 📅 Octubre 2026
 
 ### 14/10/2026
+- **⭐️ Implementación Oficial de la Versión 1.1.0 (7 Casos de Uso / CDUs):**
+    - **📦 MÓDULO A: Búsqueda Flexible y Prevención de Duplicados (Personas)**:
+        - **CDU-06 (Autocompletado Flexible / Fuzzy Search)**:
+            - Backend: Endpoint `GET /api/persons/search?q={query}&limit=10` en `PersonController.java` y `PersonService.java`. Búsqueda multi-columna (nombre, apellido, DNI) insensible a mayúsculas/minúsculas y espacios, con sanitización de comas y split por tokens (`PersonRepository.searchFlexible`). Índices optimizados `idx_persons_dni` e `idx_persons_name` creados para alta performance.
+            - Frontend: Componente universal `PersonAutocomplete.jsx` con *debounce* de 300 ms, renderizado de sugerencias destacadas con formato `Nombre Completo — DNI: [número] — [Localidad]` y opción manual "Crear nueva persona" cuando no existen coincidencias.
+        - **CDU-07 (Vista 360° / Historial del Solicitante)**:
+            - Backend: DTO `PersonSummaryDTO.java` y endpoint `GET /api/persons/{id}/stats` que calcula de forma agregada las solicitudes históricas agrupadas por estado (Pendientes, En Proceso, Aprobadas, Rechazadas, Total) mediante consulta JPQL indexada en `SolicitudRepository.countSolicitudesByPersonGroupByStatus`.
+            - Frontend: Badge contextual interactivo y resumen visual en `PersonAutocomplete.jsx` y `SolicitudModal.jsx` desplegando `"X solicitudes registradas (Y Pendientes, Z Aprobadas)"`.
+        - **CDU-08 (Detección de Inconsistencias por DNI)**:
+            - Backend: Endpoint `GET /api/persons/by-dni/{dni}` para búsqueda exacta por documento.
+            - Frontend: Validación reactiva en el evento `onBlur` del campo DNI; si el operador ingresa un DNI preexistente pero con otro nombre, se despliega una alerta visual amigable: *"El DNI ingresado ya pertenece a [Nombre Registrado]. ¿Desea utilizar sus datos?"*, con botón de acción inmediata para autocompletar automáticamente el formulario.
+        - **CDU-09 (Reutilización en Campos Dinámicos)**:
+            - Integración universal de `PersonAutocomplete` en el solicitante principal y en campos dinámicos de formularios de Subsidios Institucionales y Agenda (p. ej. `Responsable 1: Nombre`, `Responsable 2: Nombre`), autocompletando simultáneamente el nombre y el DNI correspondiente.
+    - **📧 MÓDULO B: Emails de Aprobación al Responsable Territorial**:
+        - **CDU-10 (Envío Automático Liviano al Responsable)**:
+            - Refactorización de `EmailService.java` y `SolicitudService.java` para desacoplar las notificaciones de Subsidios y generalizarlas a cualquier tipo de solicitud aprobada (Agenda, Subsidios, Declaración de Interés, Pedidos).
+            - Destinatario: el **Responsable Territorial** asignado a la solicitud (`solicitud.getResponsable().getEmail()`).
+            - Formato liviano sin archivos adjuntos pesados: asunto `[SGP] Solicitud Aprobada - #{id}`, resumen institucional con beneficiario, tipo y observaciones de resolución, y botón directo que redirige a `${sgp.frontend.url}/mis-solicitudes?id={id}`.
+            - Frontend: Soporte de parámetro de consulta `?id={id}` en `ProjectDetailsPage.jsx` para apertura automática del modal de la solicitud tras el clic en el email.
+    - **📅 MÓDULO C: Gestión de Invitados en Google Calendar (Agenda)**:
+        - **CDU-14 (Administración de Invitados Frecuentes)**:
+            - Entidad JPA `AgendaGuest.java` mapeada a la tabla `agenda_guests` y repositorio `AgendaGuestRepository.java`.
+            - Endpoints REST en `SheetsConfigController.java` (`GET /api/config/{id}/guests`, `POST /api/config/{id}/guests`, `DELETE /api/config/guests/{guestId}` y alias global `/api/config/agenda/guests`).
+            - Frontend: Componente de gestión `AgendaGuestsManager.jsx` integrado en la configuración de proyectos y resolutores (`ProjectSettingsPage.jsx` y `ResolutorSettingsPage.jsx`).
+        - **CDU-15 (Selección de Invitados al Crear Evento)**:
+            - En el modal de resolución/aprobación de Agenda (`SolicitudModal.jsx`), al activar *"Crear evento en Google Calendar"*, se despliegan checkboxes con los invitados frecuentes configurados.
+            - Integración con Google Calendar API (`GoogleCalendarService.java`): inclusión dinámica de los correos seleccionados en el listado de `attendees` del evento oficial de Calendar.
+    - **🛡️ Aislamiento y Migraciones de Base de Datos**:
+        - Aislamiento completo del entorno de desarrollo creando la base `sgp_dev_v1_1` (conservando `sgp_db` intacta).
+        - Generación de scripts SQL reproducibles: `docs/migrations/v1.1.0_migrations.sql` y `code/backend/src/main/resources/db/migration_v1_1_0.sql`.
+    - **🧪 Aseguramiento de Calidad (Testing)**:
+        - Suite de integración Spring Boot `Version110FeaturesTest.java`: 5/5 pruebas nuevas pasando en verde (18/18 tests totales en `mvn test`).
+        - Verificación de Frontend: Build de Vite/React exitoso sin errores de bundling.
+
 - **⭐️ Automatización de Renovación SSL con Docker Hooks en Producción:**
     - **Implementación de Renewal Hooks de Certbot**: Se configuraron scripts ejecutables en `/etc/letsencrypt/renewal-hooks/pre/01-stop-frontend.sh` y `/etc/letsencrypt/renewal-hooks/post/01-start-frontend.sh` en el VPS de producción.
     - **Resolución de Conflicto en Puerto 80**: Al renovar en modo `standalone`, Certbot ahora detiene de forma transparente el contenedor `sgp-frontend` durante los 3-5 segundos que dura el handshake con Let's Encrypt y lo reinicia automáticamente al concluir, garantizando la recarga de los certificados renovados sin intervención manual.
