@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import api from '../config/axios';
 import { useAuth } from '../context/AuthContext';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import {
     ArrowLeft,
     Calendar,
@@ -109,6 +109,7 @@ const StatusBadge = ({ status }) => {
 
 export default function ProjectDetailsPage() {
     const { configId } = useParams();
+    const [searchParams] = useSearchParams();
     const { user } = useAuth();
     const [solicitudes, setSolicitudes] = useState([]);
     const [config, setConfig] = useState(null);
@@ -121,6 +122,22 @@ export default function ProjectDetailsPage() {
     const [selectedRows, setSelectedRows] = useState([]);
     const [isAsociarModalOpen, setIsAsociarModalOpen] = useState(false);
     const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+
+    // Apertura automática de solicitud si viene referenciada por URL (?id=...)
+    useEffect(() => {
+        const urlId = searchParams.get('id');
+        if (urlId) {
+            api.get(`/api/solicitudes/${urlId}`)
+                .then(res => {
+                    if (res.data) {
+                        setSelectedSolicitud(res.data);
+                    }
+                })
+                .catch(err => {
+                    console.error("Error al cargar solicitud referenciada en URL:", err);
+                });
+        }
+    }, [searchParams]);
 
     // Estados de la interfaz
     const [searchTerm, setSearchTerm] = useState('');

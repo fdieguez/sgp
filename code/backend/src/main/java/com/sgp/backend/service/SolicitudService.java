@@ -29,6 +29,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 public class SolicitudService {
 
     private final SolicitudRepository solicitudRepository;
@@ -757,8 +758,19 @@ public class SolicitudService {
                     throw new RuntimeException(e.getMessage(), e);
                 }
             }
-        } else if ("SUBSIDIO".equalsIgnoreCase(assignment.getTipoResolucion())) {
-            emailService.sendSubsidioApprovedEmail(resolutor.getEmail(), saved.getId());
+        }
+
+        // Notificación por correo electrónico liviana al Responsable Territorial (CDU-10)
+        // Se dispara para cualquier tipo de resolución aprobada sin archivos adjuntos pesados
+        if (saved.getResponsable() != null && saved.getResponsable().getEmail() != null && !saved.getResponsable().getEmail().trim().isEmpty()) {
+            emailService.sendSolicitudAprobadaEmail(
+                    saved.getResponsable().getEmail(),
+                    saved.getId(),
+                    assignment.getTipoResolucion(),
+                    observaciones
+            );
+        } else {
+            log.info("No se envía correo de notificación de aprobación: la solicitud #{} no posee responsable territorial asignado con correo válido.", saved.getId());
         }
     }
 
