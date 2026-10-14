@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar, Users, Plus, Trash2, History, FileText, UploadCloud, Download, ArrowRight, MessageSquare, Check, Eye, LayoutDashboard, UserCheck } from 'lucide-react';
+import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar, Users, Plus, Trash2, History, FileText, UploadCloud, Download, ArrowRight, MessageSquare, Check, Eye, LayoutDashboard, UserCheck, AlertTriangle } from 'lucide-react';
 import api from '../config/axios';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import TicketSeguimiento from './TicketSeguimiento';
+import PersonAutocomplete from './PersonAutocomplete';
 
 // Función de ayuda para formatear cualquier tipo de fecha a "yyyy-MM-dd" de forma segura
 const formatDateISO = (dateVal) => {
@@ -113,6 +114,28 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const [calendarDescription, setCalendarDescription] = useState('');
     const [availableGuests, setAvailableGuests] = useState([]);
     const [selectedGuests, setSelectedGuests] = useState([]);
+
+    // Estados para Vista 360 e Inconsistencias por DNI (CDU-07 y CDU-08)
+    const [selectedPersonStats, setSelectedPersonStats] = useState(null);
+    const [dniCollision, setDniCollision] = useState(null);
+
+    const handleDniBlur = async () => {
+        const dni = formData.person?.dni ? String(formData.person.dni).trim() : '';
+        if (!dni || dni.length < 5) return;
+        try {
+            const res = await api.get(`/api/persons/by-dni/${encodeURIComponent(dni)}`);
+            if (res.data) {
+                const registered = res.data;
+                const currentName = (formData.person?.name || '').trim().toLowerCase();
+                const registeredName = (registered.name || '').trim().toLowerCase();
+                if (registeredName && currentName && registeredName !== currentName && registered.id !== formData.person?.id) {
+                    setDniCollision(registered);
+                }
+            }
+        } catch (err) {
+            // Sin colisión de DNI
+        }
+    };
 
     // Pestañas y estados adicionales
     const [activeTab, setActiveTab] = useState('detalles');
@@ -422,7 +445,17 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 });
                 setSelectedZone(initialData.zone || initialData.responsable?.zone || '');
                 setAsistencia(initialData.asistencia || '');
+                if (initialData.person?.id) {
+                    api.get(`/api/persons/${initialData.person.id}/stats`)
+                        .then(res => setSelectedPersonStats(res.data))
+                        .catch(() => setSelectedPersonStats(null));
+                } else {
+                    setSelectedPersonStats(null);
+                }
+                setDniCollision(null);
             } else {
+                setSelectedPersonStats(null);
+                setDniCollision(null);
                 const myRespId = isResponsable ? (user?.responsable?.id || user?.id || '') : '';
                 const myZone = isResponsable ? (user?.responsable?.zone || user?.zone || '') : '';
                 setFormData({
@@ -984,14 +1017,101 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             <UserIcon className="h-4 w-4 text-indigo-400" /> Solicitante
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="md:col-span-2">
+                                <PersonAutocomplete
+                                    value={formData.person.name}
+                                    placeholder="Buscar por nombre o DNI (Autocompletado inteligente)..."
+                                    required
+                                    label="Nombre Completo / Institución"
+                                    selectedPerson={selectedPersonStats || formData.person}
+                                    showStatsBadge={true}
+                                    onChange={(val) => setFormData({ ...formData, person: { ...formData.person, name: val } })}
+                                    onSelect={(p) => {
+                                        const newLocation = p.locationName || formData.locationName;
+                                        setFormData({
+                                            ...formData,
+                                            person: {
+                                                ...formData.person,
+                                                id: p.id,
+                                                name: p.name,
+                                                phone: p.phone || formData.person.phone,
+                                                dni: p.dni || formData.person.dni,
+                                                type: p.type || formData.person.type,
+                                                subType: p.subType || formData.person.subType
+                                            },
+                                            locationName: newLocation
+                                        });
+                                        setSelectedPersonStats(p);
+                                        setDniCollision(null);
+                                    }}
+                                    onClear={() => {
+                                        setFormData({
+                                            ...formData,
+                                            person: { ...formData.person, id: null, name: '' }
+                                        });
+                                        setSelectedPersonStats(null);
+                                        setDniCollision(null);
+                                    }}
+                                />
+                            </div>
+
+                            {/* Alerta interactiva de Inconsistencia por DNI (CDU-08) */}
+                            {dniCollision && (
+                                <div className="md:col-span-2 p-3.5 bg-amber-950/40 border border-amber-500/50 rounded-xl space-y-2 animate-in fade-in duration-200">
+                                    <div className="flex items-start gap-2.5">
+                                        <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+                                        <div className="text-xs text-amber-200">
+                                            <p className="font-bold text-amber-300">Detección de Inconsistencia por DNI</p>
+                                            <p className="mt-0.5">
+                                                El DNI ingresado (<strong>{dniCollision.dni}</strong>) ya pertenece a <strong>{dniCollision.name}</strong> en el sistema. ¿Desea utilizar sus datos registrados?
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-end gap-2 pt-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => setDniCollision(null)}
+                                            className="px-3 py-1 text-xs text-gray-400 hover:text-white rounded-lg hover:bg-gray-800 transition-colors"
+                                        >
+                                            Mantener datos actuales
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setFormData({
+                                                    ...formData,
+                                                    person: {
+                                                        ...formData.person,
+                                                        id: dniCollision.id,
+                                                        name: dniCollision.name,
+                                                        phone: dniCollision.phone || formData.person.phone,
+                                                        dni: dniCollision.dni,
+                                                        type: dniCollision.type || formData.person.type,
+                                                        subType: dniCollision.subType || formData.person.subType
+                                                    },
+                                                    locationName: dniCollision.locationName || formData.locationName
+                                                });
+                                                setSelectedPersonStats(dniCollision);
+                                                setDniCollision(null);
+                                                toast.success(`Datos actualizados con la ficha de ${dniCollision.name}`);
+                                            }}
+                                            className="px-3.5 py-1 text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white rounded-lg shadow transition-colors"
+                                        >
+                                            Sí, utilizar datos de {dniCollision.name}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             <div>
-                                <label className="block text-sm text-gray-500 mb-1">Nombre Completo / Institución</label>
+                                <label className="block text-sm text-gray-500 mb-1">DNI (Documento)</label>
                                 <input
                                     type="text"
-                                    required
-                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                                    value={formData.person.name}
-                                    onChange={(e) => setFormData({ ...formData, person: { ...formData.person, name: e.target.value } })}
+                                    placeholder="Ej: 34567890"
+                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                    value={formData.person.dni || ''}
+                                    onChange={(e) => setFormData({ ...formData, person: { ...formData.person, dni: e.target.value } })}
+                                    onBlur={handleDniBlur}
                                 />
                             </div>
                             <div>
@@ -1591,19 +1711,62 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                                 </div>
                                                                             )}
                                                                         </div>
-                                                                    ) : (
-                                                                        <input
-                                                                            type={campo.tipoDato === 'DATE' || campo.nombre === 'Día' ? 'date' : (campo.tipoDato === 'TIME' || campo.nombre === 'Hora' ? 'time' : (campo.tipoDato === 'NUMBER' ? 'number' : 'text'))}
-                                                                            value={currentData[campo.nombre] || ''}
-                                                                            onChange={e => {
-                                                                                const newAssignments = [...formData.assignments];
-                                                                                newAssignments[index].detalle = { ...currentData, [campo.nombre]: e.target.value };
-                                                                                setFormData({ ...formData, assignments: newAssignments });
-                                                                            }}
-                                                                            className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none block disabled:opacity-50"
-                                                                            disabled={!canEditThis}
-                                                                        />
-                                                                    )}
+                                                                    ) : (() => {
+                                                                        const nombreCampoNorm = (campo.nombre || '').toLowerCase();
+                                                                        const esCampoPersona = (nombreCampoNorm.includes('responsable') && nombreCampoNorm.includes('nombre')) ||
+                                                                                               nombreCampoNorm.includes('representante') ||
+                                                                                               (nombreCampoNorm.includes('contacto') && !nombreCampoNorm.includes('fecha'));
+
+                                                                        if (esCampoPersona) {
+                                                                            return (
+                                                                                <PersonAutocomplete
+                                                                                    value={currentData[campo.nombre] || ''}
+                                                                                    label=""
+                                                                                    placeholder={`Buscar o ingresar ${campo.nombre}...`}
+                                                                                    disabled={!canEditThis}
+                                                                                    showStatsBadge={false}
+                                                                                    onChange={val => {
+                                                                                        const newAssignments = [...formData.assignments];
+                                                                                        newAssignments[index].detalle = { ...currentData, [campo.nombre]: val };
+                                                                                        setFormData({ ...formData, assignments: newAssignments });
+                                                                                    }}
+                                                                                    onSelect={p => {
+                                                                                        const newAssignments = [...formData.assignments];
+                                                                                        const updatedDetalle = { ...currentData, [campo.nombre]: p.name };
+                                                                                        if (campo.nombre.includes('1') && p.dni) {
+                                                                                            updatedDetalle['Responsable 1: DNI'] = p.dni;
+                                                                                        } else if (campo.nombre.includes('2') && p.dni) {
+                                                                                            updatedDetalle['Responsable 2: DNI'] = p.dni;
+                                                                                        } else if (p.dni && updatedDetalle['DNI'] !== undefined) {
+                                                                                            updatedDetalle['DNI'] = p.dni;
+                                                                                        }
+                                                                                        newAssignments[index].detalle = updatedDetalle;
+                                                                                        setFormData({ ...formData, assignments: newAssignments });
+                                                                                        toast.success(`Datos de ${p.name} autocompletados en ${campo.nombre}`);
+                                                                                    }}
+                                                                                    onClear={() => {
+                                                                                        const newAssignments = [...formData.assignments];
+                                                                                        newAssignments[index].detalle = { ...currentData, [campo.nombre]: '' };
+                                                                                        setFormData({ ...formData, assignments: newAssignments });
+                                                                                    }}
+                                                                                />
+                                                                            );
+                                                                        }
+
+                                                                        return (
+                                                                            <input
+                                                                                type={campo.tipoDato === 'DATE' || campo.nombre === 'Día' ? 'date' : (campo.tipoDato === 'TIME' || campo.nombre === 'Hora' ? 'time' : (campo.tipoDato === 'NUMBER' ? 'number' : 'text'))}
+                                                                                value={currentData[campo.nombre] || ''}
+                                                                                onChange={e => {
+                                                                                    const newAssignments = [...formData.assignments];
+                                                                                    newAssignments[index].detalle = { ...currentData, [campo.nombre]: e.target.value };
+                                                                                    setFormData({ ...formData, assignments: newAssignments });
+                                                                                }}
+                                                                                className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none block disabled:opacity-50"
+                                                                                disabled={!canEditThis}
+                                                                            />
+                                                                        );
+                                                                    })()}
                                                                 </div>
                                                                 );
                                                             })}

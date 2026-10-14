@@ -23,4 +23,8 @@ public interface SolicitudRepository extends JpaRepository<Solicitud, Long>,
     @org.springframework.data.jpa.repository.Query("SELECT SUM(s.amount) FROM Solicitud s WHERE s.status = :status AND s.type = 'SUBSIDIO'")
     java.math.BigDecimal sumSubsidiosAmountByStatus(
             @org.springframework.data.repository.query.Param("status") String status);
+
+    @org.springframework.data.jpa.repository.Query("SELECT LOWER(s.status), COUNT(s) FROM Solicitud s WHERE s.person.id = :personId GROUP BY LOWER(s.status)")
+    List<Object[]> countSolicitudesByPersonGroupByStatus(
+            @org.springframework.data.repository.query.Param("personId") Long personId);
 }
