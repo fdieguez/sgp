@@ -6,9 +6,18 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
  * Credenciales de prueba estándar para entorno local y réplica de producción
  */
 const CREDENCIALES = {
-  ADMIN: { email: 'admin@sgp.com', pass: 'SGP_Admin_#2026_Prod_Secure_!', fallbackPass: 'SGP_Admin_#J57f_Prod_Secure_!' },
-  RESOLUTOR: { email: 'resolutor@sgp.com', pass: 'password123', fallbackPass: 'Resolutor_SGP_gMbf!' },
-  OPERADOR: { email: 'celeste_solari19@hotmail.com', pass: 'password123', fallbackPass: 'Celeste_SGP_Npg8#' }
+  ADMIN: { 
+    email: 'admin@sgp.com', 
+    passwords: ['SGP_Admin_#gAfU_Prod_Secure_!', 'SGP_Admin_#J57f_Prod_Secure_!', 'SGP_Admin_#2026_Prod_Secure_!'] 
+  },
+  RESOLUTOR: { 
+    email: 'resolutor@sgp.com', 
+    passwords: ['Resolutor_SGP_J6dz!', 'Resolutor_SGP_gMbf!', 'password123'] 
+  },
+  OPERADOR: { 
+    email: 'celeste_solari19@hotmail.com', 
+    passwords: ['Celeste_SGP_nWsx#', 'Celeste_SGP_Npg8#', 'password123'] 
+  }
 };
 
 /**
@@ -29,7 +38,6 @@ const iniciarSesion = async (page, email, password, rolASeleccionar = null) => {
     return;
   }
 
-  // Intentar login con la contraseña principal y fallback si existen credenciales seguras de BD
   const intentarLogin = async (pass) => {
     await page.locator('input[type="email"]').fill(email);
     await page.locator('input[type="password"]').fill(pass);
@@ -42,12 +50,14 @@ const iniciarSesion = async (page, email, password, rolASeleccionar = null) => {
     }
   };
 
-  let ok = await intentarLogin(password);
-  if (!ok) {
-    const cred = Object.values(CREDENCIALES).find(c => c.email === email);
-    if (cred?.fallbackPass) {
-      await intentarLogin(cred.fallbackPass);
-    }
+  // Buscar lista de contraseñas del usuario
+  const cred = Object.values(CREDENCIALES).find(c => c.email === email);
+  const passList = cred ? cred.passwords : [password];
+
+  let logueado = false;
+  for (const pass of passList) {
+    logueado = await intentarLogin(pass);
+    if (logueado) break;
   }
 
   await page.waitForURL(/.*(dashboard|mis-solicitudes|settings|select-rol|resolutor-settings).*/, { timeout: 15000 });
