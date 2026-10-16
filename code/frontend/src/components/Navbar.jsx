@@ -23,7 +23,7 @@ export default function Navbar() {
                             Panel SGP
                         </Link>
                         <span className="ml-2 text-[10px] bg-indigo-950/80 text-indigo-300 font-mono font-bold px-2 py-0.5 rounded border border-indigo-500/40 tracking-wider">
-                            v1.0.1
+                            v1.1.0
                         </span>
                     </div>
                     <div className="flex items-center gap-4">
