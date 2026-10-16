@@ -23,16 +23,19 @@ public class SheetsConfigController {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final com.sgp.backend.service.GoogleCalendarService googleCalendarService;
+    private final com.sgp.backend.repository.AgendaGuestRepository agendaGuestRepository;
 
     public SheetsConfigController(
             SheetsConfigRepository repository,
             ProjectRepository projectRepository,
             UserRepository userRepository,
-            com.sgp.backend.service.GoogleCalendarService googleCalendarService) {
+            com.sgp.backend.service.GoogleCalendarService googleCalendarService,
+            com.sgp.backend.repository.AgendaGuestRepository agendaGuestRepository) {
         this.repository = repository;
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.googleCalendarService = googleCalendarService;
+        this.agendaGuestRepository = agendaGuestRepository;
     }
 
     @GetMapping
@@ -152,4 +155,67 @@ public class SheetsConfigController {
             }
         }).orElse(ResponseEntity.notFound().build());
     }
+
+    /**
+     * Obtiene la lista de invitados frecuentes configurados para una Agenda específica (CDU-14).
+     */
+    @GetMapping("/{id}/guests")
+    public ResponseEntity<List<com.sgp.backend.entity.AgendaGuest>> getGuests(@PathVariable Long id) {
+        return ResponseEntity.ok(agendaGuestRepository.findBySheetsConfigIdOrderByCreatedAtAsc(id));
+    }
+
+    /**
+     * Agrega un nuevo invitado frecuente a la configuración de Agenda (CDU-14).
+     */
+    @PostMapping("/{id}/guests")
+    public ResponseEntity<com.sgp.backend.entity.AgendaGuest> addGuest(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<String, String> body) {
+        return repository.findById(id).map(config -> {
+            String name = body.get("name");
+            String email = body.get("email");
+            if (name == null || name.trim().isEmpty() || email == null || email.trim().isEmpty()) {
+                throw new IllegalArgumentException("El nombre y el correo electrónico del invitado son obligatorios.");
+            }
+            com.sgp.backend.entity.AgendaGuest guest = com.sgp.backend.entity.AgendaGuest.builder()
+                    .sheetsConfig(config)
+                    .name(name.trim())
+                    .email(email.trim().toLowerCase())
+                    .createdAt(java.time.LocalDateTime.now())
+                    .build();
+            return ResponseEntity.ok(agendaGuestRepository.save(guest));
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Elimina un invitado frecuente por su identificador único (CDU-14).
+     */
+    @DeleteMapping("/{id}/guests/{guestId}")
+    public ResponseEntity<Void> deleteGuest(@PathVariable Long id, @PathVariable Long guestId) {
+        if (agendaGuestRepository.existsById(guestId)) {
+            agendaGuestRepository.deleteById(guestId);
+            return ResponseEntity.ok().build();
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    /**
+     * Retorna los invitados frecuentes de la configuración activa de Agenda (CDU-15).
+     */
+    @GetMapping("/agenda/guests")
+    public ResponseEntity<List<com.sgp.backend.entity.AgendaGuest>> getAgendaDefaultGuests() {
+        List<SheetsConfig> configs = repository.findAll();
+        for (SheetsConfig c : configs) {
+            com.sgp.backend.entity.Project project = projectRepository.findBySheetsConfig(c).orElse(null);
+            String name = (project != null) ? project.getName() : c.getSheetName();
+            if (name != null && name.toUpperCase().contains("AGENDA")) {
+                return ResponseEntity.ok(agendaGuestRepository.findBySheetsConfigIdOrderByCreatedAtAsc(c.getId()));
+            }
+        }
+        if (!configs.isEmpty()) {
+            return ResponseEntity.ok(agendaGuestRepository.findBySheetsConfigIdOrderByCreatedAtAsc(configs.get(0).getId()));
+        }
+        return ResponseEntity.ok(java.util.Collections.emptyList());
+    }
 }
+

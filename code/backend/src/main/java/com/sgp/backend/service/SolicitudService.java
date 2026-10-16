@@ -29,6 +29,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 public class SolicitudService {
 
     private final SolicitudRepository solicitudRepository;
@@ -667,7 +668,7 @@ public class SolicitudService {
     }
 
     @org.springframework.transaction.annotation.Transactional
-    public void aprobarAsignacion(Long solicitudId, String emailResolutor, String observaciones, String asistencia, java.util.Map<String, String> calendarData) {
+    public void aprobarAsignacion(Long solicitudId, String emailResolutor, String observaciones, String asistencia, java.util.Map<String, Object> calendarData) {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
 
@@ -692,8 +693,8 @@ public class SolicitudService {
         
         String eventInfo = "";
         if ("AGENDA".equalsIgnoreCase(assignment.getTipoResolucion()) && calendarData != null) {
-            String date = calendarData.get("date");
-            String time = calendarData.get("time");
+            String date = calendarData.get("date") != null ? calendarData.get("date").toString() : null;
+            String time = calendarData.get("time") != null ? calendarData.get("time").toString() : null;
             if (date != null && !date.trim().isEmpty()) {
                 eventInfo = " (📅 Evento agendado para el día: " + date + (time != null && !time.trim().isEmpty() ? " a las " + time + " hs" : "") + ")";
             }
@@ -709,11 +710,9 @@ public class SolicitudService {
         Solicitud saved = solicitudRepository.save(solicitud);
 
         // Disparar integraciones asíncronas externas tras aprobación exitosa.
-        // Se evalúa el tipo de resolución de la asignación aprobada (assignment.getTipoResolucion()) en lugar del tipo de solicitud (saved.getType())
-        // para ejecutar únicamente la integración correspondiente a esta asignación (Google Calendar para AGENDA, EmailService para SUBSIDIO).
         if ("AGENDA".equalsIgnoreCase(assignment.getTipoResolucion())) {
-            if (calendarData != null && "true".equals(calendarData.get("createEvent"))) {
-                String calendarId = calendarData.get("calendarId");
+            if (calendarData != null && "true".equalsIgnoreCase(String.valueOf(calendarData.get("createEvent")))) {
+                String calendarId = calendarData.get("calendarId") != null ? calendarData.get("calendarId").toString() : null;
                 if (calendarId == null || calendarId.trim().isEmpty()) {
                     if (saved.getSheetsConfig() != null && saved.getSheetsConfig().getCalendarId() != null && !saved.getSheetsConfig().getCalendarId().trim().isEmpty()) {
                         calendarId = saved.getSheetsConfig().getCalendarId();
@@ -745,20 +744,48 @@ public class SolicitudService {
                 if (calendarId == null || calendarId.trim().isEmpty()) {
                     calendarId = emailResolutor; // Respaldo definitivo al correo electrónico del resolutor si no hay configuración
                 }
-                String title = calendarData.get("title");
-                String description = calendarData.get("description");
-                String location = calendarData.get("location");
-                String date = calendarData.get("date");
-                String time = calendarData.get("time");
+                String title = calendarData.get("title") != null ? calendarData.get("title").toString() : "";
+                String description = calendarData.get("description") != null ? calendarData.get("description").toString() : "";
+                String location = calendarData.get("location") != null ? calendarData.get("location").toString() : "";
+                String date = calendarData.get("date") != null ? calendarData.get("date").toString() : "";
+                String time = calendarData.get("time") != null ? calendarData.get("time").toString() : "";
+
+                // Extraer lista de invitados seleccionados (CDU-15)
+                java.util.List<String> guestEmails = new java.util.ArrayList<>();
+                Object guestObj = calendarData.get("guestEmails");
+                if (guestObj instanceof java.util.List<?> list) {
+                    for (Object item : list) {
+                        if (item != null) {
+                            guestEmails.add(item.toString());
+                        }
+                    }
+                } else if (guestObj instanceof String str && !str.trim().isEmpty()) {
+                    for (String part : str.split(",")) {
+                        if (!part.trim().isEmpty()) {
+                            guestEmails.add(part.trim());
+                        }
+                    }
+                }
                 
                 try {
-                    googleCalendarService.createEvent(calendarId, title, description, location, date, time, saved.getId());
+                    googleCalendarService.createEvent(calendarId, title, description, location, date, time, saved.getId(), guestEmails);
                 } catch (Exception e) {
                     throw new RuntimeException(e.getMessage(), e);
                 }
             }
-        } else if ("SUBSIDIO".equalsIgnoreCase(assignment.getTipoResolucion())) {
-            emailService.sendSubsidioApprovedEmail(resolutor.getEmail(), saved.getId());
+        }
+
+        // Notificación por correo electrónico liviana al Responsable Territorial (CDU-10)
+        // Se dispara para cualquier tipo de resolución aprobada sin archivos adjuntos pesados
+        if (saved.getResponsable() != null && saved.getResponsable().getEmail() != null && !saved.getResponsable().getEmail().trim().isEmpty()) {
+            emailService.sendSolicitudAprobadaEmail(
+                    saved.getResponsable().getEmail(),
+                    saved.getId(),
+                    assignment.getTipoResolucion(),
+                    observaciones
+            );
+        } else {
+            log.info("No se envía correo de notificación de aprobación: la solicitud #{} no posee responsable territorial asignado con correo válido.", saved.getId());
         }
     }
 

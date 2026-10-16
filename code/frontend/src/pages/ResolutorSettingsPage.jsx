@@ -16,6 +16,7 @@ import {
     X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import AgendaGuestsManager from '../components/AgendaGuestsManager';
 
 export default function ResolutorSettingsPage() {
     const { user } = useAuth();
@@ -26,9 +27,10 @@ export default function ResolutorSettingsPage() {
     const [savingId, setSavingId] = useState(null);
     const [calendarStatus, setCalendarStatus] = useState({}); // Mapeo de projectId a { active: boolean, checked: boolean, error: string, checking: boolean }
 
-    // Identificar las especialidades del resolutor
-    const tieneAgenda = user?.tiposResolucion?.some(t => t.tipo?.toUpperCase() === 'AGENDA') || false;
-    const tieneSubsidio = user?.tiposResolucion?.some(t => t.tipo?.toUpperCase() === 'SUBSIDIO') || false;
+    // Identificar las especialidades del resolutor o permitir al administrador configurar todas
+    const esAdmin = user?.role === 'ADMINISTRADOR' || user?.roles?.includes('ADMINISTRADOR');
+    const tieneAgenda = esAdmin || user?.tiposResolucion?.some(t => t.tipo?.toUpperCase() === 'AGENDA') || false;
+    const tieneSubsidio = esAdmin || user?.tiposResolucion?.some(t => t.tipo?.toUpperCase() === 'SUBSIDIO') || false;
 
     useEffect(() => {
         fetchProjects();
@@ -284,6 +286,9 @@ export default function ResolutorSettingsPage() {
                                                             </button>
                                                         </div>
                                                     </form>
+                                                    <div className="pt-3 border-t border-gray-700/60">
+                                                        <AgendaGuestsManager configId={p.sheetsConfig?.id} />
+                                                    </div>
                                                 </div>
                                             );
                                         })}
