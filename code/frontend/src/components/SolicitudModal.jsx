@@ -737,6 +737,11 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 copy['Lugar - Barrio'] = formData.barrio;
                             }
                         }
+                        if (a.tipoResolucion === 'SUBSIDIO' || a.tipoResolucion === 'DECLARACION DE INTERES' || a.tipoResolucion === 'DECLARACIÓN DE INTERÉS') {
+                            if (!copy['Localidad'] && formData.locationName) {
+                                copy['Localidad'] = formData.locationName;
+                            }
+                        }
                         detalleFinal = JSON.stringify(copy);
                     }
                     return {
@@ -1446,7 +1451,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                             currentDet['Lugar - Barrio'] = formData.barrio;
                                                         }
                                                     }
-                                                    if (type === 'DECLARACION DE INTERES' || type === 'DECLARACIÓN DE INTERÉS') {
+                                                    if (type === 'DECLARACION DE INTERES' || type === 'DECLARACIÓN DE INTERÉS' || type === 'SUBSIDIO') {
                                                         if (!currentDet['Localidad'] && formData.locationName) {
                                                             currentDet['Localidad'] = formData.locationName;
                                                         }
@@ -1501,7 +1506,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                             currentData['Lugar - Barrio'] = formData.barrio;
                                                         }
                                                     }
-                                                    if (assignment.tipoResolucion === 'DECLARACION DE INTERES' || assignment.tipoResolucion === 'DECLARACIÓN DE INTERÉS') {
+                                                    if (assignment.tipoResolucion === 'DECLARACION DE INTERES' || assignment.tipoResolucion === 'DECLARACIÓN DE INTERÉS' || assignment.tipoResolucion === 'SUBSIDIO') {
                                                         if (!currentData['Localidad'] && formData.locationName) {
                                                             currentData['Localidad'] = formData.locationName;
                                                         }
@@ -1540,8 +1545,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                     }
                                                                 }
 
-                                                                // Desplegable de Localidad para AGENDA y DECLARACION DE INTERES
-                                                                if (campo.nombre === 'Lugar - Localidad' || ((assignment.tipoResolucion === 'DECLARACION DE INTERES' || assignment.tipoResolucion === 'DECLARACIÓN DE INTERÉS') && campo.nombre === 'Localidad')) {
+                                                                // Desplegable de Localidad para cualquier tipo de resolución (AGENDA, SUBSIDIO, DECLARACION DE INTERES, etc.)
+                                                                if (campo.nombre === 'Lugar - Localidad' || campo.nombre === 'Localidad') {
                                                                     return (
                                                                         <div key={campo.id}>
                                                                             <label className="block text-[11px] text-gray-400 mb-1 uppercase tracking-wider font-semibold">
