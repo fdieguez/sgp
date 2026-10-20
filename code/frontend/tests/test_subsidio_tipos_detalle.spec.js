@@ -124,6 +124,9 @@ test.describe('🧪 Validación E2E: Formularios y Condicionales de Subsidio (Pe
     expect(opcionesCompania).toContain('PERSONAL');
     expect(opcionesCompania).toContain('OTRA');
 
+    // Tomar captura de confirmación Caso A (Personal)
+    await page.screenshot({ path: '../../test-results/captura_subsidio_caso_personal.png', fullPage: true });
+
     // Comprobar que NO están visibles los campos institucionales ni de especie
     await expect(modal.locator('label:text-is("Nombre de institución")')).toHaveCount(0);
     await expect(modal.locator('label:text-is("Fecha del evento")')).toHaveCount(0);
@@ -144,6 +147,9 @@ test.describe('🧪 Validación E2E: Formularios y Condicionales de Subsidio (Pe
     await expect(modal.locator('label:has-text("Responsable 1: DNI")')).toBeVisible();
     await expect(modal.locator('label:has-text("Responsable 1: Cargo")')).toBeVisible();
     await expect(modal.locator('label:has-text("Nota de pedido")')).toBeVisible();
+
+    // Tomar captura de confirmación Caso B (Institucional en Dinero)
+    await page.screenshot({ path: '../../test-results/captura_subsidio_caso_dinero.png', fullPage: true });
 
     // NO deben mostrarse campos de Personal ni de Especie
     await expect(modal.locator('label:has-text("Compañía")')).toHaveCount(0);
@@ -173,7 +179,7 @@ test.describe('🧪 Validación E2E: Formularios y Condicionales de Subsidio (Pe
     const labelsMonto = modal.locator('div.bg-gray-800\\/80 label').filter({ hasText: /^Monto(\s*\*|$)/ });
     await expect(labelsMonto).toHaveCount(0);
 
-    // Tomar captura de confirmación final
-    await page.screenshot({ path: 'test-results/captura_subsidio_especie_verificado.png', fullPage: true });
+    // Tomar captura de confirmación final Caso C (Institucional en Especie)
+    await page.screenshot({ path: '../../test-results/captura_subsidio_caso_especie.png', fullPage: true });
   });
 });
