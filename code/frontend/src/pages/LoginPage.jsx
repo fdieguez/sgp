@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Lock, Mail, Loader2, Eye, EyeOff, ShieldCheck, ArrowRight } from 'lucide-react';
+import { APP_VERSION_LABEL } from '../config/version';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');

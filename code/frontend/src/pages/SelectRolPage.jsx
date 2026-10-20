@@ -1,6 +1,7 @@
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Shield, ClipboardList, Briefcase, FileCheck, LogOut, BarChart } from 'lucide-react';
+import { APP_VERSION_LABEL } from '../config/version';
 
 export default function SelectRolPage() {
     const { allRoles, selectRole, logout, user } = useAuth();
