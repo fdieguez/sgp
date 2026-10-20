@@ -1,7 +1,11 @@
 -- ==============================================================================
 -- Migración DDL/DML v1.1.2: Saneamiento de acentos y nombres de usuarios en UTF-8
 -- Corrige caracteres corruptos generados por codificaciones no-UTF8 en la nómina.
+-- Compatible tanto con Linux (producción) como con Windows (desarrollo local).
 -- ==============================================================================
+
+SET NAMES 'utf8mb4';
+SET CHARACTER SET utf8mb4;
 
 UPDATE users SET first_name = 'Matías', last_name = 'Ippólito' WHERE email = 'matias.ippolito@gmail.com';
 UPDATE users SET first_name = 'Verónica', last_name = 'González' WHERE email = 'mveronicagonzalez79@gmail.com';
