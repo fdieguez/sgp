@@ -189,6 +189,7 @@ test.describe('🧪 Validación E2E: Carga de Adjuntos Directos al Crear Solicit
 
     const inputSolicitante = modal.locator('input[placeholder*="Buscar por nombre"]').first();
     await inputSolicitante.fill(nombrePersona);
+    await modal.locator('input[placeholder*="Ej: 34567890"]').fill('35111222');
     await modal.locator('label:text-is("Teléfono") + input').fill('3424887766');
     await modal.locator('label:text-is("Tipo Solicitante") + select').selectOption({ label: 'Personal' });
     await page.waitForTimeout(300);

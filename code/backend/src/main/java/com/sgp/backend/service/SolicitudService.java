@@ -239,6 +239,15 @@ public class SolicitudService {
 
     @org.springframework.transaction.annotation.Transactional
     public Solicitud createSolicitud(Solicitud solicitud) {
+        // Validación obligatoria de DNI para subsidios
+        boolean isSubsidio = "SUBSIDIO".equalsIgnoreCase(solicitud.getType()) ||
+                (solicitud.getResolutorAssignments() != null && solicitud.getResolutorAssignments().stream().anyMatch(a -> "SUBSIDIO".equalsIgnoreCase(a.getTipoResolucion())));
+        if (isSubsidio) {
+            if (solicitud.getPerson() == null || solicitud.getPerson().getDni() == null || solicitud.getPerson().getDni().trim().isEmpty()) {
+                throw new IllegalArgumentException("El DNI del solicitante/beneficiario es obligatorio para tramitar un subsidio.");
+            }
+        }
+
         // 1. Procesar Persona
         if (solicitud.getPerson() != null) {
             Person p = solicitud.getPerson();
@@ -251,6 +260,10 @@ public class SolicitudService {
                             }
                             return personRepository.save(personToSave);
                         });
+            }
+            if (solicitud.getPerson().getDni() != null && !solicitud.getPerson().getDni().trim().isEmpty()) {
+                p.setDni(solicitud.getPerson().getDni().trim());
+                p = personRepository.save(p);
             }
             solicitud.setPerson(p);
         }
@@ -340,6 +353,16 @@ public class SolicitudService {
         User oldResponsable = existing.getResponsable();
         String oldStatus = existing.getStatus();
 
+        // Validación obligatoria de DNI para subsidios
+        boolean isSubsidio = "SUBSIDIO".equalsIgnoreCase(dto.getType()) || "SUBSIDIO".equalsIgnoreCase(existing.getType()) ||
+                (dto.getAssignments() != null && dto.getAssignments().stream().anyMatch(a -> "SUBSIDIO".equalsIgnoreCase(a.getTipoResolucion())));
+        if (isSubsidio) {
+            String dni = dto.getPerson() != null ? dto.getPerson().getDni() : (existing.getPerson() != null ? existing.getPerson().getDni() : null);
+            if (dni == null || dni.trim().isEmpty()) {
+                throw new IllegalArgumentException("El DNI del solicitante/beneficiario es obligatorio para tramitar un subsidio.");
+            }
+        }
+
         // 1. Actualizar beneficiario
         if (dto.getPerson() != null) {
             Person p;
@@ -350,6 +373,9 @@ public class SolicitudService {
                 p.setPhone(dto.getPerson().getPhone());
                 p.setType(dto.getPerson().getType() != null ? dto.getPerson().getType() : p.getType());
                 p.setSubType(dto.getPerson().getSubType());
+                if (dto.getPerson().getDni() != null) {
+                    p.setDni(dto.getPerson().getDni().trim());
+                }
                 p = personRepository.save(p);
             } else {
                 // Persona nueva: buscar por nombre o crear
@@ -361,6 +387,9 @@ public class SolicitudService {
                     nueva.setPhone(telefono);
                     nueva.setType(dto.getPerson().getType() != null ? dto.getPerson().getType() : "INDIVIDUAL");
                     nueva.setSubType(dto.getPerson().getSubType());
+                    if (dto.getPerson().getDni() != null) {
+                        nueva.setDni(dto.getPerson().getDni().trim());
+                    }
                     return personRepository.save(nueva);
                 });
             }

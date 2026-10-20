@@ -79,6 +79,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     // Se desplaza esta declaración después de formData para evitar ReferenceError por acceso previo a la inicialización de formData.
     const canPonerConsideracion = user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN' || user?.role === 'RESPONSABLE' || isResolutorSubsidio === true || formData.status === 'consideracion';
     const canTomar = Boolean(formData.id && !formData.responsableId && (user?.role === 'RESPONSABLE' || user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN') && (!formData.zone || !user?.zone || formData.zone.toLowerCase() === user?.zone.toLowerCase() || user?.role?.includes('ADMIN')));
+    const isSubsidio = formData.type === 'SUBSIDIO' || (formData.assignments || []).some(a => a.tipoResolucion?.toUpperCase() === 'SUBSIDIO');
 
     const handleTomar = async () => {
         if (!formData.id) return;
@@ -665,17 +666,17 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             toast.error("El responsable de la solicitud es obligatorio.");
             return;
         }
+
+        // Validación obligatoria de DNI para subsidios
+        if (isSubsidio && (!formData.person?.dni || !String(formData.person.dni).trim())) {
+            toast.error("El DNI del solicitante/beneficiario es obligatorio para tramitar un subsidio.");
+            return;
+        }
+
+        // Validación no bloqueante para subsidios (Opción 1: Monto, Fecha de entrega y Tipo de subsidio son opcionales)
         if (formData.type === 'SUBSIDIO') {
-            if (!formData.amount || Number(formData.amount) <= 0) {
-                toast.error("El monto solicitado es obligatorio y debe ser mayor que cero.");
-                return;
-            }
-            if (!formData.grantDate) {
-                toast.error("La fecha de otorgamiento es obligatoria.");
-                return;
-            }
-            if (!formData.subsidioType || !formData.subsidioType.trim()) {
-                toast.error("El tipo de subsidio es obligatorio.");
+            if (formData.amount && Number(formData.amount) < 0) {
+                toast.error("El monto solicitado no puede ser negativo.");
                 return;
             }
         }
@@ -1248,7 +1249,9 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             )}
 
                             <div>
-                                <label className="block text-sm text-gray-500 mb-1">DNI (Documento)</label>
+                                <label className="block text-sm text-gray-500 mb-1">
+                                    DNI (Documento) {isSubsidio && <span className="text-red-400 font-bold">*</span>}
+                                </label>
                                 <input
                                     type="text"
                                     placeholder="Ej: 34567890"
@@ -1406,16 +1409,17 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         </div>
                     )}
 
-                    {/* Campos específicos de Subsidio */}
+                    {/* Campos específicos de Subsidio (Opcionales) */}
                     {formData.type === 'SUBSIDIO' && (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-top-2 p-4 bg-emerald-900/20 rounded-xl border border-emerald-800/50">
                             <div>
                                 <label className="block text-sm font-medium text-emerald-400 mb-1 flex items-center gap-1">
-                                    <DollarSign className="h-3 w-3" /> Monto
+                                    <DollarSign className="h-3 w-3" /> Monto (Opcional)
                                 </label>
                                 <input
                                     type="number"
                                     step="0.01"
+                                    placeholder="Ej: 50000"
                                     className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-emerald-500"
                                     value={formData.amount}
                                     onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
@@ -1423,7 +1427,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-emerald-400 mb-1 flex items-center gap-1">
-                                    <Calendar className="h-3 w-3" /> Fecha Entrega
+                                    <Calendar className="h-3 w-3" /> Fecha Entrega (Opcional)
                                 </label>
                                 <input
                                     type="date"
@@ -1434,7 +1438,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-emerald-400 mb-1 flex items-center gap-1">
-                                    <LayoutDashboard className="h-3 w-3" /> Tipo Subsidio
+                                    <LayoutDashboard className="h-3 w-3" /> Tipo Subsidio (Opcional)
                                 </label>
                                 <select
                                     className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-emerald-500"
