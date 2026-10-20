@@ -69,33 +69,46 @@ test.describe('🧪 Validación E2E: Carga de Adjuntos Directos al Crear Solicit
     const modal = page.locator('div.fixed.inset-0').last();
     await expect(modal.locator('h2:has-text("Nueva Solicitud")')).toBeVisible();
 
-    // Verificar que NO existe la advertencia previa que bloqueaba la carga de archivos
+    // 1. Verificar que NO existe el cartel restrictivo previo
+    await expect(modal.locator('text=Guarde la solicitud primero para poder agregar adjuntos')).toHaveCount(0);
     await expect(modal.locator('text=Guarde la solicitud antes de subir archivos')).toHaveCount(0);
 
-    // Verificar que la sección "Adjuntos Rápidos" está visible
-    await expect(modal.locator('h3:has-text("Adjuntos Rápidos")')).toBeVisible();
-    await expect(modal.locator('label:has-text("Seleccionar Archivo")')).toBeVisible();
+    // 2. Verificar que la pestaña "Adjuntos" superior está HABILITADA
+    const tabAdjuntos = modal.locator('button:has-text("Adjuntos")');
+    await expect(tabAdjuntos).toBeVisible();
+    await expect(tabAdjuntos).toBeEnabled();
 
-    // Simular selección de un archivo en adjuntos rápidos antes de guardar la solicitud
-    const fileInputRapido = modal.locator('label:has-text("Seleccionar Archivo") input[type="file"]');
-    await fileInputRapido.setInputFiles({
-      name: 'documento_test.pdf',
+    // 3. Probar navegación directa a la pestaña "Adjuntos" antes de guardar
+    await tabAdjuntos.click();
+    await page.waitForTimeout(300);
+    await expect(modal.locator('h3:has-text("Subir Documento")')).toBeVisible();
+
+    // Subir archivo dentro de la pestaña "Adjuntos"
+    const fileInputPestaña = modal.locator('div:has-text("Subir Documento") input[type="file"]');
+    await fileInputPestaña.setInputFiles({
+      name: 'documento_pestaña.pdf',
       mimeType: 'application/pdf',
-      buffer: Buffer.from('%PDF-1.4 test content')
+      buffer: Buffer.from('%PDF-1.4 test tab content')
     });
 
-    // Validar que se liste en la cola de pendientes con su botón para quitar
-    await expect(modal.locator('text=documento_test.pdf')).toBeVisible();
-    await expect(modal.locator('button:has-text("Quitar")')).toBeVisible();
+    // Validar que se muestre en la lista de pendientes de la pestaña Adjuntos
+    await expect(modal.locator('text=documento_pestaña.pdf')).toBeVisible();
+    await expect(modal.locator('text=Listo para subir al guardar')).toBeVisible();
+
+    // Volver a la pestaña Formulario / Detalles
+    await modal.locator('button:has-text("Formulario / Detalles")').click();
+    await page.waitForTimeout(300);
+
+    // Verificar que la sección "Adjuntos Rápidos" del formulario también refleje el archivo
+    await expect(modal.locator('h3:has-text("Adjuntos Rápidos")')).toBeVisible();
     await expect(modal.locator('span:has-text("listos para subir")')).toContainText('1');
 
-    // Probar el botón quitar
-    await modal.locator('button:has-text("Quitar")').click();
-    await expect(modal.locator('text=documento_test.pdf')).toHaveCount(0);
+    // Quitar el archivo desde el botón de la lista rápida
+    await modal.locator('button:has-text("Quitar")').first().click();
     await expect(modal.locator('span:has-text("listos para subir")')).toContainText('0');
   });
 
-  test('CP-02: Creación integral de solicitud con adjuntos rápidos persistidos en backend', async ({ page }) => {
+  test('CP-02: Creación integral de solicitud con adjuntos subidos desde la pestaña Adjuntos', async ({ page }) => {
     await iniciarSesion(page, CREDENCIALES.RESPONSABLE.email, 'RESPONSABLE');
     await page.goto(`${BASE_URL}/mis-solicitudes`, { waitUntil: 'networkidle' });
 
@@ -106,7 +119,7 @@ test.describe('🧪 Validación E2E: Carga de Adjuntos Directos al Crear Solicit
 
     // Completar Solicitante en la cabecera
     const sufijo = Date.now().toString().slice(-4);
-    const nombrePersona = `Beneficiario Diferido ${sufijo}`;
+    const nombrePersona = `Beneficiario Pestaña ${sufijo}`;
 
     const inputSolicitante = modal.locator('input[placeholder*="Buscar por nombre"]').first();
     await inputSolicitante.fill(nombrePersona);
@@ -122,19 +135,23 @@ test.describe('🧪 Validación E2E: Carga de Adjuntos Directos al Crear Solicit
     await modal.locator('label:text-is("Barrio") + select').selectOption({ index: 1 });
 
     // Descripción requerida
-    await modal.locator('label:has-text("Descripción / Pedido") + textarea').fill(`Solicitud con adjuntos diferidos ${sufijo}`);
+    await modal.locator('label:has-text("Descripción / Pedido") + textarea').fill(`Solicitud con adjunto desde pestaña ${sufijo}`);
 
-    // Adjuntar archivo general en la sección rápida
-    const fileInputRapido = modal.locator('label:has-text("Seleccionar Archivo") input[type="file"]');
-    await fileInputRapido.setInputFiles({
-      name: `comprobante_${sufijo}.pdf`,
+    // Ir a la pestaña "Adjuntos" y subir archivo
+    await modal.locator('button:has-text("Adjuntos")').click();
+    await page.waitForTimeout(300);
+
+    const fileInputPestaña = modal.locator('div:has-text("Subir Documento") input[type="file"]');
+    await fileInputPestaña.setInputFiles({
+      name: `comprobante_tab_${sufijo}.pdf`,
       mimeType: 'application/pdf',
-      buffer: Buffer.from('%PDF-1.4 archivo de prueba diferida automatizada')
+      buffer: Buffer.from('%PDF-1.4 archivo cargado desde pestana adjuntos')
     });
 
-    await expect(modal.locator(`text=comprobante_${sufijo}.pdf`)).toBeVisible();
+    await expect(modal.locator(`text=comprobante_tab_${sufijo}.pdf`)).toBeVisible();
+    await expect(modal.locator('text=Listo para subir al guardar')).toBeVisible();
 
-    // Guardar solicitud
+    // Guardar solicitud directamente desde la pestaña "Adjuntos"
     const btnGuardar = modal.locator('button:has-text("Guardar Solicitud")');
     await btnGuardar.click();
 
@@ -154,7 +171,7 @@ test.describe('🧪 Validación E2E: Carga de Adjuntos Directos al Crear Solicit
     await modalLectura.locator('button:has-text("Adjuntos")').click();
 
     // Verificar que el archivo subido esté listado y persistido en la pestaña Adjuntos
-    await expect(modalLectura.locator(`text=comprobante_${sufijo}.pdf`)).toBeVisible({ timeout: 10000 });
+    await expect(modalLectura.locator(`text=comprobante_tab_${sufijo}.pdf`)).toBeVisible({ timeout: 10000 });
   });
 
   test('CP-03: Carga diferida en campos dinámicos de resolución (FILE) al crear solicitud', async ({ page }) => {

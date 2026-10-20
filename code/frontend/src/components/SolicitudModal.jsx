@@ -1097,16 +1097,17 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     </button>
                     <button
                         type="button"
-                        disabled={!formData.id}
                         onClick={() => setActiveTab('adjuntos')}
-                        title={!formData.id ? "Debe guardar la solicitud primero para subir adjuntos" : ""}
                         className={`px-4 py-3 font-bold text-sm tracking-wide flex items-center gap-2 transition-all ${
-                            !formData.id 
-                                ? 'text-gray-600 opacity-50 cursor-not-allowed' 
-                                : activeTab === 'adjuntos' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'
+                            activeTab === 'adjuntos' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'
                         }`}
                     >
                         <FileText className="h-4 w-4" /> Adjuntos
+                        {!formData.id && pendingGeneralFiles.length > 0 && (
+                            <span className="bg-indigo-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                                {pendingGeneralFiles.length}
+                            </span>
+                        )}
                     </button>
                 </div>
 
@@ -1114,11 +1115,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     {activeTab === 'detalles' && (
                         <form onSubmit={handleSubmit} className="p-6">
                             <fieldset disabled={isReadOnly} className="space-y-6">
-                            {!formData.id && (
-                                <div className="bg-indigo-950/40 border border-indigo-800 rounded-xl p-3 text-xs text-indigo-300 text-center animate-in fade-in duration-300">
-                                    📢 <strong>Nota:</strong> Guarde la solicitud primero para poder agregar adjuntos, notas de seguimiento o consultar el historial de auditoría.
-                                </div>
-                            )}
+
                             {/* Tipo y Estado */}
                             <div className="grid grid-cols-2 gap-4">
                                 {!!formData.id && user?.role !== 'DISTRIBUIDOR' && (
@@ -2161,7 +2158,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         </div>
                     )}
                     
-                    {activeTab === 'adjuntos' && formData.id && (
+                    {activeTab === 'adjuntos' && (
                         <div className="p-6 space-y-6">
                             <div 
                                 onDragOver={handleDragOver}
@@ -2174,45 +2171,81 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 <p className="text-gray-400 text-sm mb-4">Arrastra aquí tu archivo o haz clic para seleccionar</p>
                                 <label className={`bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold cursor-pointer transition-colors inline-block ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
                                     {isUploading ? 'Subiendo...' : 'Seleccionar Archivo'}
-                                    <input type="file" className="hidden" disabled={isUploading} onChange={(e) => handleFileUpload(e.target.files[0])} />
+                                    <input type="file" className="hidden" disabled={isUploading} onChange={(e) => {
+                                        if (e.target.files && e.target.files[0]) {
+                                            handleFileUpload(e.target.files[0]);
+                                        }
+                                    }} />
                                 </label>
                             </div>
 
                             <div className="space-y-4">
                                 <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                                    <FileText className="h-4 w-4" /> Archivos Adjuntos ({adjuntos.length})
+                                    <FileText className="h-4 w-4" /> Archivos Adjuntos ({formData.id ? adjuntos.length : pendingGeneralFiles.length})
                                 </h3>
-                                {adjuntos.length === 0 ? (
-                                    <div className="text-center py-8 bg-gray-900/30 rounded-xl border border-gray-700/50">
-                                        <p className="text-gray-500 text-sm">No hay documentos adjuntos aún.</p>
-                                    </div>
-                                ) : (
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        {adjuntos.map(adj => (
-                                            <div key={adj.id} className="bg-gray-800 border border-gray-700 p-4 rounded-xl flex items-center justify-between group">
-                                                <div className="flex items-center gap-3 overflow-hidden">
-                                                    <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400 shrink-0">
-                                                        <FileText className="h-6 w-6" />
+                                {!formData.id ? (
+                                    pendingGeneralFiles.length === 0 ? (
+                                        <div className="text-center py-8 bg-gray-900/30 rounded-xl border border-gray-700/50">
+                                            <p className="text-gray-500 text-sm">No hay documentos seleccionados aún. Arrastra archivos o haz clic arriba para agregarlos antes de guardar.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            {pendingGeneralFiles.map((file, idx) => (
+                                                <div key={idx} className="bg-gray-800 border border-gray-700 p-4 rounded-xl flex items-center justify-between group">
+                                                    <div className="flex items-center gap-3 overflow-hidden">
+                                                        <div className="p-2 bg-amber-500/10 rounded-lg text-amber-400 shrink-0">
+                                                            <FileText className="h-6 w-6" />
+                                                        </div>
+                                                        <div className="truncate min-w-0 flex-1">
+                                                            <p className="text-sm font-bold text-white truncate" title={file.name}>{file.name}</p>
+                                                            <p className="text-xs text-amber-400">{(file.size / 1024 / 1024).toFixed(2)} MB • Listo para subir al guardar</p>
+                                                        </div>
                                                     </div>
-                                                    <div className="truncate min-w-0 flex-1">
-                                                        <p className="text-sm font-bold text-white truncate" title={adj.originalFileName}>{adj.originalFileName}</p>
-                                                        <p className="text-xs text-gray-500">{(adj.size / 1024 / 1024).toFixed(2)} MB • {new Date(adj.uploadedAt).toLocaleDateString()}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
-                                                    <button type="button" onClick={() => handleViewInline(adj)} className="p-2 text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors" title="Visualizar">
-                                                        <Eye className="h-4 w-4" />
-                                                    </button>
-                                                    <button type="button" onClick={() => handleDownload(adj)} className="p-2 text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors" title="Descargar">
-                                                        <Download className="h-4 w-4" />
-                                                    </button>
-                                                    <button type="button" onClick={() => handleDeleteAdjunto(adj.id)} className="p-2 text-red-400 hover:text-white bg-red-900/20 hover:bg-red-600 rounded-lg transition-colors" title="Eliminar">
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={() => handleRemovePendingGeneralFile(idx)} 
+                                                        className="p-2 text-red-400 hover:text-white bg-red-900/20 hover:bg-red-600 rounded-lg transition-colors shrink-0 ml-2" 
+                                                        title="Quitar de la lista"
+                                                    >
                                                         <Trash2 className="h-4 w-4" />
                                                     </button>
                                                 </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                            ))}
+                                        </div>
+                                    )
+                                ) : (
+                                    adjuntos.length === 0 ? (
+                                        <div className="text-center py-8 bg-gray-900/30 rounded-xl border border-gray-700/50">
+                                            <p className="text-gray-500 text-sm">No hay documentos adjuntos aún.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            {adjuntos.map(adj => (
+                                                <div key={adj.id} className="bg-gray-800 border border-gray-700 p-4 rounded-xl flex items-center justify-between group">
+                                                    <div className="flex items-center gap-3 overflow-hidden">
+                                                        <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400 shrink-0">
+                                                            <FileText className="h-6 w-6" />
+                                                        </div>
+                                                        <div className="truncate min-w-0 flex-1">
+                                                            <p className="text-sm font-bold text-white truncate" title={adj.originalFileName}>{adj.originalFileName}</p>
+                                                            <p className="text-xs text-gray-500">{(adj.size / 1024 / 1024).toFixed(2)} MB • {new Date(adj.uploadedAt).toLocaleDateString()}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
+                                                        <button type="button" onClick={() => handleViewInline(adj)} className="p-2 text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors" title="Visualizar">
+                                                            <Eye className="h-4 w-4" />
+                                                        </button>
+                                                        <button type="button" onClick={() => handleDownload(adj)} className="p-2 text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors" title="Descargar">
+                                                            <Download className="h-4 w-4" />
+                                                        </button>
+                                                        <button type="button" onClick={() => handleDeleteAdjunto(adj.id)} className="p-2 text-red-400 hover:text-white bg-red-900/20 hover:bg-red-600 rounded-lg transition-colors" title="Eliminar">
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )
                                 )}
                             </div>
                         </div>
