@@ -2,9 +2,32 @@
 
 > **Propósito**: Este archivo registra todos los cambios, mejoras y decisiones técnicas del proyecto SGP para facilitar la continuidad entre sesiones de desarrollo.
 
-**Versión Actual**: `1.1.0` (Versión 1.1.0 - Búsqueda Flexible, Prevención de Duplicados, Emails al Responsable y Gestión de Invitados en Agenda)
+**Versión Actual**: `1.1.1` (Ajustes y Segmentación en Formularios de Resolución de Subsidios)
 
 ## 📅 Octubre 2026
+
+### 20/10/2026
+- **⭐️ Ajustes y Segmentación Condicional en Tipos de Resolución de Subsidios (Versión 1.1.1):**
+    - **Tipo Personal:**
+        - Precarga automática de los datos del Solicitante (`Nombre y apellido`, `DNI` y `Teléfono`) al seleccionar `Personal` en el formulario de resolución de subsidios.
+        - Mejora del campo `Compañía`: se estandarizó como desplegable `SELECT` con 4 opciones fijas: `MOVISTAR`, `CLARO`, `PERSONAL` y `OTRA`.
+    - **Tipo Institucional en Dinero:**
+        - Desacoplamiento estricto de visibilidad en frontend: los campos de `Dirección de institución`, `Localidad` (con datalist de sugerencias), `Responsables 1 y 2` (Nombre, DNI y Cargo) y `Nota de pedido` aplican exclusivamente a *Institucional en dinero*.
+    - **Tipo Institucional en Especie:**
+        - Incorporación de los atributos específicos faltantes: `Fecha del evento` (tipo `DATE`) y `Descripción del monto y bienes solicitados` (tipo `TEXTAREA`).
+        - Ocultamiento de campos bancarios y numéricos planos (`Monto` plano, autoridades y nota de pedido) para dejar únicamente los campos pertinentes (`Nombre de institución`, `Fecha del evento`, `Descripción del monto y bienes solicitados` y `Observaciones`).
+    - **Base de Datos y DataInitializer:**
+        - Creación de migración SQL `docs/migrations/v1.1.1_subsidio_atributos.sql` idempotente para entornos de producción y staging.
+        - Actualización de `DataInitializer.java` para mantener la consistencia automática en el arranque local y de tests.
+    - **Suite E2E Playwright:**
+        - Nuevo test automatizado `code/frontend/tests/test_subsidio_tipos_detalle.spec.js` validando los tres tipos de formularios, precargas y condicionales. 100% en verde.
+
+### 19/10/2026
+- **🚨 Diagnóstico de Indisponibilidad de Producción (VPS Suspendido por Facturación):**
+    - **Incidente**: Pérdida total de conectividad en `solicitudes.ultrasoft.website` y caída del servidor VPS (`149.50.128.168`).
+    - **Diagnóstico DevOps**: Se comprobó 100% de pérdida de paquetes en Ping y cierre total de puertos (SSH `5287`, HTTPS `443`, HTTP `80`).
+    - **Causa Confirmada**: Suspensión temporal por vencimiento del ciclo de facturación del servidor en DonWeb.
+    - **Documentación Preventiva**: Se documentó el checklist de diagnóstico rápido y la causa en [`docs/mantenimiento_servidor.md`](./mantenimiento_servidor.md) para descartar fallas de código o Docker ante caídas totales similares.
 
 ### 14/10/2026
 - **⭐️ Implementación Oficial de la Versión 1.1.0 (7 Casos de Uso / CDUs):**

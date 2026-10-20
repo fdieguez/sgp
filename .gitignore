@@ -77,3 +77,8 @@ videos_demo/
 prueba_correo_*.html
 sgp-*-logs*.txt
 *-logs-*.txt
+
+test-results/
+scratch/
+scripts/backup_users_insert.sql
+scripts/restore_users_prod.sql

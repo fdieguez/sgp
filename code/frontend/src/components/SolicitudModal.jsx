@@ -1455,6 +1455,17 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                         if (!currentDet['Localidad'] && formData.locationName) {
                                                             currentDet['Localidad'] = formData.locationName;
                                                         }
+                                                        if (type === 'SUBSIDIO' && currentDet['Tipo de pedido'] === 'Personal') {
+                                                            if (!currentDet['Nombre y apellido'] && formData.person?.name) {
+                                                                currentDet['Nombre y apellido'] = formData.person.name;
+                                                            }
+                                                            if (!currentDet['DNI'] && formData.person?.dni) {
+                                                                currentDet['DNI'] = formData.person.dni;
+                                                            }
+                                                            if (!currentDet['Teléfono'] && formData.person?.phone) {
+                                                                currentDet['Teléfono'] = formData.person.phone;
+                                                            }
+                                                        }
                                                     }
                                                     newAssignments[index] = { 
                                                         ...assignment, 
@@ -1520,20 +1531,37 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                 if (assignment.tipoResolucion === 'SUBSIDIO') {
                                                                     const tipoPedido = currentData['Tipo de pedido'] || '';
                                                                     const camposPersonal = [
-                                                                        'Nombre y apellido', 'DNI', 'Dirección de DNI',
+                                                                        'Nombre y apellido', 'DNI', 'Teléfono', 'Compañía', 'Dirección de DNI',
                                                                         'DNI frente', 'DNI dorso', 'Constancia de CBU'
                                                                     ];
-                                                                    const camposInstitucional = [
-                                                                        'Nombre de institución', 'Dirección de institución', 'Localidad',
+                                                                    const camposInstitucionalDinero = [
+                                                                        'Dirección de institución', 'Localidad',
                                                                         'Responsable 1: Nombre', 'Responsable 1: DNI', 'Responsable 1: Cargo',
                                                                         'Responsable 2: Nombre', 'Responsable 2: DNI', 'Responsable 2: Cargo',
                                                                         'Nota de pedido'
                                                                     ];
+                                                                    const camposInstitucionalEspecie = [
+                                                                        'Fecha del evento', 'Descripción del monto y bienes solicitados'
+                                                                    ];
 
+                                                                    // Campos exclusivos de tipo Personal
                                                                     if (camposPersonal.includes(campo.nombre) && tipoPedido !== 'Personal') {
                                                                         return null;
                                                                     }
-                                                                    if (camposInstitucional.includes(campo.nombre) && !tipoPedido.startsWith('Institucional')) {
+                                                                    // Nombre de institución es común a Institucional en dinero e Institucional en especie
+                                                                    if (campo.nombre === 'Nombre de institución' && tipoPedido !== 'Institucional en dinero' && tipoPedido !== 'Institucional en especie') {
+                                                                        return null;
+                                                                    }
+                                                                    // Campos exclusivos de Institucional en dinero
+                                                                    if (camposInstitucionalDinero.includes(campo.nombre) && tipoPedido !== 'Institucional en dinero') {
+                                                                        return null;
+                                                                    }
+                                                                    // Campos exclusivos de Institucional en especie
+                                                                    if (camposInstitucionalEspecie.includes(campo.nombre) && tipoPedido !== 'Institucional en especie') {
+                                                                        return null;
+                                                                    }
+                                                                    // En Institucional en especie, el monto y los bienes se describen en su campo específico
+                                                                    if (campo.nombre === 'Monto' && tipoPedido === 'Institucional en especie') {
                                                                         return null;
                                                                     }
                                                                 }
@@ -1545,8 +1573,38 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                     }
                                                                 }
 
-                                                                // Desplegable de Localidad para cualquier tipo de resolución (AGENDA, SUBSIDIO, DECLARACION DE INTERES, etc.)
-                                                                if (campo.nombre === 'Lugar - Localidad' || campo.nombre === 'Localidad') {
+                                                                // Campo de Localidad para SUBSIDIO: Input de texto libre con sugerencias mediante datalist
+                                                                if (assignment.tipoResolucion === 'SUBSIDIO' && campo.nombre === 'Localidad') {
+                                                                    const datalistId = `datalist-localidades-subsidio-${index}`;
+                                                                    return (
+                                                                        <div key={campo.id}>
+                                                                            <label className="block text-[11px] text-gray-400 mb-1 uppercase tracking-wider font-semibold">
+                                                                                {campo.nombre} {ac.requerido && <span className="text-red-400">*</span>}
+                                                                            </label>
+                                                                            <input
+                                                                                type="text"
+                                                                                list={datalistId}
+                                                                                placeholder="Escribir o seleccionar localidad..."
+                                                                                value={currentData[campo.nombre] || ''}
+                                                                                onChange={e => {
+                                                                                    const newAssignments = [...formData.assignments];
+                                                                                    newAssignments[index].detalle = { ...currentData, [campo.nombre]: e.target.value };
+                                                                                    setFormData({ ...formData, assignments: newAssignments });
+                                                                                }}
+                                                                                className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none block disabled:opacity-50"
+                                                                                disabled={!canEditThis}
+                                                                            />
+                                                                            <datalist id={datalistId}>
+                                                                                {availableCities.map(c => (
+                                                                                    <option key={c.id} value={c.name} />
+                                                                                ))}
+                                                                            </datalist>
+                                                                        </div>
+                                                                    );
+                                                                }
+
+                                                                // Desplegable de Localidad para AGENDA y DECLARACION DE INTERES
+                                                                if (campo.nombre === 'Lugar - Localidad' || ((assignment.tipoResolucion === 'DECLARACION DE INTERES' || assignment.tipoResolucion === 'DECLARACIÓN DE INTERÉS') && campo.nombre === 'Localidad')) {
                                                                     return (
                                                                         <div key={campo.id}>
                                                                             <label className="block text-[11px] text-gray-400 mb-1 uppercase tracking-wider font-semibold">
@@ -1622,6 +1680,18 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                                 const newDetalle = { ...currentData, [campo.nombre]: val };
                                                                                 if (campo.nombre === 'Aporte?' && val !== 'si') {
                                                                                     delete newDetalle['Descripción/monto'];
+                                                                                }
+                                                                                // Precargar datos del solicitante si se selecciona tipo Personal en SUBSIDIO
+                                                                                if (assignment.tipoResolucion === 'SUBSIDIO' && campo.nombre === 'Tipo de pedido' && val === 'Personal') {
+                                                                                    if (!newDetalle['Nombre y apellido'] && formData.person?.name) {
+                                                                                        newDetalle['Nombre y apellido'] = formData.person.name;
+                                                                                    }
+                                                                                    if (!newDetalle['DNI'] && formData.person?.dni) {
+                                                                                        newDetalle['DNI'] = formData.person.dni;
+                                                                                    }
+                                                                                    if (!newDetalle['Teléfono'] && formData.person?.phone) {
+                                                                                        newDetalle['Teléfono'] = formData.person.phone;
+                                                                                    }
                                                                                 }
                                                                                 const newAssignments = [...formData.assignments];
                                                                                 newAssignments[index].detalle = newDetalle;

@@ -12,7 +12,15 @@ description: >-
 
 Este skill define el protocolo estricto y desatendido para realizar un pase a producción del proyecto **SGP (Sistema de Gestión Política)** ante el comando `/deployprod` o cuando el usuario solicite actualizar producción.
 
+> [!CAUTION] REGLA INQUEBRANTABLE DE SEGURIDAD: NO MODIFICAR NI RESETEAR CONTRASEÑAS
+> **BAJO NINGUNA CIRCUNSTANCIA SE DEBEN MODIFICAR, ACTUALIZAR O RESETEAR LAS CONTRASEÑAS DE LOS USUARIOS EN PRODUCCIÓN.**
+> - Los usuarios reales ya disponen de sus credenciales oficiales comunicadas formalmente por correo.
+> - Está estrictamente prohibido ejecutar scripts de actualización o reseteo masivo de contraseñas (como `actualizar_contrasenas_2026.sql` o regeneraciones con `GeneradorCredenciales.java`).
+> - La propiedad `sgp.seed.overwrite-users=false` debe mantenerse siempre inalterada en `false`.
+> - Cualquier cambio en base de datos debe preservar de forma absoluta e intacta la tabla `users` y sus hashes BCrypt.
+
 ---
+
 
 ## 📌 Contexto de Infraestructura y Credenciales
 

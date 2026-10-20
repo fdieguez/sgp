@@ -573,7 +573,7 @@ public class DataInitializer implements CommandLineRunner {
         AtributoResolucion attrNombreApellido = obtenerOCrearAtributo("Nombre y apellido", "TEXT", null);
         AtributoResolucion attrDni = obtenerOCrearAtributo("DNI", "TEXT", null);
         AtributoResolucion attrTelefono = obtenerOCrearAtributo("Teléfono", "TEXT", null);
-        AtributoResolucion attrCompania = obtenerOCrearAtributo("Compañía", "TEXT", null);
+        AtributoResolucion attrCompania = obtenerOCrearAtributo("Compañía", "SELECT", "MOVISTAR,CLARO,PERSONAL,OTRA");
         AtributoResolucion attrDireccionDni = obtenerOCrearAtributo("Dirección de DNI", "TEXT", null);
         AtributoResolucion attrDniFrente = obtenerOCrearAtributo("DNI frente", "FILE", null);
         AtributoResolucion attrDniDorso = obtenerOCrearAtributo("DNI dorso", "FILE", null);
@@ -586,6 +586,8 @@ public class DataInitializer implements CommandLineRunner {
         AtributoResolucion attrResp2Dni = obtenerOCrearAtributo("Responsable 2: DNI", "TEXT", null);
         AtributoResolucion attrResp2Cargo = obtenerOCrearAtributo("Responsable 2: Cargo", "TEXT", null);
         AtributoResolucion attrNotaPedido = obtenerOCrearAtributo("Nota de pedido", "FILE", null);
+        AtributoResolucion attrFechaEvento = obtenerOCrearAtributo("Fecha del evento", "DATE", null);
+        AtributoResolucion attrDescBienes = obtenerOCrearAtributo("Descripción del monto y bienes solicitados", "TEXTAREA", null);
 
         // Atributos específicos de AGENDA para la Etapa 11 (13 campos ordenados)
         AtributoResolucion attrTipoActividad = obtenerOCrearAtributo("Tipo de actividad", "SELECT", "Reunión,Evento,Acto,Recorrido gestión,Recorrido territorial,Visita,Otro");
@@ -638,8 +640,10 @@ public class DataInitializer implements CommandLineRunner {
             new AtributoConfig(attrResp2Dni, false, 17),
             new AtributoConfig(attrResp2Cargo, false, 18),
             new AtributoConfig(attrNotaPedido, false, 19),
-            new AtributoConfig(attrMonto, false, 20),
-            new AtributoConfig(attrDatoObs, false, 21)
+            new AtributoConfig(attrFechaEvento, false, 20),
+            new AtributoConfig(attrDescBienes, false, 21),
+            new AtributoConfig(attrMonto, false, 22),
+            new AtributoConfig(attrDatoObs, false, 23)
         ));
 
         // Atributos específicos de DECLARACION DE INTERES para la Etapa 11 (13 campos ordenados)

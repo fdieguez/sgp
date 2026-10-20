@@ -98,23 +98,22 @@ test.describe('🧪 Validación E2E: Carga y Persistencia de Subsidios con Local
     await selectTipoPedido.selectOption({ label: 'Institucional en dinero' });
     await page.waitForTimeout(600);
 
-    // 8. Validar el campo Localidad dinámico de Subsidio (EL BUG REPORTADO)
-    const selectLocalidadSubsidio = modal.locator('label').filter({ hasText: /^Localidad/i }).last().locator('xpath=following-sibling::select | ../select');
-    await expect(selectLocalidadSubsidio).toBeVisible();
+    // 8. Validar el campo Localidad dinámico de Subsidio (Input de texto libre con sugerencias datalist)
+    const inputLocalidadSubsidio = modal.locator('label').filter({ hasText: /^Localidad/i }).last().locator('xpath=following-sibling::input | ../input');
+    await expect(inputLocalidadSubsidio).toBeVisible();
 
-    // Extraer opciones cargadas
-    const opcionesLocalidad = await selectLocalidadSubsidio.locator('option').allInnerTexts();
-    console.log('=== OPCIONES CONFIRMADAS EN LOCALIDAD DE SUBSIDIO TRAS EL FIX ===');
-    console.log('Total opciones disponibles:', opcionesLocalidad.length);
-    console.log('Ciudades incluidas:', opcionesLocalidad.slice(0, 8).join(', '), '...');
+    // Validar existencia de datalist con opciones sugeridas
+    const datalistId = await inputLocalidadSubsidio.getAttribute('list');
+    expect(datalistId).toBeTruthy();
+    const datalistOptions = await modal.locator(`datalist#${datalistId} option`).all();
+    console.log('=== OPCIONES SUGERIDAS EN DATALIST DE LOCALIDAD DE SUBSIDIO ===');
+    console.log('Total opciones sugeridas:', datalistOptions.length);
+    expect(datalistOptions.length).toBeGreaterThan(1);
 
-    expect(opcionesLocalidad.length).toBeGreaterThan(1);
-    expect(opcionesLocalidad).toContain('Santa Fe');
+    // Escribir localidad en el input libre (ej. Rafaela o Santa Fe)
+    await inputLocalidadSubsidio.fill('Santa Fe');
 
-    // Seleccionar Santa Fe en el desplegable de Localidad del subsidio
-    await selectLocalidadSubsidio.selectOption({ label: 'Santa Fe' });
-
-    // Tomar Captura 1: Formulario con el desplegable de Localidad oficial cargado y seleccionado
+    // Tomar Captura 1: Formulario con el input de Localidad libre y sugerencias cargadas
     await page.screenshot({ path: 'test-results/captura_subsidio_1_formulario_localidades.png', fullPage: true });
 
     // 9. Guardar la Solicitud

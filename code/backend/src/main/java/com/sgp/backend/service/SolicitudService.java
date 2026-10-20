@@ -268,6 +268,7 @@ public class SolicitudService {
                         Location newCity = new Location();
                         newCity.setName(cityName);
                         newCity.setType("CITY");
+                        newCity.setShowInUi(true);
                         return locationRepository.save(newCity);
                     })));
 
@@ -379,6 +380,7 @@ public class SolicitudService {
                         Location newCity = new Location();
                         newCity.setName(cityName);
                         newCity.setType("CITY");
+                        newCity.setShowInUi(true);
                         return locationRepository.save(newCity);
                     })));
 
@@ -576,6 +578,21 @@ public class SolicitudService {
                             }
                             if (monto != null) {
                                 solicitud.setAmount(monto);
+                            }
+                        }
+
+                        // Registrar localidad de Subsidio en el catálogo maestro para futuras sugerencias en la UI
+                        if (rootNode.has("Localidad") && !rootNode.get("Localidad").isNull()) {
+                            String locNombre = rootNode.get("Localidad").asText();
+                            if (locNombre != null && !locNombre.trim().isEmpty()) {
+                                final String nombreLimpio = locNombre.trim();
+                                locationRepository.findFirstByName(nombreLimpio).orElseGet(() -> {
+                                    Location nuevaLoc = new Location();
+                                    nuevaLoc.setName(nombreLimpio);
+                                    nuevaLoc.setType("CITY");
+                                    nuevaLoc.setShowInUi(true);
+                                    return locationRepository.save(nuevaLoc);
+                                });
                             }
                         }
                     } catch (Exception e) {

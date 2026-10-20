@@ -59,6 +59,22 @@ public class GeneradorCredenciales {
     }
 
     public static void main(String[] args) throws Exception {
+        // BLOQUEO ESTRICTO DE SEGURIDAD:
+        // Las credenciales oficiales fueron comunicadas por correo el 25/09/2026.
+        // Queda estrictamente prohibido sobreescribir las contraseñas sin confirmación explícita.
+        boolean confirmacionForzada = args.length > 0 && "--SOBREESCRIBIR-TODAS-LAS-CREDENCIALES-CONFIRMADO".equals(args[0]);
+        if (!confirmacionForzada) {
+            System.err.println("=============================================================================");
+            System.err.println("❌ ERROR CRÍTICO DE SEGURIDAD (GeneradorCredenciales):");
+            System.err.println("Las credenciales oficiales ya están distribuidas a los usuarios por correo.");
+            System.err.println("Ejecutar este generador invalidaría el acceso de los 44 destinatarios reales.");
+            System.err.println("Si de verdad se requiere regenerar y despachar correos masivos nuevamente,");
+            System.err.println("ejecuta explícitamente pasando el argumento:");
+            System.err.println("  --SOBREESCRIBIR-TODAS-LAS-CREDENCIALES-CONFIRMADO");
+            System.err.println("=============================================================================");
+            System.exit(1);
+        }
+
         List<UsuarioDef> listaMaestra = Arrays.asList(
             new UsuarioDef(1, "Admin Supremo", "ADMINISTRADOR", "admin@sgp.com", "SGP_Admin_#2026_Prod_Secure_!", "Administración Total", "3420000000", "12.345.678"),
             new UsuarioDef(2, "Maria Celeste Solari", "OPERADOR", "celeste_solari19@hotmail.com", "Celeste_SGP_2026#", "Mesa de Entrada", "3424760480", "30562372"),
