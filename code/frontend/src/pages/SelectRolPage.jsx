@@ -143,7 +143,7 @@ export default function SelectRolPage() {
 
             {/* Pie de página */}
             <div className="text-center text-[10px] font-mono tracking-widest text-gray-500 max-w-5xl mx-auto w-full border-t border-gray-900 pt-6 z-10">
-                SGP PLATFORM • v1.1.0 • CONEXIÓN SEGURA SSL
+                SGP PLATFORM • {APP_VERSION_LABEL} • CONEXIÓN SEGURA SSL
             </div>
         </div>
     );

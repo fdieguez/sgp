@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Briefcase, Settings, HelpCircle, LogOut, Sun, Moon, Users } from 'lucide-react';
+import { APP_VERSION_LABEL } from '../config/version';
 
 export default function Navbar() {
     const { user, logout, allRoles } = useAuth();
@@ -23,7 +24,7 @@ export default function Navbar() {
                             Panel SGP
                         </Link>
                         <span className="ml-2 text-[10px] bg-indigo-950/80 text-indigo-300 font-mono font-bold px-2 py-0.5 rounded border border-indigo-500/40 tracking-wider">
-                            v1.1.0
+                            {APP_VERSION_LABEL}
                         </span>
                     </div>
                     <div className="flex items-center gap-4">
