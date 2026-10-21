@@ -67,6 +67,9 @@ public class Solicitud {
 
     private String zone;
 
+    @Column(name = "tema", length = 100)
+    private String tema;
+
     private Boolean firstContactControl;
 
     @Column(name = "suggested_resolution_type")

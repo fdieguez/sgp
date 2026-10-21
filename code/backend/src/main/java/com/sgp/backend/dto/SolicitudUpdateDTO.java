@@ -32,6 +32,7 @@ public class SolicitudUpdateDTO {
     private String locationName;
     private String barrio;
     private String zone;
+    private String tema;
 
     /* ── Seguimiento ─────────────────────────────────────────────────── */
     private LocalDate contactDate;
@@ -75,6 +76,7 @@ public class SolicitudUpdateDTO {
         private String name;
         private String phone;
         private String dni;
+        private String socialMedia;
         private String type;
         private String subType;
     }

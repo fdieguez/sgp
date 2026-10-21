@@ -240,8 +240,8 @@ public class SolicitudService {
     @org.springframework.transaction.annotation.Transactional
     public Solicitud createSolicitud(Solicitud solicitud) {
         // Validación obligatoria de DNI para subsidios
-        boolean isSubsidio = "SUBSIDIO".equalsIgnoreCase(solicitud.getType()) ||
-                (solicitud.getResolutorAssignments() != null && solicitud.getResolutorAssignments().stream().anyMatch(a -> "SUBSIDIO".equalsIgnoreCase(a.getTipoResolucion())));
+        boolean isSubsidio = (solicitud.getType() != null && solicitud.getType().toUpperCase().contains("SUBSIDIO")) ||
+                (solicitud.getResolutorAssignments() != null && solicitud.getResolutorAssignments().stream().anyMatch(a -> a.getTipoResolucion() != null && a.getTipoResolucion().toUpperCase().contains("SUBSIDIO")));
         if (isSubsidio) {
             if (solicitud.getPerson() == null || solicitud.getPerson().getDni() == null || solicitud.getPerson().getDni().trim().isEmpty()) {
                 throw new IllegalArgumentException("El DNI del solicitante/beneficiario es obligatorio para tramitar un subsidio.");
@@ -263,6 +263,10 @@ public class SolicitudService {
             }
             if (solicitud.getPerson().getDni() != null && !solicitud.getPerson().getDni().trim().isEmpty()) {
                 p.setDni(solicitud.getPerson().getDni().trim());
+                p = personRepository.save(p);
+            }
+            if (solicitud.getPerson().getSocialMedia() != null && !solicitud.getPerson().getSocialMedia().trim().isEmpty()) {
+                p.setSocialMedia(solicitud.getPerson().getSocialMedia().trim());
                 p = personRepository.save(p);
             }
             solicitud.setPerson(p);
@@ -354,8 +358,9 @@ public class SolicitudService {
         String oldStatus = existing.getStatus();
 
         // Validación obligatoria de DNI para subsidios
-        boolean isSubsidio = "SUBSIDIO".equalsIgnoreCase(dto.getType()) || "SUBSIDIO".equalsIgnoreCase(existing.getType()) ||
-                (dto.getAssignments() != null && dto.getAssignments().stream().anyMatch(a -> "SUBSIDIO".equalsIgnoreCase(a.getTipoResolucion())));
+        boolean isSubsidio = (dto.getType() != null && dto.getType().toUpperCase().contains("SUBSIDIO")) ||
+                (existing.getType() != null && existing.getType().toUpperCase().contains("SUBSIDIO")) ||
+                (dto.getAssignments() != null && dto.getAssignments().stream().anyMatch(a -> a.getTipoResolucion() != null && a.getTipoResolucion().toUpperCase().contains("SUBSIDIO")));
         if (isSubsidio) {
             String dni = dto.getPerson() != null ? dto.getPerson().getDni() : (existing.getPerson() != null ? existing.getPerson().getDni() : null);
             if (dni == null || dni.trim().isEmpty()) {
@@ -376,6 +381,9 @@ public class SolicitudService {
                 if (dto.getPerson().getDni() != null) {
                     p.setDni(dto.getPerson().getDni().trim());
                 }
+                if (dto.getPerson().getSocialMedia() != null) {
+                    p.setSocialMedia(dto.getPerson().getSocialMedia().trim());
+                }
                 p = personRepository.save(p);
             } else {
                 // Persona nueva: buscar por nombre o crear
@@ -389,6 +397,9 @@ public class SolicitudService {
                     nueva.setSubType(dto.getPerson().getSubType());
                     if (dto.getPerson().getDni() != null) {
                         nueva.setDni(dto.getPerson().getDni().trim());
+                    }
+                    if (dto.getPerson().getSocialMedia() != null) {
+                        nueva.setSocialMedia(dto.getPerson().getSocialMedia().trim());
                     }
                     return personRepository.save(nueva);
                 });
@@ -436,6 +447,7 @@ public class SolicitudService {
         existing.setDescription(dto.getDescription());
         existing.setStatus(dto.getStatus());
         existing.setOrigin(dto.getOrigin());
+        existing.setTema(dto.getTema());
         existing.setZone(dto.getZone());
         existing.setContactDate(dto.getContactDate());
         existing.setResolutionDate(dto.getResolutionDate());

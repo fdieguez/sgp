@@ -33,6 +33,9 @@ public class Person {
 
     private String email;
 
+    @Column(name = "social_media", length = 500)
+    private String socialMedia;
+
     private String address;
 
     @ManyToOne

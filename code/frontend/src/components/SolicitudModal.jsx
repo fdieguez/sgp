@@ -60,9 +60,10 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         type: 'PEDIDO',
         description: '',
         status: 'pendiente',
-        origin: 'MANUAL',
+        origin: 'Directo de paco',
+        tema: '',
         entryDate: new Date().toISOString().split('T')[0],
-        person: { name: '', phone: '' },
+        person: { name: '', phone: '', dni: '', type: '', subType: '', socialMedia: '' },
         locationName: 'Santa Fe',
         barrio: '',
         responsableId: '',
@@ -79,7 +80,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     // Se desplaza esta declaración después de formData para evitar ReferenceError por acceso previo a la inicialización de formData.
     const canPonerConsideracion = user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN' || user?.role === 'RESPONSABLE' || isResolutorSubsidio === true || formData.status === 'consideracion';
     const canTomar = Boolean(formData.id && !formData.responsableId && (user?.role === 'RESPONSABLE' || user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN') && (!formData.zone || !user?.zone || formData.zone.toLowerCase() === user?.zone.toLowerCase() || user?.role?.includes('ADMIN')));
-    const isSubsidio = formData.type === 'SUBSIDIO' || (formData.assignments || []).some(a => a.tipoResolucion?.toUpperCase() === 'SUBSIDIO');
+    const isSubsidio = (formData.type && formData.type.toUpperCase().includes('SUBSIDIO')) || (formData.assignments || []).some(a => a.tipoResolucion && a.tipoResolucion.toUpperCase().includes('SUBSIDIO'));
 
     const handleTomar = async () => {
         if (!formData.id) return;
@@ -467,7 +468,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         ...initialData,
                         status: normStatus,
                         type: initialData.type || ((initialData.amount !== undefined && initialData.amount !== null) ? 'SUBSIDIO' : ((initialData.asistencia !== undefined && initialData.asistencia !== null) ? 'AGENDA' : (configId ? 'SUBSIDIO' : 'PEDIDO'))),
-                        person: initialData.person || { name: '', phone: '' },
+                        person: initialData.person || { name: '', phone: '', dni: '', type: '', subType: '', socialMedia: '' },
+                        tema: initialData.tema || '',
                         locationName: initialData.location?.type === 'NEIGHBORHOOD' ? (initialData.location?.parent?.name || '') : (initialData.location?.name || ''),
                         barrio: initialData.location?.type === 'NEIGHBORHOOD' ? (initialData.location?.name || '') : '',
                         responsableId: initialData.responsable?.id || '',
@@ -524,9 +526,10 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     type: configId ? (configId.toString() === '1' ? 'AGENDA' : 'SUBSIDIO') : 'PEDIDO',
                     description: '',
                     status: 'pendiente',
-                    origin: 'MANUAL',
+                    origin: 'Directo de paco',
+                    tema: '',
                     entryDate: new Date().toISOString().split('T')[0],
-                    person: { name: '', phone: '' },
+                    person: { name: '', phone: '', dni: '', type: '', subType: '', socialMedia: '' },
                     locationName: 'Santa Fe',
                     barrio: '',
                     responsableId: myRespId,
@@ -560,9 +563,10 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 type: 'PEDIDO',
                 description: '',
                 status: 'pendiente',
-                origin: 'MANUAL',
+                origin: 'Directo de paco',
+                tema: '',
                 entryDate: new Date().toISOString().split('T')[0],
-                person: { name: '', phone: '' },
+                person: { name: '', phone: '', dni: '', type: '', subType: '', socialMedia: '' },
                 locationName: 'Santa Fe',
                 barrio: '',
                 responsableId: '',
@@ -828,6 +832,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     description: formData.description,
                     status: formData.status,
                     origin: formData.origin,
+                    tema: formData.tema || null,
                     entryDate: formData.entryDate || null,
                     person: formData.person,
                     locationName: formData.locationName,
@@ -919,6 +924,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             description: formData.description,
                             status: formData.status,
                             origin: formData.origin,
+                    tema: formData.tema || null,
                             entryDate: formData.entryDate || null,
                             person: formData.person,
                             locationName: formData.locationName,
@@ -1249,16 +1255,13 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             )}
 
                             <div>
-                                <label className="block text-sm text-gray-500 mb-1">
-                                    DNI (Documento) {isSubsidio && <span className="text-red-400 font-bold">*</span>}
-                                </label>
+                                <label className="block text-sm text-gray-500 mb-1">Redes Sociales / Perfil</label>
                                 <input
                                     type="text"
-                                    placeholder="Ej: 34567890"
+                                    placeholder="Ej: @usuario o link de perfil"
                                     className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                    value={formData.person.dni || ''}
-                                    onChange={(e) => setFormData({ ...formData, person: { ...formData.person, dni: e.target.value } })}
-                                    onBlur={handleDniBlur}
+                                    value={formData.person.socialMedia || ''}
+                                    onChange={(e) => setFormData({ ...formData, person: { ...formData.person, socialMedia: e.target.value } })}
                                 />
                             </div>
                             <div>
@@ -1278,19 +1281,13 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     onChange={(e) => setFormData({ ...formData, person: { ...formData.person, type: e.target.value, subType: '' } })}
                                 >
                                     <option value="">Seleccionar...</option>
-                                    <option value="Club">Club</option>
-                                    <option value="Iglesia">Iglesia</option>
-                                    <option value="Escuela">Escuela</option>
-                                    <option value="Gobierno Local">Gobierno Local</option>
-                                    <option value="ONGs">ONGs</option>
-                                    <option value="Grupo social">Grupo social</option>
-                                    <option value="Comedor/Merendero">Comedor/Merendero</option>
+                                    <option value="Institucional">Institucional</option>
                                     <option value="Personal">Personal</option>
                                 </select>
                             </div>
                             {formData.person.type === 'Personal' && (
                                 <div>
-                                    <label className="block text-sm text-gray-500 mb-1">Subtipo</label>
+                                    <label className="block text-sm text-gray-500 mb-1">Subtipo Personal</label>
                                     <select
                                         className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
                                         value={formData.person.subType || ''}
@@ -1300,6 +1297,26 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                         <option value="joven">Joven</option>
                                         <option value="emprendedor">Emprendedor</option>
                                         <option value="referente">Referente</option>
+                                        <option value="otro">Otro</option>
+                                    </select>
+                                </div>
+                            )}
+                            {formData.person.type === 'Institucional' && (
+                                <div>
+                                    <label className="block text-sm text-gray-500 mb-1">Subtipo Institucional</label>
+                                    <select
+                                        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        value={formData.person.subType || ''}
+                                        onChange={(e) => setFormData({ ...formData, person: { ...formData.person, subType: e.target.value } })}
+                                    >
+                                        <option value="">Seleccionar...</option>
+                                        <option value="Club">Club</option>
+                                        <option value="Iglesia">Iglesia</option>
+                                        <option value="Escuela">Escuela</option>
+                                        <option value="Gobierno Local">Gobierno Local</option>
+                                        <option value="ONGs">ONGs</option>
+                                        <option value="Grupo social">Grupo social</option>
+                                        <option value="Comedor/Merendero">Comedor/Merendero</option>
                                         <option value="otro">Otro</option>
                                     </select>
                                 </div>
@@ -1379,23 +1396,47 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         />
                     </div>
 
-                    {/* Campo de Origen */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Origen</label>
-                        <select
-                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                            value={formData.origin || 'MANUAL'}
-                            onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
-                        >
-                            <option value="MANUAL">Manual / Personal</option>
-                            <option value="WHATSAPP">WhatsApp</option>
-                            <option value="NOTE">Nota / Expediente</option>
-                            <option value="INSTAGRAM">Instagram</option>
-                            <option value="FACEBOOK">Facebook</option>
-                            <option value="OTRO">Otro</option>
-                            <option value="PHONE">Teléfono</option>
-                            <option value="EMAIL">Email</option>
-                        </select>
+                    {/* Tema Solicitud y Origen */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-1">Tema Solicitud</label>
+                            <select
+                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                value={formData.tema || ''}
+                                onChange={(e) => setFormData({ ...formData, tema: e.target.value })}
+                            >
+                                <option value="">Seleccionar Tema...</option>
+                                <option value="DEPORTE">DEPORTE</option>
+                                <option value="SALUD">SALUD</option>
+                                <option value="CULTURA">CULTURA</option>
+                                <option value="EDUCACIÓN">EDUCACIÓN</option>
+                                <option value="SEGURIDAD">SEGURIDAD</option>
+                                <option value="VIVIENDA">VIVIENDA</option>
+                                <option value="TRABAJO / EMPRENDEDOR">TRABAJO / EMPRENDEDOR</option>
+                                <option value="ECONOMÍA - PRODUCCIÓN">ECONOMÍA - PRODUCCIÓN</option>
+                                <option value="TEMAS MUNICIPALES">TEMAS MUNICIPALES</option>
+                                <option value="TEMAS PROVINCIALES">TEMAS PROVINCIALES</option>
+                                <option value="ASISTENCIA / SUBSISTENCIA">ASISTENCIA / SUBSISTENCIA</option>
+                                <option value="OTROS">OTROS</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-1">Origen</label>
+                            <select
+                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                value={formData.origin || 'Directo de paco'}
+                                onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
+                            >
+                                <option value="Directo de paco">Directo de paco</option>
+                                <option value="Territorio">Territorio</option>
+                                <option value="Oficina">Oficina</option>
+                                <option value="Nota / Expediente">Nota / Expediente</option>
+                                <option value="Email">Email</option>
+                                <option value="Instagram">Instagram</option>
+                                <option value="Facebook">Facebook</option>
+                                <option value="Derivado">Derivado</option>
+                            </select>
+                        </div>
                     </div>
 
                     {/* Campos específicos de Agenda para visualización de solo lectura */}
@@ -1409,9 +1450,23 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         </div>
                     )}
 
-                    {/* Campos específicos de Subsidio (Opcionales) */}
+                    {/* Campos específicos de Subsidio */}
                     {formData.type === 'SUBSIDIO' && (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-top-2 p-4 bg-emerald-900/20 rounded-xl border border-emerald-800/50">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top-2 p-4 bg-emerald-900/20 rounded-xl border border-emerald-800/50">
+                            <div>
+                                <label className="block text-sm font-medium text-emerald-400 mb-1 flex items-center gap-1">
+                                    <UserIcon className="h-3 w-3" /> DNI Beneficiario <span className="text-red-400 font-bold">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="Ej: 34567890"
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                                    value={formData.person?.dni || ''}
+                                    onChange={(e) => setFormData({ ...formData, person: { ...formData.person, dni: e.target.value } })}
+                                    onBlur={handleDniBlur}
+                                />
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-emerald-400 mb-1 flex items-center gap-1">
                                     <DollarSign className="h-3 w-3" /> Monto (Opcional)
@@ -1532,18 +1587,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 </div>
                             )}
 
-                            <div className="flex items-center gap-2 pt-1">
-                                <input
-                                    type="checkbox"
-                                    id="firstContactControl"
-                                    className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500"
-                                    checked={formData.firstContactControl}
-                                    onChange={(e) => setFormData({ ...formData, firstContactControl: e.target.checked })}
-                                />
-                                <label htmlFor="firstContactControl" className="text-sm font-medium text-gray-300">
-                                    Control 1er Contacto Realizado
-                                </label>
-                            </div>
+
                         </div>
                     )}
 
@@ -1624,10 +1668,16 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                     <option value="" disabled>No hay tipos de resolución (configúrelos en Settings)</option>
                                                 )}
                                                 {tiposResolucion.map(c => {
-                                                    const resolutorName = c.resolutor ? (c.resolutor.firstName ? `${c.resolutor.firstName} ${c.resolutor.lastName}` : c.resolutor.email) : 'Área General (Sin usuario fijo)';
+                                                    let displayTipo = c.tipo;
+                                                    const upper = (c.tipo || '').toUpperCase();
+                                                    if (upper === 'AGENDA') displayTipo = 'Agenda';
+                                                    else if (upper === 'SUBSIDIO' || upper === 'SUBSIDIO EN DINERO') displayTipo = 'Subsidio en Dinero';
+                                                    else if (upper === 'SUBSIDIO EN ESPECIE') displayTipo = 'Subsidio en Especie';
+                                                    else if (upper.includes('DECLARACION') || upper.includes('DECLARACIÓN')) displayTipo = 'Declaración de interés';
+                                                    else if (upper === 'OTRA' || upper === 'OTRO') displayTipo = 'Otro';
                                                     return (
                                                         <option key={c.id} value={c.tipo}>
-                                                            {c.tipo} - {resolutorName}
+                                                            {displayTipo}
                                                         </option>
                                                     );
                                                 })}
@@ -1671,8 +1721,13 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                 const campo = ac.atributo;
 
                                                                 // Lógica condicional específica para SUBSIDIO
-                                                                if (assignment.tipoResolucion === 'SUBSIDIO') {
-                                                                    const tipoPedido = currentData['Tipo de pedido'] || '';
+                                                                const isSubsidioAssoc = (assignment.tipoResolucion || '').toUpperCase().includes('SUBSIDIO');
+                                                                if (isSubsidioAssoc) {
+                                                                    let tipoPedido = currentData['Tipo de pedido'] || '';
+                                                                    if (!tipoPedido) {
+                                                                        if (assignment.tipoResolucion === 'SUBSIDIO EN ESPECIE') tipoPedido = 'Institucional en especie';
+                                                                        else if (assignment.tipoResolucion === 'SUBSIDIO EN DINERO') tipoPedido = 'Institucional en dinero';
+                                                                    }
                                                                     const camposPersonal = [
                                                                         'Nombre y apellido', 'DNI', 'Teléfono', 'Compañía', 'Dirección de DNI',
                                                                         'DNI frente', 'DNI dorso', 'Constancia de CBU'
@@ -1717,7 +1772,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                 }
 
                                                                 // Campo de Localidad para SUBSIDIO: Input de texto libre con sugerencias mediante datalist
-                                                                if (assignment.tipoResolucion === 'SUBSIDIO' && campo.nombre === 'Localidad') {
+                                                                if (isSubsidioAssoc && campo.nombre === 'Localidad') {
                                                                     const datalistId = `datalist-localidades-subsidio-${index}`;
                                                                     return (
                                                                         <div key={campo.id}>
@@ -1728,11 +1783,20 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                                 type="text"
                                                                                 list={datalistId}
                                                                                 placeholder="Escribir o seleccionar localidad..."
-                                                                                value={currentData[campo.nombre] || ''}
+                                                                                value={currentData[campo.nombre] !== undefined ? currentData[campo.nombre] : (campo.nombre === 'DNI' ? (formData.person?.dni || '') : '')}
                                                                                 onChange={e => {
+                                                                                    const val = e.target.value;
                                                                                     const newAssignments = [...formData.assignments];
-                                                                                    newAssignments[index].detalle = { ...currentData, [campo.nombre]: e.target.value };
-                                                                                    setFormData({ ...formData, assignments: newAssignments });
+                                                                                    newAssignments[index].detalle = { ...currentData, [campo.nombre]: val };
+                                                                                    if (campo.nombre === 'DNI' && val) {
+                                                                                        setFormData(prev => ({
+                                                                                            ...prev,
+                                                                                            person: { ...prev.person, dni: val },
+                                                                                            assignments: newAssignments
+                                                                                        }));
+                                                                                    } else {
+                                                                                        setFormData({ ...formData, assignments: newAssignments });
+                                                                                    }
                                                                                 }}
                                                                                 className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none block disabled:opacity-50"
                                                                                 disabled={!canEditThis}
@@ -1977,11 +2041,20 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                         return (
                                                                             <input
                                                                                 type={campo.tipoDato === 'DATE' || campo.nombre === 'Día' ? 'date' : (campo.tipoDato === 'TIME' || campo.nombre === 'Hora' ? 'time' : (campo.tipoDato === 'NUMBER' ? 'number' : 'text'))}
-                                                                                value={currentData[campo.nombre] || ''}
+                                                                                value={currentData[campo.nombre] !== undefined ? currentData[campo.nombre] : (campo.nombre === 'DNI' ? (formData.person?.dni || '') : '')}
                                                                                 onChange={e => {
+                                                                                    const val = e.target.value;
                                                                                     const newAssignments = [...formData.assignments];
-                                                                                    newAssignments[index].detalle = { ...currentData, [campo.nombre]: e.target.value };
-                                                                                    setFormData({ ...formData, assignments: newAssignments });
+                                                                                    newAssignments[index].detalle = { ...currentData, [campo.nombre]: val };
+                                                                                    if (campo.nombre === 'DNI' && val) {
+                                                                                        setFormData(prev => ({
+                                                                                            ...prev,
+                                                                                            person: { ...prev.person, dni: val },
+                                                                                            assignments: newAssignments
+                                                                                        }));
+                                                                                    } else {
+                                                                                        setFormData({ ...formData, assignments: newAssignments });
+                                                                                    }
                                                                                 }}
                                                                                 className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none block disabled:opacity-50"
                                                                                 disabled={!canEditThis}

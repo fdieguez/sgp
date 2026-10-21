@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Calendar, User, MapPin, Tag, Box, DollarSign, Clock, Hash, History, ArrowRight, FileText, UploadCloud, Download, Trash2, Plus } from 'lucide-react';
+import { X, Calendar, User, MapPin, Tag, Box, DollarSign, Clock, Hash, History, ArrowRight, FileText, UploadCloud, Download, Trash2, Plus, Share2 } from 'lucide-react';
 import api from '../config/axios';
 import TicketSeguimiento from './TicketSeguimiento';
 
@@ -253,6 +253,17 @@ export default function SolicitudDetailModal({ isOpen, onClose, solicitud }) {
                                             <div>
                                                 <div className="text-[10px] text-gray-500 uppercase font-bold">Documento / ID</div>
                                                 <div className="text-sm font-medium">{solicitud.person?.dni || '-'}</div>
+                                            </div>
+                                        </div>
+                                        {solicitud.person?.socialMedia && (
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-pink-500/10 rounded-lg"><Share2 className="h-4 w-4 text-pink-400" /></div>
+                                                <div>
+                                                    <div className="text-[10px] text-gray-500 uppercase font-bold">Redes Sociales / Perfil</div>
+                                                    <div className="text-sm font-medium text-pink-300">{solicitud.person.socialMedia}</div>
+                                                </div>
+                                            </div>
+                                        )}
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-3">
