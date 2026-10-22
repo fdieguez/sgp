@@ -209,19 +209,13 @@ export default function SolicitudDetailModal({ isOpen, onClose, solicitud }) {
                                                 <div className="text-sm font-semibold">{formatDate(solicitud.grantDate)}</div>
                                             </div>
                                         )}
-                                        <div className="bg-gray-900/30 p-3 rounded-xl border border-gray-700/30 col-span-2">
-                                            <div className="text-[10px] text-gray-500 uppercase font-bold">1er Contacto</div>
-                                            <div className="text-sm font-semibold flex items-center gap-2 mt-1">
-                                                {solicitud.firstContactControl ? (
-                                                    <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded border border-emerald-500/30 flex items-center gap-1">
-                                                        ✅ Control 1er Contacto Realizado
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-xs bg-gray-800 text-gray-400 px-2 py-1 rounded border border-gray-700">
-                                                        Pendiente de 1er contacto
-                                                    </span>
-                                                )}
-                                            </div>
+                                        <div className="bg-gray-900/30 p-3 rounded-xl border border-gray-700/30">
+                                            <div className="text-[10px] text-gray-500 uppercase font-bold">Tema Solicitud</div>
+                                            <div className="text-sm font-semibold text-indigo-300">{solicitud.tema || 'Sin tema'}</div>
+                                        </div>
+                                        <div className="bg-gray-900/30 p-3 rounded-xl border border-gray-700/30">
+                                            <div className="text-[10px] text-gray-500 uppercase font-bold">Origen</div>
+                                            <div className="text-sm font-semibold text-gray-300">{solicitud.origin || 'Directo de paco'}</div>
                                         </div>
                                     </div>
                                 </section>
