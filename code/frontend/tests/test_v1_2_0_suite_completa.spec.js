@@ -1,62 +1,50 @@
 import { test, expect } from '@playwright/test';
 
+/**
+ * 🎯 Suite Completa E2E: Versión 1.2.0
+ * 
+ * Cobertura de funcionalidades:
+ *  - Carga inicial:
+ *      * Sin campo DNI en cabecera
+ *      * Tipo Solicitante Institucional / Personal y sus subtipos obligatorios
+ *      * Tema Solicitud (12 temas normalizados)
+ *      * Redes Sociales (persistencia del perfil)
+ *      * Clasificación de Origen (8 orígenes)
+ *      * Remoción de check de primer contacto
+ *  - Etapa 2 (Permisos y Estados Automáticos):
+ *      * Bloqueo de Carga Original para no creadores (solo Operador o Creador)
+ *      * Subsidios propuestos (Dinero y Especie): DNI obligatorio en subsidio,
+ *        edición permitida solo a Creador y Resolutor asignado, bloqueo para terceros
+ *      * Estados Automáticos:
+ *          - Sin resolución -> "Asignadas" (en proceso)
+ *          - Con resolución -> "En Resolución"
+ *      * Resolutores limpios sin nombres en el selector
+ *      * Verificación de persistencia en Modal de Detalle
+ */
+
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
 
 const CREDENCIALES = {
-  ADMIN: { 
-    email: 'admin@sgp.com', 
-    passwords: ['SGP_Admin_#J57f_Prod_Secure_!', 'SGP_Admin_#gAfU_Prod_Secure_!', 'SGP_Admin_#2026_Prod_Secure_!', 'password'] 
-  },
-  RESPONSABLE: {
-    email: 'dieguezfrancisco@gmail.com',
-    passwords: ['password']
-  },
-  RESPONSABLE_OTRO: {
-    email: 'lea.aufranc@gmail.com',
-    passwords: ['Leandro&trYi&Kb', 'password']
-  },
-  OPERADOR: {
-    email: 'celeste_solari19@hotmail.com',
-    passwords: ['Celeste_SGP_Npg8#', 'password']
-  },
-  RESOLUTOR_SUBSIDIO: {
-    email: 'martinnocioni@gmail.com',
-    passwords: ['Martin_SGP_b7kP*', 'password']
-  }
+  ADMIN: { email: 'admin@sgp.com', password: 'password' },
+  OPERADOR: { email: 'carinacdevard@gmail.com', password: 'password' },
+  RESPONSABLE: { email: 'hrdorigo@gmail.com', password: 'password' },
+  RESPONSABLE_OTRO: { email: 'sabrivschmidt@gmail.com', password: 'password' },
+  RESOLUTOR_SUBSIDIO: { email: 'resolutor@sgp.com', password: 'password' }
 };
 
 const iniciarSesion = async (page, email, rolASeleccionar = null) => {
-  await page.goto(`${BASE_URL}/login`, { timeout: 15000, waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(500);
+  await page.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle' });
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+  await page.reload({ waitUntil: 'networkidle' });
 
-  const botonSalir = page.locator('button:has-text("Salir")');
-  if (await botonSalir.count() > 0) {
-    await botonSalir.click();
-    await page.waitForURL(/.*login.*/, { timeout: 10000 });
-  }
+  await page.fill('input[type="email"], input[name="email"]', email);
+  await page.fill('input[type="password"], input[name="password"]', 'password');
+  await page.click('button[type="submit"]');
 
-  const intentarLogin = async (pass) => {
-    await page.locator('input[type="email"]').fill(email);
-    await page.locator('input[type="password"]').fill(pass);
-    await page.click('button:has-text("Ingresar")');
-    try {
-      await page.waitForURL(/.*(dashboard|mis-solicitudes|settings|select-rol|resolutor-settings).*/, { timeout: 6000 });
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const cred = Object.values(CREDENCIALES).find(c => c.email === email);
-  const passList = cred ? cred.passwords : ['password'];
-
-  for (const pass of passList) {
-    const ok = await intentarLogin(pass);
-    if (ok) break;
-  }
-
-  await page.waitForURL(/.*(dashboard|mis-solicitudes|settings|select-rol|resolutor-settings).*/, { timeout: 15000 });
-  await page.waitForTimeout(500);
+  await page.waitForURL(url => !url.pathname.includes('/login'), { timeout: 15000 });
 
   if (page.url().includes('/select-rol')) {
     if (rolASeleccionar) {
@@ -74,10 +62,6 @@ const iniciarSesion = async (page, email, rolASeleccionar = null) => {
 };
 
 test.describe('🎯 Suite Completa E2E: Versión 1.2.0 (Flujos Cruzados, Roles, Validaciones y Modal Detalle)', () => {
-
-  test.beforeEach(async () => {
-    test.setTimeout(90000);
-  });
 
   test('CP-01: Flujo cruzado completo: Creación por Responsable -> Asignadas -> Bloqueo para Responsable no creador -> Edición libre para Operador', async ({ page }) => {
     const timestamp = Date.now();
@@ -123,6 +107,11 @@ test.describe('🎯 Suite Completa E2E: Versión 1.2.0 (Flujos Cruzados, Roles, 
     await iniciarSesion(page, CREDENCIALES.RESPONSABLE_OTRO.email, 'RESPONSABLE');
     await page.goto(`${BASE_URL}/dashboard`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(500);
+    const tabAsignadasOtro = page.locator('button:has-text("Asignadas")').first();
+    if (await tabAsignadasOtro.count() > 0) {
+      await tabAsignadasOtro.click();
+      await page.waitForTimeout(500);
+    }
     const inputBuscarOtro = page.locator('input[placeholder*="Buscar"]').first();
     if (await inputBuscarOtro.count() > 0) {
       await inputBuscarOtro.fill(nombrePersona);
@@ -145,6 +134,13 @@ test.describe('🎯 Suite Completa E2E: Versión 1.2.0 (Flujos Cruzados, Roles, 
     await iniciarSesion(page, CREDENCIALES.OPERADOR.email, 'OPERADOR');
     await page.goto(`${BASE_URL}/dashboard`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(500);
+
+    const tabAsignadasOp = page.locator('button:has-text("Asignadas")').first();
+    if (await tabAsignadasOp.count() > 0) {
+      await tabAsignadasOp.click();
+      await page.waitForTimeout(500);
+    }
+
     await page.locator('input[placeholder*="Buscar"]').first().fill(nombrePersona);
     await page.waitForTimeout(500);
 
@@ -217,6 +213,13 @@ test.describe('🎯 Suite Completa E2E: Versión 1.2.0 (Flujos Cruzados, Roles, 
     await iniciarSesion(page, CREDENCIALES.RESPONSABLE_OTRO.email, 'RESPONSABLE');
     await page.goto(`${BASE_URL}/dashboard`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(500);
+
+    const tabEnResOtro = page.locator('button:has-text("En Resolución")').first();
+    if (await tabEnResOtro.count() > 0) {
+      await tabEnResOtro.click();
+      await page.waitForTimeout(500);
+    }
+
     await page.locator('input[placeholder*="Buscar"]').first().fill(nombrePersona);
     await page.waitForTimeout(500);
 
@@ -241,6 +244,13 @@ test.describe('🎯 Suite Completa E2E: Versión 1.2.0 (Flujos Cruzados, Roles, 
     await iniciarSesion(page, CREDENCIALES.RESOLUTOR_SUBSIDIO.email, 'RESOLUTOR');
     await page.goto(`${BASE_URL}/dashboard`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(500);
+
+    const tabEnResResolutor = page.locator('button:has-text("En Resolución")').first();
+    if (await tabEnResResolutor.count() > 0) {
+      await tabEnResResolutor.click();
+      await page.waitForTimeout(500);
+    }
+
     await page.locator('input[placeholder*="Buscar"]').first().fill(nombrePersona);
     await page.waitForTimeout(500);
 
