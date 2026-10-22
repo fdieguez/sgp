@@ -318,24 +318,40 @@ public class SolicitudService {
             solicitud.setLocation(l);
         }
 
-        // 3. Valores predeterminados
-        if (solicitud.getStatus() == null) {
-            solicitud.setStatus("pendiente");
-        }
-        if (solicitud.getEntryDate() == null) {
-            solicitud.setEntryDate(java.time.LocalDate.now());
-        }
-
         // Establecer seguimiento de creación
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        User currentUser = null;
         if (auth != null && auth.isAuthenticated() && !auth.getName().equals("anonymousUser")) {
-            userRepository.findByEmail(auth.getName()).ifPresent(solicitud::setCreatedBy);
+            currentUser = userRepository.findByEmail(auth.getName()).orElse(null);
+            if (currentUser != null) {
+                solicitud.setCreatedBy(currentUser);
+                // Punto 9: Si el creador es Responsable y no se especificó otro responsable, auto-asignarlo
+                if (currentUser.getRole() != null && currentUser.getRole().equalsIgnoreCase("RESPONSABLE")) {
+                    if (solicitud.getResponsable() == null) {
+                        solicitud.setResponsable(currentUser);
+                    }
+                }
+            }
+        }
+
+        // 3. Valores predeterminados
+        if (solicitud.getEntryDate() == null) {
+            solicitud.setEntryDate(java.time.LocalDate.now());
         }
 
         Solicitud saved = solicitudRepository.save(solicitud);
 
         // Procesar asignaciones si están presentes
-        processAssignments(saved, solicitud.getAssignments());
+        boolean isCreator = true;
+        boolean isOperadorOrAdmin = currentUser != null && currentUser.getRole() != null &&
+                (currentUser.getRole().equalsIgnoreCase("OPERADOR") ||
+                 currentUser.getRole().equalsIgnoreCase("ADMINISTRADOR") ||
+                 currentUser.getRole().equalsIgnoreCase("ADMIN"));
+        processAssignments(saved, solicitud.getAssignments(), currentUser, isCreator, isOperadorOrAdmin);
+
+        // Actualizar estado automático según reglas de negocio (Punto 9)
+        updateSolicitudStatus(saved);
+        saved = solicitudRepository.save(saved);
 
         // Registrar la creación en el historial
         if (saved.getCreatedBy() != null) {
@@ -357,6 +373,23 @@ public class SolicitudService {
         User oldResponsable = existing.getResponsable();
         String oldStatus = existing.getStatus();
 
+        // Determinar permisos sobre la carga inicial (Punto 6)
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        User currentUser = null;
+        if (auth != null && auth.isAuthenticated() && !auth.getName().equals("anonymousUser")) {
+            currentUser = userRepository.findByEmail(auth.getName()).orElse(null);
+        }
+
+        boolean isOperadorOrAdmin = currentUser != null && currentUser.getRole() != null &&
+                (currentUser.getRole().equalsIgnoreCase("OPERADOR") ||
+                 currentUser.getRole().equalsIgnoreCase("ADMINISTRADOR") ||
+                 currentUser.getRole().equalsIgnoreCase("ADMIN"));
+
+        boolean isCreator = currentUser != null && existing.getCreatedBy() != null &&
+                existing.getCreatedBy().getId().equals(currentUser.getId());
+
+        boolean canEditInitialData = isOperadorOrAdmin || isCreator;
+
         // Validación obligatoria de DNI para subsidios
         boolean isSubsidio = (dto.getType() != null && dto.getType().toUpperCase().contains("SUBSIDIO")) ||
                 (existing.getType() != null && existing.getType().toUpperCase().contains("SUBSIDIO")) ||
@@ -368,8 +401,8 @@ public class SolicitudService {
             }
         }
 
-        // 1. Actualizar beneficiario
-        if (dto.getPerson() != null) {
+        // 1. Actualizar beneficiario (Solo si tiene permiso sobre carga original - Punto 6)
+        if (canEditInitialData && dto.getPerson() != null) {
             Person p;
             if (dto.getPerson().getId() != null) {
                 // Persona existente: actualizar sus campos
@@ -407,8 +440,8 @@ public class SolicitudService {
             existing.setPerson(p);
         }
 
-        // 2. Actualizar ubicación usando los campos planos del DTO
-        if (dto.getLocationName() != null && !dto.getLocationName().trim().isEmpty()) {
+        // 2. Actualizar ubicación usando los campos planos del DTO (Solo si tiene permiso sobre carga original - Punto 6)
+        if (canEditInitialData && dto.getLocationName() != null && !dto.getLocationName().trim().isEmpty()) {
             final String cityName = dto.getLocationName().trim();
             final String inputBarrio = (dto.getBarrio() != null && !dto.getBarrio().trim().isEmpty())
                     ? dto.getBarrio().trim() : null;
@@ -440,14 +473,20 @@ public class SolicitudService {
             }
         }
 
-        // 3. Actualizar campos primitivos
-        if (dto.getType() != null) {
-            existing.setType(dto.getType());
+        // 3. Actualizar campos primitivos (Solo si tiene permiso sobre carga original - Punto 6)
+        if (canEditInitialData) {
+            if (dto.getType() != null) {
+                existing.setType(dto.getType());
+            }
+            existing.setDescription(dto.getDescription());
+            existing.setOrigin(dto.getOrigin());
+            existing.setTema(dto.getTema());
+            if (dto.getEntryDate() != null) {
+                existing.setEntryDate(dto.getEntryDate());
+            }
         }
-        existing.setDescription(dto.getDescription());
+
         existing.setStatus(dto.getStatus());
-        existing.setOrigin(dto.getOrigin());
-        existing.setTema(dto.getTema());
         existing.setZone(dto.getZone());
         existing.setContactDate(dto.getContactDate());
         existing.setResolutionDate(dto.getResolutionDate());
@@ -456,15 +495,13 @@ public class SolicitudService {
         existing.setDetail(dto.getDetail());
         existing.setFirstContactControl(dto.getFirstContactControl());
 
-        if (dto.getEntryDate() != null) {
-            existing.setEntryDate(dto.getEntryDate());
+        // 4. Campos específicos de Subsidio (Punto 8)
+        boolean canEditSubsidioData = isCreator || isOperadorOrAdmin;
+        if (canEditSubsidioData) {
+            if (dto.getAmount() != null) existing.setAmount(dto.getAmount());
+            if (dto.getGrantDate() != null) existing.setGrantDate(dto.getGrantDate());
+            if (dto.getSubsidioType() != null) existing.setSubsidioType(dto.getSubsidioType());
         }
-
-        // 4. Campos específicos de Subsidio
-        // 4. Campos específicos
-        if (dto.getAmount() != null) existing.setAmount(dto.getAmount());
-        if (dto.getGrantDate() != null) existing.setGrantDate(dto.getGrantDate());
-        if (dto.getSubsidioType() != null) existing.setSubsidioType(dto.getSubsidioType());
 
         // 5. Flujo de sugerencia de resolución
         String newSuggestedType = dto.getSuggestedResolutionType();
@@ -494,8 +531,8 @@ public class SolicitudService {
 
         Solicitud saved = solicitudRepository.save(existing);
 
-        // 7. Sincronizar asignaciones de resolutores
-        processAssignments(saved, dto.getAssignments());
+        // 7. Sincronizar asignaciones de resolutores (Punto 8)
+        processAssignments(saved, dto.getAssignments(), currentUser, isCreator, isOperadorOrAdmin);
 
         // 8. Recalcular estado automático (solo si no se cambió de forma manual en el DTO)
         boolean statusChangedManually = dto.getStatus() != null && !dto.getStatus().equalsIgnoreCase(oldStatus);
@@ -545,7 +582,7 @@ public class SolicitudService {
         asignacionHistorialRepository.save(history);
     }
 
-    private void processAssignments(Solicitud solicitud, List<ResolutorAssignmentDTO> dtos) {
+    private void processAssignments(Solicitud solicitud, List<ResolutorAssignmentDTO> dtos, User currentUser, boolean isCreator, boolean isOperadorOrAdmin) {
         if (dtos == null) return;
         
         List<SolicitudResolutorAssignment> currentAssignments = solicitud.getResolutorAssignments();
@@ -555,13 +592,25 @@ public class SolicitudService {
         }
 
         // 1. Eliminar asignaciones que ya no están presentes en el listado recibido del cliente
-        currentAssignments.removeIf(existing -> dtos.stream().noneMatch(dto ->
-                dto.getResolutorEmail() != null &&
-                dto.getTipoResolucion() != null &&
-                existing.getResolutor() != null &&
-                dto.getResolutorEmail().equalsIgnoreCase(existing.getResolutor().getEmail()) &&
-                dto.getTipoResolucion().equalsIgnoreCase(existing.getTipoResolucion())
-        ));
+        currentAssignments.removeIf(existingAssignment -> {
+            boolean isSubsidio = existingAssignment.getTipoResolucion() != null &&
+                    existingAssignment.getTipoResolucion().toUpperCase().contains("SUBSIDIO");
+            if (isSubsidio) {
+                boolean isAssignedResolutor = existingAssignment.getResolutor() != null &&
+                        currentUser != null && existingAssignment.getResolutor().getId().equals(currentUser.getId());
+                boolean canDeleteSubsidio = isCreator || isAssignedResolutor || isOperadorOrAdmin;
+                if (!canDeleteSubsidio) {
+                    return false; // Proteger asignación de subsidio si no tiene permisos (Punto 8)
+                }
+            }
+            return dtos.stream().noneMatch(dto ->
+                    dto.getResolutorEmail() != null &&
+                    dto.getTipoResolucion() != null &&
+                    existingAssignment.getResolutor() != null &&
+                    dto.getResolutorEmail().equalsIgnoreCase(existingAssignment.getResolutor().getEmail()) &&
+                    dto.getTipoResolucion().equalsIgnoreCase(existingAssignment.getTipoResolucion())
+            );
+        });
         
         // 2. Actualizar las asignaciones existentes o agregar las nuevas sin reiniciar la colección
         for (ResolutorAssignmentDTO dto : dtos) {
@@ -576,18 +625,26 @@ public class SolicitudService {
                         .findFirst()
                         .orElse(null);
                         
+                boolean isSubsidio = dto.getTipoResolucion().toUpperCase().contains("SUBSIDIO");
+                boolean isAssignedResolutor = currentUser != null && resolutor.getId().equals(currentUser.getId());
+                boolean canEditThisAssignment = !isSubsidio || isCreator || isAssignedResolutor || isOperadorOrAdmin;
+
                 if (existing != null) {
-                    // Actualizar el detalle de la asignación existente de forma directa
-                    existing.setDetalle(dto.getDetalle());
+                    // Actualizar el detalle de la asignación existente solo si tiene permiso (Punto 8)
+                    if (canEditThisAssignment) {
+                        existing.setDetalle(dto.getDetalle());
+                    }
                 } else {
-                    // Crear y agregar una nueva asignación
-                    SolicitudResolutorAssignment assignment = SolicitudResolutorAssignment.builder()
-                            .solicitud(solicitud)
-                            .resolutor(resolutor)
-                            .tipoResolucion(dto.getTipoResolucion())
-                            .detalle(dto.getDetalle())
-                            .build();
-                    currentAssignments.add(assignment);
+                    // Solo quien puede crear/proponer subsidio puede agregar nueva asignación de subsidio
+                    if (canEditThisAssignment) {
+                        SolicitudResolutorAssignment assignment = SolicitudResolutorAssignment.builder()
+                                .solicitud(solicitud)
+                                .resolutor(resolutor)
+                                .tipoResolucion(dto.getTipoResolucion())
+                                .detalle(dto.getDetalle())
+                                .build();
+                        currentAssignments.add(assignment);
+                    }
                 }
             }
 
@@ -596,7 +653,7 @@ public class SolicitudService {
             }
 
             // Requisito R1: Procesar la asignación de tipo SUBSIDIO y extraer su monto desde el JSON de detalle
-            if (dto.getTipoResolucion() != null && dto.getTipoResolucion().equalsIgnoreCase("SUBSIDIO")) {
+            if (dto.getTipoResolucion() != null && dto.getTipoResolucion().toUpperCase().contains("SUBSIDIO")) {
                 solicitud.setType("SUBSIDIO");
                 if (dto.getDetalle() != null && !dto.getDetalle().trim().isEmpty()) {
                     try {

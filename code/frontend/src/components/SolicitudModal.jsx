@@ -82,6 +82,18 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const canTomar = Boolean(formData.id && !formData.responsableId && (user?.role === 'RESPONSABLE' || user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN') && (!formData.zone || !user?.zone || formData.zone.toLowerCase() === user?.zone.toLowerCase() || user?.role?.includes('ADMIN')));
     const isSubsidio = (formData.type && formData.type.toUpperCase().includes('SUBSIDIO')) || (formData.assignments || []).some(a => a.tipoResolucion && a.tipoResolucion.toUpperCase().includes('SUBSIDIO'));
 
+    // Permisos Etapa 2 (Punto 6 y Punto 8)
+    const isNewSolicitud = !formData.id;
+    const isOperadorOrAdmin = user?.role === 'OPERADOR' || user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN';
+    const isCreator = Boolean(
+        formData.createdBy && (
+            (formData.createdBy.id && user?.id && Number(formData.createdBy.id) === Number(user.id)) ||
+            (formData.createdBy.email && user?.email && formData.createdBy.email.toLowerCase() === user.email.toLowerCase())
+        )
+    );
+    // Punto 6: La carga inicial solo puede cambiarla el Operador/Admin, o el Responsable si él mismo la cargó
+    const canEditInitialData = isNewSolicitud || isOperadorOrAdmin || isCreator;
+
     const handleTomar = async () => {
         if (!formData.id) return;
         setLoading(true);
@@ -525,7 +537,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 setFormData({
                     type: configId ? (configId.toString() === '1' ? 'AGENDA' : 'SUBSIDIO') : 'PEDIDO',
                     description: '',
-                    status: 'pendiente',
+                    status: (user?.role === 'RESPONSABLE') ? 'en proceso' : 'pendiente',
                     origin: 'Directo de paco',
                     tema: '',
                     entryDate: new Date().toISOString().split('T')[0],
@@ -858,10 +870,17 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 await api.put(`/api/solicitudes/${formData.id}`, updatePayload);
             } else {
                 // POST mantiene el formato original con polimorfismo (entidad completa)
+                // Punto 9: Si un responsable carga, el estado es "en proceso" (Asignadas) sin resolución, o "en resolucion" con resolución
+                let calculatedStatus = formData.status;
+                if (user?.role === 'RESPONSABLE') {
+                    const hasAssignments = assignments && assignments.length > 0;
+                    calculatedStatus = hasAssignments ? 'en resolucion' : 'en proceso';
+                }
                 const createPayload = {
                     ...formData,
+                    status: calculatedStatus,
                     zone: formData.zone || selectedZone || null,
-                    responsable: formData.responsableId ? { id: Number(formData.responsableId) } : null,
+                    responsable: formData.responsableId ? { id: Number(formData.responsableId) } : (user?.role === 'RESPONSABLE' && user?.id ? { id: Number(user.id) } : null),
                     assignments
                 };
                 const response = await api.post('/api/solicitudes', createPayload);
@@ -1162,6 +1181,14 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         )}
                     </div>
 
+                    {/* Banner de restricción de edición de carga original (Punto 6) */}
+                    {!canEditInitialData && !isReadOnly && (
+                        <div className="p-3 bg-amber-950/40 border border-amber-500/50 rounded-xl flex items-center gap-2.5 text-xs text-amber-200">
+                            <Lock className="h-4 w-4 text-amber-400 shrink-0" />
+                            <span>Los datos de la carga inicial solo pueden ser modificados por el Operador o el Responsable que cargó este pedido.</span>
+                        </div>
+                    )}
+
                     {/* Datos de la Persona */}
                     <div className="space-y-4 p-4 bg-gray-900/40 rounded-xl border border-gray-700">
                         <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
@@ -1173,6 +1200,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     value={formData.person.name}
                                     placeholder="Buscar por nombre o DNI (Autocompletado inteligente)..."
                                     required
+                                    disabled={!canEditInitialData || isReadOnly}
                                     label="Nombre Completo / Institución"
                                     selectedPerson={selectedPersonStats || formData.person}
                                     showStatsBadge={true}
@@ -1259,7 +1287,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 <input
                                     type="text"
                                     placeholder="Ej: @usuario o link de perfil"
-                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                    disabled={!canEditInitialData || isReadOnly}
+                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                                     value={formData.person.socialMedia || ''}
                                     onChange={(e) => setFormData({ ...formData, person: { ...formData.person, socialMedia: e.target.value } })}
                                 />
@@ -1268,7 +1297,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 <label className="block text-sm text-gray-500 mb-1">Teléfono</label>
                                 <input
                                     type="text"
-                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                                    disabled={!canEditInitialData || isReadOnly}
+                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white disabled:opacity-50"
                                     value={formData.person.phone}
                                     onChange={(e) => setFormData({ ...formData, person: { ...formData.person, phone: e.target.value } })}
                                 />
@@ -1276,7 +1306,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             <div>
                                 <label className="block text-sm text-gray-500 mb-1">Tipo Solicitante</label>
                                 <select
-                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                    disabled={!canEditInitialData || isReadOnly}
+                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                                     value={formData.person.type || ''}
                                     onChange={(e) => setFormData({ ...formData, person: { ...formData.person, type: e.target.value, subType: '' } })}
                                 >
@@ -1289,7 +1320,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 <div>
                                     <label className="block text-sm text-gray-500 mb-1">Subtipo Personal</label>
                                     <select
-                                        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        disabled={!canEditInitialData || isReadOnly}
+                                        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                                         value={formData.person.subType || ''}
                                         onChange={(e) => setFormData({ ...formData, person: { ...formData.person, subType: e.target.value } })}
                                     >
@@ -1305,7 +1337,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 <div>
                                     <label className="block text-sm text-gray-500 mb-1">Subtipo Institucional</label>
                                     <select
-                                        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                        disabled={!canEditInitialData || isReadOnly}
+                                        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                                         value={formData.person.subType || ''}
                                         onChange={(e) => setFormData({ ...formData, person: { ...formData.person, subType: e.target.value } })}
                                     >
@@ -1333,7 +1366,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 <label className="block text-sm text-gray-500 mb-1">Localidad</label>
                                 <select
                                     required
-                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                                    disabled={!canEditInitialData || isReadOnly}
+                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                                     value={formData.locationName}
                                     onChange={(e) => setFormData({ ...formData, locationName: e.target.value, barrio: '' })} // Reset barrio al cambiar ciudad
                                 >
@@ -1350,7 +1384,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                                     value={formData.barrio}
                                     onChange={(e) => setFormData({ ...formData, barrio: e.target.value })}
-                                    disabled={!formData.locationName}
+                                    disabled={!canEditInitialData || isReadOnly || !formData.locationName}
                                 >
                                     <option value="">{selectedCity ? "Seleccione Barrio..." : "Primero elija localidad"}</option>
                                     {availableNeighborhoods.map(n => (
@@ -1380,7 +1414,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         <textarea
                             required
                             rows="2"
-                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                            disabled={!canEditInitialData || isReadOnly}
+                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                         />
@@ -1401,7 +1436,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         <div>
                             <label className="block text-sm font-medium text-gray-400 mb-1">Tema Solicitud</label>
                             <select
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                disabled={!canEditInitialData || isReadOnly}
+                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
                                 value={formData.tema || ''}
                                 onChange={(e) => setFormData({ ...formData, tema: e.target.value })}
                             >
@@ -1423,7 +1459,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         <div>
                             <label className="block text-sm font-medium text-gray-400 mb-1">Origen</label>
                             <select
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                disabled={!canEditInitialData || isReadOnly}
+                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
                                 value={formData.origin || 'Directo de paco'}
                                 onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
                             >
@@ -1686,23 +1723,37 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                     );
                                                 })}
                                             </select>
-                                            {!isResolutor && (
-                                                <button 
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const newAssignments = formData.assignments.filter((_, i) => i !== index);
-                                                        setFormData({ ...formData, assignments: newAssignments });
-                                                    }}
-                                                    className="text-red-400 hover:text-red-300 p-1"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
-                                            )}
+                                            {(() => {
+                                                const isSubsidioAssoc = (assignment.tipoResolucion || '').toUpperCase().includes('SUBSIDIO');
+                                                const isAssignedResolutor = Boolean(
+                                                    (assignment.resolutorEmail && user?.email && assignment.resolutorEmail.toLowerCase() === user.email.toLowerCase())
+                                                );
+                                                const canEditThisAsgn = isNewSolicitud || (isSubsidioAssoc ? (isCreator || isAssignedResolutor || isOperadorOrAdmin) : (!isResolutor || isAssignedResolutor || isOperadorOrAdmin || isCreator));
+                                                
+                                                return !isReadOnly && canEditThisAsgn && (!isResolutor || isOperadorOrAdmin) && (
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newAssignments = formData.assignments.filter((_, i) => i !== index);
+                                                            setFormData({ ...formData, assignments: newAssignments });
+                                                        }}
+                                                        className="text-red-400 hover:text-red-300 p-1"
+                                                        title="Eliminar asignación"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                );
+                                            })()}
                                         </div>
                                         <div className="flex flex-col mt-2">
                                                 {(() => {
                                                     const config = tiposResolucion.find(c => c.tipo === assignment.tipoResolucion);
-                                                    const canEditThis = !isResolutor || (assignment.resolutorEmail === user?.email);
+                                                    const isSubsidioAssoc = (assignment.tipoResolucion || '').toUpperCase().includes('SUBSIDIO');
+                                                    const isAssignedResolutor = Boolean(
+                                                        (assignment.resolutorEmail && user?.email && assignment.resolutorEmail.toLowerCase() === user.email.toLowerCase())
+                                                    );
+                                                    // Punto 8: Nadie más que el propio responsable que propone una resolución, o el resolutor asignado deberían poder cambiar los datos de un subsidio propuesto
+                                                    const canEditThis = isNewSolicitud || (isSubsidioAssoc ? (isCreator || isAssignedResolutor || isOperadorOrAdmin) : (!isResolutor || isAssignedResolutor || isOperadorOrAdmin || isCreator));
                                                     if (config && config.atributosConfig && config.atributosConfig.length > 0) {
                                                         const sortedCampos = [...config.atributosConfig].sort((a,b) => a.orden - b.orden);
                                                         const currentData = typeof assignment.detalle === 'object' && assignment.detalle !== null ? { ...assignment.detalle } : {};
