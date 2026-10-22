@@ -55,7 +55,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const canSuggestResolutor = user?.role === 'RESPONSABLE';
     const isResolutor = user?.role === 'RESOLUTOR';
     // Determinar si el usuario actual es un Resolutor con la competencia 'SUBSIDIO'
-    const isResolutorSubsidio = user?.role === 'RESOLUTOR' && user?.tiposResolucion?.some(t => t?.tipo?.toUpperCase() === 'SUBSIDIO');
+    const isResolutorSubsidio = user?.role === 'RESOLUTOR' && user?.tiposResolucion?.some(t => (t?.tipo?.toUpperCase() || '').includes('SUBSIDIO'));
     const [formData, setFormData] = useState({
         type: 'PEDIDO',
         description: '',
@@ -678,7 +678,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         }
 
         // Validación no bloqueante para subsidios (Opción 1: Monto, Fecha de entrega y Tipo de subsidio son opcionales)
-        if (formData.type === 'SUBSIDIO') {
+        if (formData.type && formData.type.toUpperCase().includes('SUBSIDIO')) {
             if (formData.amount && Number(formData.amount) < 0) {
                 toast.error("El monto solicitado no puede ser negativo.");
                 return;
@@ -809,7 +809,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 copy['Lugar - Barrio'] = formData.barrio;
                             }
                         }
-                        if (a.tipoResolucion === 'SUBSIDIO' || a.tipoResolucion === 'DECLARACION DE INTERES' || a.tipoResolucion === 'DECLARACIÓN DE INTERÉS') {
+                        if ((a.tipoResolucion || '').includes('SUBSIDIO') || a.tipoResolucion === 'DECLARACION DE INTERES' || a.tipoResolucion === 'DECLARACIÓN DE INTERÉS') {
                             if (!copy['Localidad'] && formData.locationName) {
                                 copy['Localidad'] = formData.locationName;
                             }
@@ -1638,11 +1638,15 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                             currentDet['Lugar - Barrio'] = formData.barrio;
                                                         }
                                                     }
-                                                    if (type === 'DECLARACION DE INTERES' || type === 'DECLARACIÓN DE INTERÉS' || type === 'SUBSIDIO') {
+                                                    if (type === 'DECLARACION DE INTERES' || type === 'DECLARACIÓN DE INTERÉS' || (type || '').includes('SUBSIDIO')) {
                                                         if (!currentDet['Localidad'] && formData.locationName) {
                                                             currentDet['Localidad'] = formData.locationName;
                                                         }
-                                                        if (type === 'SUBSIDIO' && currentDet['Tipo de pedido'] === 'Personal') {
+                                                        const defaultTipoPedido = formData.person?.type === 'Personal' ? 'Personal' : (type === 'SUBSIDIO EN ESPECIE' ? 'Institucional en especie' : 'Institucional en dinero');
+                                                        if (!currentDet['Tipo de pedido']) {
+                                                            currentDet['Tipo de pedido'] = defaultTipoPedido;
+                                                        }
+                                                        if ((type || '').includes('SUBSIDIO') && (currentDet['Tipo de pedido'] === 'Personal' || defaultTipoPedido === 'Personal')) {
                                                             if (!currentDet['Nombre y apellido'] && formData.person?.name) {
                                                                 currentDet['Nombre y apellido'] = formData.person.name;
                                                             }
@@ -1710,7 +1714,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                             currentData['Lugar - Barrio'] = formData.barrio;
                                                         }
                                                     }
-                                                    if (assignment.tipoResolucion === 'DECLARACION DE INTERES' || assignment.tipoResolucion === 'DECLARACIÓN DE INTERÉS' || assignment.tipoResolucion === 'SUBSIDIO') {
+                                                    if (assignment.tipoResolucion === 'DECLARACION DE INTERES' || assignment.tipoResolucion === 'DECLARACIÓN DE INTERÉS' || (assignment.tipoResolucion || '').includes('SUBSIDIO')) {
                                                         if (!currentData['Localidad'] && formData.locationName) {
                                                             currentData['Localidad'] = formData.locationName;
                                                         }
@@ -1725,8 +1729,9 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                 if (isSubsidioAssoc) {
                                                                     let tipoPedido = currentData['Tipo de pedido'] || '';
                                                                     if (!tipoPedido) {
-                                                                        if (assignment.tipoResolucion === 'SUBSIDIO EN ESPECIE') tipoPedido = 'Institucional en especie';
-                                                                        else if (assignment.tipoResolucion === 'SUBSIDIO EN DINERO') tipoPedido = 'Institucional en dinero';
+                                                                        if (formData.person?.type === 'Personal') tipoPedido = 'Personal';
+                                                                        else if (assignment.tipoResolucion === 'SUBSIDIO EN ESPECIE') tipoPedido = 'Institucional en especie';
+                                                                        else tipoPedido = 'Institucional en dinero';
                                                                     }
                                                                     const camposPersonal = [
                                                                         'Nombre y apellido', 'DNI', 'Teléfono', 'Compañía', 'Dirección de DNI',
@@ -1788,7 +1793,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                                     const val = e.target.value;
                                                                                     const newAssignments = [...formData.assignments];
                                                                                     newAssignments[index].detalle = { ...currentData, [campo.nombre]: val };
-                                                                                    if (campo.nombre === 'DNI' && val) {
+                                                                                    if ((campo.nombre === 'DNI' || campo.nombre.includes('DNI')) && val) {
                                                                                         setFormData(prev => ({
                                                                                             ...prev,
                                                                                             person: { ...prev.person, dni: val },
@@ -1889,7 +1894,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                                     delete newDetalle['Descripción/monto'];
                                                                                 }
                                                                                 // Precargar datos del solicitante si se selecciona tipo Personal en SUBSIDIO
-                                                                                if (assignment.tipoResolucion === 'SUBSIDIO' && campo.nombre === 'Tipo de pedido' && val === 'Personal') {
+                                                                                if ((assignment.tipoResolucion || '').includes('SUBSIDIO') && campo.nombre === 'Tipo de pedido' && val === 'Personal') {
                                                                                     if (!newDetalle['Nombre y apellido'] && formData.person?.name) {
                                                                                         newDetalle['Nombre y apellido'] = formData.person.name;
                                                                                     }
@@ -2046,7 +2051,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                                     const val = e.target.value;
                                                                                     const newAssignments = [...formData.assignments];
                                                                                     newAssignments[index].detalle = { ...currentData, [campo.nombre]: val };
-                                                                                    if (campo.nombre === 'DNI' && val) {
+                                                                                    if ((campo.nombre === 'DNI' || campo.nombre.includes('DNI')) && val) {
                                                                                         setFormData(prev => ({
                                                                                             ...prev,
                                                                                             person: { ...prev.person, dni: val },
