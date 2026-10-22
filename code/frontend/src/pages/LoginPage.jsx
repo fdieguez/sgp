@@ -23,7 +23,10 @@ export default function LoginPage() {
         setError('');
         setLoading(true);
         try {
-            const loggedInUser = await login(email, password);
+            // Saneamiento de espacios accidentales al copiar y pegar
+            const cleanEmail = email.trim();
+            const cleanPassword = password.trim();
+            const loggedInUser = await login(cleanEmail, cleanPassword);
             if (redirectTo) {
                 navigate(redirectTo);
             } else if (loggedInUser && (loggedInUser.role === 'ADMINISTRADOR' || loggedInUser.role === 'AUDITOR')) {

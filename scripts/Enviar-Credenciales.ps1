@@ -5,7 +5,8 @@ param (
     [switch]$DryRun,
     [switch]$Force,
     [string]$TestEmail = "",
-    [string]$WitnessEmail = "dieguezfrancisco@gmail.com",
+    [string]$BccEmail = "dieguezfrancisco@gmail.com",
+    [string]$WitnessEmail = "",
     [string]$SmtpHost = "smtp.gmail.com",
     [int]$SmtpPort = 587,
     [string]$SmtpUser = "",
@@ -70,7 +71,7 @@ if (-not $SmtpUser -or -not $SmtpPass) {
 }
 
 function Send-SmtpMessageInternal {
-    param ($ToEmail, $Subject, $HtmlContent)
+    param ($ToEmail, $Subject, $HtmlContent, [string]$Bcc = "")
 
     $smtpClient = New-Object System.Net.Mail.SmtpClient($SmtpHost, $SmtpPort)
     $smtpClient.EnableSsl = $true
@@ -79,8 +80,13 @@ function Send-SmtpMessageInternal {
     $mailMsg = New-Object System.Net.Mail.MailMessage
     $mailMsg.From = New-Object System.Net.Mail.MailAddress($SmtpUser, "Sistema SGP")
     $mailMsg.To.Add($ToEmail)
+    if ($Bcc) {
+        $mailMsg.Bcc.Add($Bcc)
+    }
     $mailMsg.Subject = $Subject
+    $mailMsg.SubjectEncoding = [System.Text.Encoding]::UTF8
     $mailMsg.Body = $HtmlContent
+    $mailMsg.BodyEncoding = [System.Text.Encoding]::UTF8
     $mailMsg.IsBodyHtml = $true
 
     $smtpClient.Send($mailMsg)
@@ -100,12 +106,12 @@ if ($TestEmail) {
     }
     $htmlTest = Render-Html -Usuario $testUser
     try {
-        Send-SmtpMessageInternal -ToEmail $TestEmail -Subject "Acceso Oficial al Sistema de Gestion Politica (SGP) [PRUEBA]" -HtmlContent $htmlTest
+        Send-SmtpMessageInternal -ToEmail $TestEmail -Subject 'Actualizacion Oficial de Acceso - Sistema de Gestion Politica (SGP) [PRUEBA]' -HtmlContent $htmlTest
         Write-Host "Correo de prueba enviado con exito a $TestEmail." -ForegroundColor Green
     } catch {
         Write-Error "Fallo el envio de prueba: $_"
     }
-    return
+    exit 0
 }
 
 if (-not $Force) {
@@ -126,27 +132,14 @@ foreach ($u in $usuarios) {
     Write-Host "[$i/$($usuarios.Count)] Enviando a $($u.nombre) ($($u.email))... " -NoNewline
     $htmlBody = Render-Html -Usuario $u
     try {
-        Send-SmtpMessageInternal -ToEmail $u.email -Subject "Acceso Oficial al Sistema de Gestion Politica (SGP)" -HtmlContent $htmlBody
-        Write-Host "OK" -ForegroundColor Green
-        "[$([DateTime]::Now.ToString('HH:mm:ss'))] OK: $($u.nombre) <$($u.email)> | Rol: $($u.rol)" | Out-File -FilePath $logFile -Append -Encoding utf8
+        Send-SmtpMessageInternal -ToEmail $u.email -Subject 'Actualizacion Oficial de Acceso - Sistema de Gestion Politica (SGP)' -HtmlContent $htmlBody -Bcc $BccEmail
+        Write-Host "OK (CCO: $BccEmail)" -ForegroundColor Green
+        "[$([DateTime]::Now.ToString('HH:mm:ss'))] OK: $($u.nombre) <$($u.email)> | Rol: $($u.rol) | CCO: $BccEmail" | Out-File -FilePath $logFile -Append -Encoding utf8
         $enviados++
     } catch {
         Write-Host "ERROR: $_" -ForegroundColor Red
         "[$([DateTime]::Now.ToString('HH:mm:ss'))] ERROR: $($u.nombre) <$($u.email)> | Error: $_" | Out-File -FilePath $logFile -Append -Encoding utf8
         $fallidos++
-    }
-
-    # Despachar caso testigo para Francisco Dieguez cuando se procese a Juan Manuel Dieguez
-    if ($u.email.ToLower() -eq "juanm.dieguez@gmail.com" -and $WitnessEmail) {
-        Write-Host "    -> Enviando copia testigo de $($u.nombre) a $WitnessEmail... " -NoNewline
-        try {
-            Send-SmtpMessageInternal -ToEmail $WitnessEmail -Subject "Acceso Oficial al Sistema de Gestion Politica (SGP) [CASO TESTIGO: $($u.nombre)]" -HtmlContent $htmlBody
-            Write-Host "OK (Testigo enviado)" -ForegroundColor Green
-            "[$([DateTime]::Now.ToString('HH:mm:ss'))] TESTIGO ENVIADO: $($u.nombre) a $WitnessEmail" | Out-File -FilePath $logFile -Append -Encoding utf8
-        } catch {
-            Write-Host "ERROR EN TESTIGO: $_" -ForegroundColor Yellow
-            "[$([DateTime]::Now.ToString('HH:mm:ss'))] TESTIGO ERROR: $WitnessEmail | Error: $_" | Out-File -FilePath $logFile -Append -Encoding utf8
-        }
     }
 
     $i++
