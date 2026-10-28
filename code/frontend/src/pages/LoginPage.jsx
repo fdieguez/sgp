@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Lock, Mail, Loader2, Eye, EyeOff, ShieldCheck, ArrowRight } from 'lucide-react';
-import { APP_VERSION_LABEL } from '../config/version';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
@@ -57,7 +56,7 @@ export default function LoginPage() {
                         <div className="relative bg-gray-950/80 border border-gray-800 p-3.5 rounded-3xl shadow-xl flex items-center justify-center">
                             <img 
                                 src="/logo-sgp.svg" 
-                                alt="SGP - Sistema de Gestión Política" 
+                                alt="SGP - Acceso" 
                                 className="h-14 w-14 drop-shadow-md"
                             />
                         </div>
@@ -65,15 +64,15 @@ export default function LoginPage() {
 
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                        SGP — MÓDULO GESTIÓN DE PEDIDOS
+                        PLATAFORMA SGP
                     </span>
 
                     <div className="space-y-1.5">
                         <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-100 to-gray-300">
-                            Sistema de Gestión Política
+                            SGP
                         </h1>
                         <p className="text-xs sm:text-sm text-gray-400 leading-relaxed font-medium max-w-sm mx-auto">
-                            Plataforma integral de gestión territorial y resolución de demandas ciudadanas e institucionales.
+                            Plataforma de Gestión y Servicios Internos.
                         </p>
                     </div>
                 </div>
@@ -162,7 +161,7 @@ export default function LoginPage() {
                                 </>
                             ) : (
                                 <>
-                                    <span>Ingresar a la Plataforma</span>
+                                    <span>Ingresar</span>
                                     <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                                 </>
                             )}
@@ -173,13 +172,13 @@ export default function LoginPage() {
                 {/* Sello de Seguridad */}
                 <div className="pt-4 border-t border-gray-800/70 text-center flex items-center justify-center gap-2 text-[11px] text-gray-500 font-medium">
                     <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                    <span>Acceso institucional seguro • Cifrado SSL de 256 bits</span>
+                    <span>Acceso corporativo seguro • Conexión cifrada</span>
                 </div>
             </div>
 
             {/* Pie de Página */}
-            <div className="text-center text-[10px] font-mono tracking-widest text-gray-500 mt-6 z-10">
-                SGP PLATFORM • {APP_VERSION_LABEL} • GOBIERNO TERRITORIAL
+            <div className="text-center text-[10px] font-mono tracking-widest text-gray-500 mt-6 z-10 uppercase">
+                SGP • Acceso Privado • Todos los derechos reservados
             </div>
         </div>
     );
