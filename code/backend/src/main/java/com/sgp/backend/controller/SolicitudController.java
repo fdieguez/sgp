@@ -4,6 +4,7 @@ import com.sgp.backend.entity.Solicitud;
 import com.sgp.backend.service.SolicitudService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import com.sgp.backend.dto.SolicitudUpdateDTO;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -80,6 +81,7 @@ public class SolicitudController {
     }
 
     @PostMapping("/bulk-delete")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<Void> bulkDelete(@RequestBody java.util.Map<String, Object> payload) {
         List<Number> idsParam = (List<Number>) payload.get("ids");
         List<Long> ids = idsParam.stream().map(Number::longValue).collect(java.util.stream.Collectors.toList());
@@ -103,6 +105,7 @@ public class SolicitudController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<Void> deleteSolicitud(@PathVariable Long id) {
         solicitudService.deleteSolicitud(id);
         return ResponseEntity.ok().build();

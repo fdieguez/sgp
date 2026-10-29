@@ -49,6 +49,7 @@ public class DocumentoAdjuntoController {
     }
 
     @PostMapping("/{solicitudId}/adjuntos")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMINISTRADOR', 'RESOLUTOR', 'RESPONSABLE', 'OPERADOR')")
     public ResponseEntity<?> uploadFile(@PathVariable Long solicitudId, @RequestParam("file") MultipartFile file) {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
                 .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
@@ -94,6 +95,7 @@ public class DocumentoAdjuntoController {
     }
 
     @GetMapping("/{solicitudId}/adjuntos")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMINISTRADOR', 'RESOLUTOR', 'RESPONSABLE', 'LECTOR', 'OPERADOR', 'AUDITOR')")
     public ResponseEntity<List<DocumentoAdjunto>> getAdjuntos(@PathVariable Long solicitudId) {
         return ResponseEntity.ok(documentoAdjuntoRepository.findBySolicitudIdOrderByUploadedAtDesc(solicitudId));
     }

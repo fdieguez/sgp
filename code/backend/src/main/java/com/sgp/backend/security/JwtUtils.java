@@ -3,6 +3,7 @@ package com.sgp.backend.security;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.security.Key;
@@ -15,7 +16,11 @@ import java.util.function.Function;
 public class JwtUtils {
 
     // 256-bit secret key (should be in env vars in prod)
-    public static final String SECRET = "5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437";
+    @Value("${jwt.secret:5367566B59703373367639792F423F4528482B4D6251655468576D5A71347437}")
+    private String secretKey;
+
+    @Value("${jwt.expiration:36000000}")
+    private long jwtExpiration;
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
@@ -35,7 +40,7 @@ public class JwtUtils {
                 .setClaims(extraClaims)
                 .setSubject(username)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 10)) // 10 hours
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration)) // Tiempo configurable
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -62,7 +67,21 @@ public class JwtUtils {
     }
 
     private Key getSigningKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(SECRET);
+        byte[] keyBytes;
+        try {
+            keyBytes = Decoders.BASE64.decode(secretKey);
+            if (keyBytes.length < 32) {
+                java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+                keyBytes = md.digest(secretKey.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
+        } catch (Exception e) {
+            try {
+                java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+                keyBytes = md.digest(secretKey.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            } catch (Exception ex) {
+                throw new RuntimeException("Error al derivar clave criptográfica JWT", ex);
+            }
+        }
         return Keys.hmacShaKeyFor(keyBytes);
     }
 }

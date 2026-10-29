@@ -2,6 +2,7 @@ package com.sgp.backend;
 
 import com.sgp.backend.service.GoogleSheetsService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -18,6 +19,7 @@ public class SheetsController {
     private GoogleSheetsService sheetsService;
 
     @GetMapping("/test")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
     public List<List<Object>> testRead(
             @RequestParam String id,
             @RequestParam(defaultValue = "Sheet1!A1:E10") String range) throws IOException {

@@ -10,7 +10,7 @@ DEPLOY_DIR="/root/deploy/sgp/sgp/code"
 BACKUP_DIR="/root/backups"
 DB_NAME=$(grep -E "^DB_NAME=" "${DEPLOY_DIR}/.env" 2>/dev/null | cut -d '=' -f2- | tr -d '\r' || echo "sgp_db")
 DB_USER=$(grep -E "^DB_USER=" "${DEPLOY_DIR}/.env" 2>/dev/null | cut -d '=' -f2- | tr -d '\r' || echo "sgp_admin")
-DB_PASS=$(grep -E "^DB_PASSWORD=" "${DEPLOY_DIR}/.env" 2>/dev/null | cut -d '=' -f2- | tr -d '\r' || echo "P10xmK2vL9qRnW5z")
+DB_PASS=$(grep -E "^DB_PASSWORD=" "${DEPLOY_DIR}/.env" 2>/dev/null | cut -d '=' -f2- | tr -d '\r')
 DATE=$(date +"%Y-%m-%d_%H%M%S")
 BACKUP_FILE="${BACKUP_DIR}/sgp_prod_pre_update_${DATE}.sql"
 

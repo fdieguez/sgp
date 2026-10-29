@@ -7,6 +7,7 @@ import com.sgp.backend.repository.TipoResolucionRepository;
 import com.sgp.backend.repository.UserRepository;
 import com.sgp.backend.repository.AtributoResolucionRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,7 @@ public class TipoResolucionController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
     @Transactional
     public ResponseEntity<TipoResolucion> create(@RequestBody TipoResolucion dto) {
         dto.setActivo(true);
@@ -63,6 +65,7 @@ public class TipoResolucionController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
     @Transactional
     public ResponseEntity<TipoResolucion> update(@PathVariable Long id, @RequestBody TipoResolucion dto) {
         return repository.findById(id).map(existing -> {
@@ -108,6 +111,7 @@ public class TipoResolucionController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<Void> logicallyDelete(@PathVariable Long id) {
         return repository.findById(id).map(existing -> {
             existing.setActivo(false);

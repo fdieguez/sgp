@@ -54,22 +54,25 @@ public class EmailService {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, false, "UTF-8");
 
-            String beneficiario = solicitud.getPerson() != null && solicitud.getPerson().getName() != null
+            String rawBeneficiario = solicitud.getPerson() != null && solicitud.getPerson().getName() != null
                     ? solicitud.getPerson().getName()
                     : "Sin Beneficiario";
+            String beneficiario = org.springframework.web.util.HtmlUtils.htmlEscape(rawBeneficiario);
 
-            String tipoDisplay = (tipoResolucion != null && !tipoResolucion.trim().isEmpty())
+            String rawTipo = (tipoResolucion != null && !tipoResolucion.trim().isEmpty())
                     ? tipoResolucion
                     : (solicitud.getType() != null ? solicitud.getType() : "Solicitud General");
+            String tipoDisplay = org.springframework.web.util.HtmlUtils.htmlEscape(rawTipo);
 
             helper.setTo(responsableEmail);
             helper.setSubject(String.format("[SGP] Solicitud Aprobada - #%d", solicitud.getId()));
 
             String directUrl = frontendUrl + "/mis-solicitudes?id=" + solicitud.getId();
 
-            String obsDisplay = (observaciones != null && !observaciones.trim().isEmpty())
+            String rawObs = (observaciones != null && !observaciones.trim().isEmpty())
                     ? observaciones
                     : (solicitud.getObservation() != null ? solicitud.getObservation() : "Sin observaciones registradas.");
+            String obsDisplay = org.springframework.web.util.HtmlUtils.htmlEscape(rawObs);
 
             // Construcción de plantilla HTML liviana, responsive e institucional
             String htmlContent = String.format(

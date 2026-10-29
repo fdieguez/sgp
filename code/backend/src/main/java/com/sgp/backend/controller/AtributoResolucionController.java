@@ -4,6 +4,7 @@ import com.sgp.backend.entity.AtributoResolucion;
 import com.sgp.backend.repository.AtributoResolucionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,12 +22,14 @@ public class AtributoResolucionController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<AtributoResolucion> create(@RequestBody AtributoResolucion atributo) {
         atributo.setActivo(true);
         return ResponseEntity.ok(repository.save(atributo));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<AtributoResolucion> update(@PathVariable Long id, @RequestBody AtributoResolucion dto) {
         return repository.findById(id).map(existing -> {
             existing.setNombre(dto.getNombre());
@@ -37,6 +40,7 @@ public class AtributoResolucionController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<Void> logicallyDelete(@PathVariable Long id) {
         return repository.findById(id).map(existing -> {
             existing.setActivo(false);

@@ -19,10 +19,21 @@ public class LogController {
         String level = (String) logData.getOrDefault("level", "INFO");
         String message = (String) logData.getOrDefault("message", "");
         String stack = (String) logData.getOrDefault("stack", "");
-        
-        String formattedMessage = String.format("[FRONTEND] %s %s", message, stack.isEmpty() ? "" : "\nStack: " + stack);
 
-        switch (level.toUpperCase()) {
+        // Sanitización para prevenir Log Injection (CWE-117) limitando longitud y neutralizando CRLF
+        String cleanMessage = message != null ? message.replaceAll("[\r\n]", " ") : "";
+        if (cleanMessage.length() > 500) {
+            cleanMessage = cleanMessage.substring(0, 500) + "... [truncado]";
+        }
+
+        String cleanStack = stack != null ? stack.replaceAll("[\r\n]", " | ") : "";
+        if (cleanStack.length() > 1000) {
+            cleanStack = cleanStack.substring(0, 1000) + "... [truncado]";
+        }
+        
+        String formattedMessage = String.format("[FRONTEND] %s %s", cleanMessage, cleanStack.isEmpty() ? "" : "Stack: " + cleanStack);
+
+        switch (level != null ? level.toUpperCase() : "INFO") {
             case "ERROR":
                 frontendLogger.error(formattedMessage);
                 break;

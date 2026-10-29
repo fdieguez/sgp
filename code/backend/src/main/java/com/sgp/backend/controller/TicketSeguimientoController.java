@@ -43,11 +43,8 @@ public class TicketSeguimientoController {
         seguimiento.setSolicitud(solicitud);
         seguimiento.setFecha(LocalDateTime.now());
 
-        // Use the explicitly provided author name if any, else use the authenticated
-        // user's email
-        if (seguimiento.getAutor() == null || seguimiento.getAutor().trim().isEmpty()) {
-            seguimiento.setAutor(currentUserEmail);
-        }
+        // Se fuerza estrictamente la identidad del usuario autenticado para evitar falsificación de autoría
+        seguimiento.setAutor(currentUserEmail);
 
         TicketSeguimiento saved = ticketSeguimientoRepository.save(seguimiento);
         return ResponseEntity.ok(saved);

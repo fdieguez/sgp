@@ -1,6 +1,7 @@
 package com.sgp.backend.security;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -16,6 +17,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -26,63 +30,45 @@ public class SecurityConfig {
         private final JwtAuthenticationFilter jwtAuthFilter;
         private final UserDetailsService userDetailsService;
 
+        @Value("${spring.profiles.active:dev}")
+        private String activeProfile;
+
         @Bean
         public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+                boolean isProd = "prod".equalsIgnoreCase(activeProfile);
+
                 http
                                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                                 .csrf(AbstractHttpConfigurer::disable)
                                 .headers(headers -> headers.frameOptions(
-                                                org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig::disable))
-                                .authorizeHttpRequests(auth -> auth
-                                                // Endpoints Públicos
-                                                .requestMatchers(
-                                                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
-                                                                                "/api/auth/**"))
-                                                .permitAll()
-                                                .requestMatchers(
-                                                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
-                                                                                "/api/welcome"))
-                                                .permitAll()
-                                                .requestMatchers(
-                                                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
-                                                                                "/api/test-helper/**"))
-                                                .permitAll()
-                                                .requestMatchers(
-                                                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
-                                                                                "/h2-console/**"))
-                                                .permitAll()
-                                                .requestMatchers(
-                                                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
-                                                                                "/error"))
-                                                .permitAll()
-                                                // Endpoints de Sincronización de Planilla de Salida (Accesible para ADMIN y RESOLUTOR)
-                                                .requestMatchers(
-                                                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
-                                                                                "/api/planilla-salida/**"))
-                                                .hasAnyRole("ADMINISTRADOR", "RESOLUTOR")
-                                                // Endpoints Exclusivos de Admin
-                                                .requestMatchers(
-                                                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
-                                                                                "/api/sync/**"))
-                                                .hasRole("ADMINISTRADOR")
-                                                .requestMatchers(
-                                                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
-                                                                                "/api/config/**", "GET"))
-                                                .hasAnyRole("ADMINISTRADOR", "RESOLUTOR")
-                                                .requestMatchers(
-                                                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
-                                                                                "/api/config/**", "PUT"))
-                                                .hasAnyRole("ADMINISTRADOR", "RESOLUTOR")
-                                                .requestMatchers(
-                                                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
-                                                                                "/api/config/**/check-calendar", "POST"))
-                                                .hasAnyRole("ADMINISTRADOR", "RESOLUTOR")
-                                                .requestMatchers(
-                                                                new org.springframework.security.web.util.matcher.AntPathRequestMatcher(
-                                                                                "/api/config/**"))
-                                                .hasRole("ADMINISTRADOR")
-                                                // Endpoints Asegurados (Cualquier otra solicitud autenticada)
-                                                .anyRequest().authenticated())
+                                                org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig::sameOrigin))
+                                .authorizeHttpRequests(auth -> {
+                                        // Endpoints Públicos de Autenticación
+                                        auth.requestMatchers(new AntPathRequestMatcher("/api/auth/login")).permitAll();
+                                        auth.requestMatchers(new AntPathRequestMatcher("/api/welcome")).permitAll();
+                                        auth.requestMatchers(new AntPathRequestMatcher("/error")).permitAll();
+
+                                        // Endpoints de Pruebas y Consola H2: Exclusivamente permitidos en entornos no productivos
+                                        if (!isProd) {
+                                                auth.requestMatchers(new AntPathRequestMatcher("/api/test-helper/**")).permitAll();
+                                                auth.requestMatchers(new AntPathRequestMatcher("/h2-console/**")).permitAll();
+                                        }
+
+                                        // Endpoints de Sincronización de Planilla de Salida (Accesible para ADMIN y RESOLUTOR)
+                                        auth.requestMatchers(new AntPathRequestMatcher("/api/planilla-salida/**"))
+                                                .hasAnyRole("ADMINISTRADOR", "RESOLUTOR");
+
+                                        // Endpoints Administrativos y de Configuración
+                                        auth.requestMatchers(new AntPathRequestMatcher("/api/admin/**")).hasRole("ADMINISTRADOR");
+                                        auth.requestMatchers(new AntPathRequestMatcher("/api/sync/**")).hasRole("ADMINISTRADOR");
+                                        auth.requestMatchers(new AntPathRequestMatcher("/api/config/**", "GET")).hasAnyRole("ADMINISTRADOR", "RESOLUTOR");
+                                        auth.requestMatchers(new AntPathRequestMatcher("/api/config/**", "PUT")).hasAnyRole("ADMINISTRADOR", "RESOLUTOR");
+                                        auth.requestMatchers(new AntPathRequestMatcher("/api/config/**/check-calendar", "POST")).hasAnyRole("ADMINISTRADOR", "RESOLUTOR");
+                                        auth.requestMatchers(new AntPathRequestMatcher("/api/config/**")).hasRole("ADMINISTRADOR");
+
+                                        // Cualquier otra solicitud requiere autenticación obligatoria
+                                        auth.anyRequest().authenticated();
+                                })
                                 .exceptionHandling(exceptions -> exceptions
                                                 // Manejador para solicitudes no autenticadas o con token vencido / inválido (401)
                                                 .authenticationEntryPoint((request, response, authException) -> {
@@ -101,8 +87,8 @@ public class SecurityConfig {
                                 )
                                 .sessionManagement(session -> session
                                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                                .authenticationProvider(authenticationProvider())
-                                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                                                .authenticationProvider(authenticationProvider())
+                                                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
                 return http.build();
         }
@@ -110,14 +96,17 @@ public class SecurityConfig {
         @Bean
         public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
                 org.springframework.web.cors.CorsConfiguration configuration = new org.springframework.web.cors.CorsConfiguration();
-                // configuration.setAllowedOrigins(
-                // java.util.List.of("http://localhost:80", "http://149.50.128.168",
-                // "http://localhost:5173", "https://solicitudes.ultrasoft.website",
-                // "http://solicitudes.ultrasoft.website")); // Frontend
-                configuration.setAllowedOriginPatterns(java.util.List.of("*")); // Allow ALL for debugging
-                // URL
-                configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
-                configuration.setAllowedHeaders(java.util.List.of("*"));
+                // Restricción estricta de orígenes autorizados para prevenir explotación Cross-Origin (CORS)
+                configuration.setAllowedOriginPatterns(List.of(
+                                "http://localhost*",
+                                "http://127.0.0.1*",
+                                "https://solicitudes.ultrasoft.website",
+                                "http://solicitudes.ultrasoft.website",
+                                "http://149.50.128.168*"
+                ));
+                configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
+                configuration.setAllowedHeaders(List.of("*"));
+                configuration.setExposedHeaders(List.of("Authorization", "Content-Disposition", "X-Active-Role"));
                 configuration.setAllowCredentials(true);
                 org.springframework.web.cors.UrlBasedCorsConfigurationSource source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
                 source.registerCorsConfiguration("/**", configuration);

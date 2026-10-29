@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
+@org.springframework.context.annotation.Profile({"dev", "test"})
 @RestController
 @RequestMapping("/api/test-helper")
 @RequiredArgsConstructor

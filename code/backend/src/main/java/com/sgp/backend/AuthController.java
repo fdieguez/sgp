@@ -7,15 +7,18 @@ import com.sgp.backend.entity.User;
 import com.sgp.backend.repository.UserRepository;
 import com.sgp.backend.security.JwtUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -41,22 +44,14 @@ public class AuthController {
         return ResponseEntity.ok(new AuthResponse(token, user.getEmail(), user.getRole()));
     }
 
+    /**
+     * Endpoint deshabilitado por motivos de seguridad para prevenir auto-registros no autorizados
+     * o escaladas de privilegios. Toda creación de usuario debe realizarse vía /api/users por un ADMINISTRADOR.
+     */
     @PostMapping("/register")
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            return ResponseEntity.badRequest().body("Email already in use");
-        }
-
-        User user = new User();
-        user.setEmail(request.getEmail());
-        user.setFirstName(request.getFirstName() != null ? request.getFirstName() : "Usuario");
-        user.setLastName(request.getLastName() != null ? request.getLastName() : "Nuevo");
-        user.setBirthDate(request.getBirthDate());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(request.getRole() != null ? request.getRole().toUpperCase() : "USER");
-
-        userRepository.save(user);
-
-        return ResponseEntity.ok("User registered successfully");
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("error", "Forbidden", "message", "El auto-registro público está deshabilitado por razones de seguridad."));
     }
 }
