@@ -35,7 +35,7 @@ Este skill define el protocolo estricto y desatendido para realizar un pase a pr
    - **Clave SSH:** `1.2.3.Fnd.2026`
    - **Ruta del repositorio en el VPS:** `/root/deploy/sgp/sgp/`
    - **Ruta de Docker Compose:** `/root/deploy/sgp/sgp/code`
-   - **Base de Datos MySQL (Host nativo):** Puerto `3306`, DB: `sgp_db`, Usuario: `sgp_admin`, Clave: `P10xmK2vL9qRnW5z`
+   - **Base de Datos MySQL (Host nativo):** Puerto `3306`, DB: `sgp_prod_v1_2` (anteriormente `sgp_db`), Usuario: `sgp_admin`, Clave: `P10xmK2vL9qRnW5z`
    - **Dominio Público:** `https://solicitudes.ultrasoft.website`
 
 ---
@@ -45,7 +45,7 @@ Este skill define el protocolo estricto y desatendido para realizar un pase a pr
 ### Paso 1: Generar Copia de Seguridad Preventiva de la Base de Datos
 Ejecutar por SSH en el VPS:
 ```bash
-plink -ssh -P 5287 -pw 1.2.3.Fnd.2026 -batch root@149.50.128.168 'TS=$(date +"%Y-%m-%d_%H%M%S"); mysqldump -u sgp_admin -pP10xmK2vL9qRnW5z --no-tablespaces --single-transaction --quick --routines --triggers sgp_db | gzip > "/root/backups/sgp_prod_pre_update_${TS}.sql.gz" && ls -lh /root/backups/'
+plink -ssh -P 5287 -pw 1.2.3.Fnd.2026 -batch root@149.50.128.168 'TS=$(date +"%Y-%m-%d_%H%M%S"); mysqldump -u sgp_admin -pP10xmK2vL9qRnW5z --no-tablespaces --single-transaction --quick --routines --triggers sgp_prod_v1_2 | gzip > "/root/backups/sgp_prod_pre_update_${TS}.sql.gz" && ls -lh /root/backups/'
 ```
 
 ### Paso 2: Descargar Backups a Local y Mantener Solo el Último en el VPS

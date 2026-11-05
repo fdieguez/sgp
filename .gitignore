@@ -67,6 +67,7 @@ db_bkp/
 
 # Archivos locales con credenciales y nominas sensibles
 usuarios_contrasenas*.txt
+usuarios_credenciales*.txt
 usuarios_credenciales_envio*.csv
 smtp_credentials*.env
 update_users*.sql
@@ -82,3 +83,5 @@ test-results/
 scratch/
 scripts/backup_users_insert.sql
 scripts/restore_users_prod.sql
+
+scripts/extract_backup.ps1

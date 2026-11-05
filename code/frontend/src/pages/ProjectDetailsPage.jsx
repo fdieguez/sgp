@@ -1226,6 +1226,13 @@ export default function ProjectDetailsPage() {
                                                 </td>
                                                 <td className="p-3 text-gray-300 font-medium leading-snug">
                                                     <div className="line-clamp-2" title={s.description}>{s.description}</div>
+                                                    {s.adjuntos && s.adjuntos.length > 0 && (
+                                                        <div className="mt-1">
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-300 bg-indigo-950/80 border border-indigo-700/60 px-1.5 py-0.5 rounded">
+                                                                📎 {s.adjuntos.length} {s.adjuntos.length === 1 ? 'adjunto' : 'adjuntos'}
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td className="p-3 whitespace-nowrap">
                                                     {s.responsable ? (

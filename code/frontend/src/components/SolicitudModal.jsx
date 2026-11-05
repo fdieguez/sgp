@@ -190,15 +190,18 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     }, [formData.id]);
 
     useEffect(() => {
+        // Cargar inmediatamente los documentos adjuntos de la solicitud existente
         if (isOpen && formData.id) {
-            if (activeTab === 'historial') {
-                fetchHistorial();
-            }
-            if (activeTab === 'adjuntos') {
-                fetchAdjuntos();
-            }
+            fetchAdjuntos();
         }
-    }, [isOpen, formData.id, activeTab, fetchHistorial, fetchAdjuntos]);
+    }, [isOpen, formData.id, fetchAdjuntos]);
+
+    useEffect(() => {
+        // Cargar el historial cuando la pestaña correspondiente esté activa
+        if (isOpen && formData.id && activeTab === 'historial') {
+            fetchHistorial();
+        }
+    }, [isOpen, formData.id, activeTab, fetchHistorial]);
 
 
     const handleDragOver = (e) => {
@@ -568,6 +571,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 setPendingDynamicFiles({});
                 setPendingGeneralFiles([]);
                 setSaveProgress('');
+                setAdjuntos([]);
             }
         } else {
             // Cuando se cierra, limpiamos el formulario para asegurar que la próxima apertura cargue datos frescos del backend
@@ -605,6 +609,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             setPendingDynamicFiles({});
             setPendingGeneralFiles([]);
             setSaveProgress('');
+            setAdjuntos([]);
         }
     }, [isOpen, initialData?.id, fetchResponsables, fetchLocations, fetchTiposResolucion, isResponsable, user?.responsable?.id, user?.responsable?.zone, user?.id, user?.zone]);
 
@@ -1129,9 +1134,9 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         }`}
                     >
                         <FileText className="h-4 w-4" /> Adjuntos
-                        {!formData.id && pendingGeneralFiles.length > 0 && (
+                        {(!formData.id ? pendingGeneralFiles.length > 0 : adjuntos.length > 0) && (
                             <span className="bg-indigo-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
-                                {pendingGeneralFiles.length}
+                                {!formData.id ? pendingGeneralFiles.length : adjuntos.length}
                             </span>
                         )}
                     </button>
@@ -2206,6 +2211,58 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     ))}
                                 </div>
                             )}
+
+                            {/* Mostrar lista de archivos adjuntos ya guardados al ver o editar */}
+                            {formData.id && adjuntos.length > 0 && (
+                                <div className="space-y-2 mt-2 pt-2 border-t border-gray-800">
+                                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                                        Archivos guardados en esta solicitud:
+                                    </p>
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                        {adjuntos.map(adj => (
+                                            <div key={adj.id} className="p-2.5 bg-gray-800/80 rounded-lg border border-gray-700 flex items-center justify-between gap-2 text-xs hover:border-gray-600 transition-colors">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleViewInline(adj)}
+                                                    className="truncate text-left font-medium text-indigo-300 hover:text-indigo-200 hover:underline flex items-center gap-1.5 min-w-0 flex-1"
+                                                    title="Clic para visualizar"
+                                                >
+                                                    <FileText className="h-3.5 w-3.5 shrink-0 text-indigo-400" />
+                                                    <span className="truncate">{adj.originalFileName}</span>
+                                                </button>
+                                                <div className="flex items-center gap-1 shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleViewInline(adj)}
+                                                        className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"
+                                                        title="Visualizar documento"
+                                                    >
+                                                        <Eye className="h-3.5 w-3.5" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDownload(adj)}
+                                                        className="p-1 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"
+                                                        title="Descargar documento"
+                                                    >
+                                                        <Download className="h-3.5 w-3.5" />
+                                                    </button>
+                                                    {!isReadOnly && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDeleteAdjunto(adj.id)}
+                                                            className="p-1 hover:bg-red-900/40 rounded text-red-400 hover:text-red-300 transition-colors"
+                                                            title="Eliminar adjunto"
+                                                        >
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                             </fieldset>
@@ -2360,11 +2417,11 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                             <FileText className="h-6 w-6" />
                                                         </div>
                                                         <div className="truncate min-w-0 flex-1">
-                                                            <p className="text-sm font-bold text-white truncate" title={adj.originalFileName}>{adj.originalFileName}</p>
+                                                            <button type="button" onClick={() => handleViewInline(adj)} className="text-sm font-bold text-white hover:text-indigo-300 truncate text-left transition-colors" title={`Visualizar ${adj.originalFileName}`}>{adj.originalFileName}</button>
                                                             <p className="text-xs text-gray-500">{(adj.size / 1024 / 1024).toFixed(2)} MB • {new Date(adj.uploadedAt).toLocaleDateString()}</p>
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
+                                                    <div className="flex items-center gap-2 shrink-0 ml-2">
                                                         <button type="button" onClick={() => handleViewInline(adj)} className="p-2 text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors" title="Visualizar">
                                                             <Eye className="h-4 w-4" />
                                                         </button>
