@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar, Users, Plus, Trash2, History, FileText, UploadCloud, Download, ArrowRight, MessageSquare, Check, Eye, LayoutDashboard, UserCheck, AlertTriangle } from 'lucide-react';
+import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar, Users, Plus, Trash2, History, FileText, UploadCloud, Download, ArrowRight, MessageSquare, Check, Eye, LayoutDashboard, UserCheck, AlertTriangle, Lock } from 'lucide-react';
 import api from '../config/axios';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
