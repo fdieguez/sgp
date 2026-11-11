@@ -152,8 +152,22 @@ export default function DashboardPage() {
         }
     };
 
-    const handleOpenSolicitud = (solicitud) => {
-        setSelectedSolicitud(solicitud);
+    const handleOpenSolicitud = async (solicitud) => {
+        if (!solicitud || !solicitud.id) {
+            setSelectedSolicitud(solicitud);
+            setIsSolicitudModalOpen(true);
+            setShowResultsDropdown(false);
+            setSearchQuery('');
+            return;
+        }
+
+        try {
+            const res = await api.get(`/api/solicitudes/${solicitud.id}`);
+            setSelectedSolicitud(res.data || solicitud);
+        } catch (err) {
+            console.error("Error al obtener detalle fresco de la solicitud:", err);
+            setSelectedSolicitud(solicitud);
+        }
         setIsSolicitudModalOpen(true);
         setShowResultsDropdown(false);
         setSearchQuery('');

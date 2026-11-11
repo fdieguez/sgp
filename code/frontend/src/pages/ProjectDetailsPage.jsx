@@ -575,8 +575,23 @@ export default function ProjectDetailsPage() {
         setCurrentPage(1);
     };
 
-    const handleOpenABM = (solicitud = null) => {
-        setSelectedSolicitud(solicitud);
+    const handleOpenABM = async (solicitud = null) => {
+        if (!solicitud || !solicitud.id) {
+            setSelectedSolicitud(solicitud);
+            setIsABMOpen(true);
+            return;
+        }
+
+        // Siempre cargar la versión fresca y aislada de la solicitud desde el backend
+        // para garantizar que todas las relaciones (location, parent, person, adjuntos)
+        // se deserialicen sin colisiones de identificadores compartidos de Jackson (@JsonIdentityInfo).
+        try {
+            const res = await api.get(`/api/solicitudes/${solicitud.id}`);
+            setSelectedSolicitud(res.data || solicitud);
+        } catch (err) {
+            console.error("Error al obtener detalle fresco de la solicitud, usando datos de fila:", err);
+            setSelectedSolicitud(solicitud);
+        }
         setIsABMOpen(true);
     };
 

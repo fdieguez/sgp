@@ -474,6 +474,40 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             // Solo resetear el formulario si cambian los datos iniciales o si es una nueva apertura
             if (initialData) {
                 const normStatus = initialData.status ? initialData.status.toLowerCase() : 'pendiente';
+
+                // Resolver de forma robusta la ubicación inicial considerando posibles serializaciones
+                // anidadas o identificadores referenciales devueltos por Jackson (@JsonIdentityInfo)
+                let resolvedLocationName = '';
+                let resolvedBarrio = '';
+
+                let rawLoc = initialData.location;
+                // Si viene solo un ID numérico, buscarlo en las listas de locations disponibles
+                if (typeof rawLoc === 'number' || typeof rawLoc === 'string') {
+                    const foundLoc = locations.find(l => l.id === Number(rawLoc)) ||
+                                     cachedLocations.find(l => l.id === Number(rawLoc));
+                    if (foundLoc) rawLoc = foundLoc;
+                }
+
+                if (rawLoc && typeof rawLoc === 'object') {
+                    if (rawLoc.type === 'NEIGHBORHOOD') {
+                        resolvedBarrio = rawLoc.name || '';
+                        // Si parent es un objeto con name
+                        if (rawLoc.parent && typeof rawLoc.parent === 'object' && rawLoc.parent.name) {
+                            resolvedLocationName = rawLoc.parent.name;
+                        } else if (rawLoc.parent) {
+                            // Si parent es solo un ID numérico
+                            const parentId = typeof rawLoc.parent === 'object' ? rawLoc.parent.id : Number(rawLoc.parent);
+                            const foundParent = locations.find(l => l.id === parentId) ||
+                                                cachedLocations.find(l => l.id === parentId);
+                            resolvedLocationName = foundParent ? foundParent.name : 'Santa Fe';
+                        } else {
+                            resolvedLocationName = 'Santa Fe';
+                        }
+                    } else {
+                        resolvedLocationName = rawLoc.name || '';
+                    }
+                }
+
                 // Evitar re-setear si el ID es el mismo para no romper la experiencia del usuario si el padre re-renderiza
                 setFormData(prev => {
                     if (prev.id === initialData.id && prev.status === normStatus) {
@@ -485,8 +519,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         type: initialData.type || ((initialData.amount !== undefined && initialData.amount !== null) ? 'SUBSIDIO' : ((initialData.asistencia !== undefined && initialData.asistencia !== null) ? 'AGENDA' : (configId ? 'SUBSIDIO' : 'PEDIDO'))),
                         person: initialData.person || { name: '', phone: '', dni: '', type: '', subType: '', socialMedia: '' },
                         tema: initialData.tema || '',
-                        locationName: initialData.location?.type === 'NEIGHBORHOOD' ? (initialData.location?.parent?.name || '') : (initialData.location?.name || ''),
-                        barrio: initialData.location?.type === 'NEIGHBORHOOD' ? (initialData.location?.name || '') : '',
+                        locationName: resolvedLocationName,
+                        barrio: resolvedBarrio,
                         responsableId: initialData.responsable?.id || '',
                         amount: initialData.amount || '',
                         grantDate: formatDateISO(initialData.grantDate),
@@ -658,30 +692,33 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             toast.error("El subtipo de solicitante es obligatorio para el tipo Personal.");
             return;
         }
-        if (!formData.locationName || !formData.locationName.trim()) {
-            toast.error("La localidad es obligatoria.");
-            return;
-        }
-        const validCity = availableCities.some(c => c.name.toLowerCase() === (formData.locationName || '').trim().toLowerCase());
-        if (!validCity) {
-            toast.error("La localidad ingresada no es válida. Debe elegir una de la lista.");
-            return;
-        }
-        if (!formData.barrio || !formData.barrio.trim()) {
-            toast.error("El barrio es obligatorio.");
-            return;
-        }
-        const validBarrio = availableNeighborhoods.some(n => {
-            const entered = (formData.barrio || '').trim().toLowerCase();
-            const official = n.name.toLowerCase();
-            return official === entered || 
-                   (entered === 'candioti' && (official === 'candioti norte' || official === 'candioti sur')) ||
-                   official.startsWith(entered) || 
-                   entered.startsWith(official);
-        });
-        if (!validBarrio) {
-            toast.error("El barrio ingresado no es válido. Debe elegir una de la lista oficial.");
-            return;
+        // Validaciones de Localidad y Barrio (Solo si el usuario tiene permiso para editar la carga inicial)
+        if (canEditInitialData) {
+            if (!formData.locationName || !formData.locationName.trim()) {
+                toast.error("La localidad es obligatoria.");
+                return;
+            }
+            const validCity = availableCities.some(c => c.name.toLowerCase() === (formData.locationName || '').trim().toLowerCase());
+            if (!validCity) {
+                toast.error("La localidad ingresada no es válida. Debe elegir una de la lista.");
+                return;
+            }
+            if (!formData.barrio || !formData.barrio.trim()) {
+                toast.error("El barrio es obligatorio.");
+                return;
+            }
+            const validBarrio = availableNeighborhoods.some(n => {
+                const entered = (formData.barrio || '').trim().toLowerCase();
+                const official = n.name.toLowerCase();
+                return official === entered || 
+                       (entered === 'candioti' && (official === 'candioti norte' || official === 'candioti sur')) ||
+                       official.startsWith(entered) || 
+                       entered.startsWith(official);
+            });
+            if (!validBarrio) {
+                toast.error("El barrio ingresado no es válido. Debe elegir una de la lista oficial.");
+                return;
+            }
         }
         if (user?.role !== 'OPERADOR' && user?.role !== 'DISTRIBUIDOR' && formData.id && !formData.responsableId) {
             toast.error("El responsable de la solicitud es obligatorio.");
@@ -1370,7 +1407,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             <div>
                                 <label className="block text-sm text-gray-500 mb-1">Localidad</label>
                                 <select
-                                    required
+                                    required={canEditInitialData && !isReadOnly}
                                     disabled={!canEditInitialData || isReadOnly}
                                     className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                                     value={formData.locationName}
@@ -1385,7 +1422,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             <div>
                                 <label className="block text-sm text-gray-500 mb-1">Barrio</label>
                                 <select
-                                    required
+                                    required={canEditInitialData && !isReadOnly}
                                     className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                                     value={formData.barrio}
                                     onChange={(e) => setFormData({ ...formData, barrio: e.target.value })}
