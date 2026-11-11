@@ -85,6 +85,13 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     // Permisos Etapa 2 (Punto 6 y Punto 8)
     const isNewSolicitud = !formData.id;
     const isOperadorOrAdmin = user?.role === 'OPERADOR' || user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN';
+    const isDistribuidor = (user?.role || '').toUpperCase().includes('DISTRIBUIDOR');
+    const isAssignedResponsable = Boolean(
+        formData.responsableId && user?.id && Number(formData.responsableId) === Number(user.id)
+    );
+    // Solo Administradores, Operadores, Distribuidores o el Responsable asignado pueden cambiar el estado
+    const canEditStatus = isNewSolicitud || isOperadorOrAdmin || isDistribuidor || isAssignedResponsable;
+
     const isCreator = Boolean(
         formData.createdBy && (
             (formData.createdBy.id && user?.id && Number(formData.createdBy.id) === Number(user.id)) ||
@@ -1203,9 +1210,12 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 )}
                         {!!formData.id && (
                             <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Estado</label>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">
+                                    Estado {!canEditStatus && <span className="text-xs text-gray-500 font-normal">(Solo lectura)</span>}
+                                </label>
                                 <select
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    disabled={!canEditStatus || isReadOnly}
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                                     value={formData.status}
                                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                                 >

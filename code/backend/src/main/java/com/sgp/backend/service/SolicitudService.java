@@ -388,6 +388,14 @@ public class SolicitudService {
         boolean isCreator = currentUser != null && existing.getCreatedBy() != null &&
                 existing.getCreatedBy().getId().equals(currentUser.getId());
 
+        boolean isDistribuidor = currentUser != null && currentUser.getRole() != null &&
+                currentUser.getRole().toUpperCase().contains("DISTRIBUIDOR");
+
+        boolean isAssignedResponsable = currentUser != null && existing.getResponsable() != null &&
+                existing.getResponsable().getId().equals(currentUser.getId());
+
+        boolean canEditStatus = isOperadorOrAdmin || isDistribuidor || isAssignedResponsable;
+
         boolean canEditInitialData = isOperadorOrAdmin || isCreator;
 
         // Validación obligatoria de DNI para subsidios
@@ -486,7 +494,11 @@ public class SolicitudService {
             }
         }
 
-        existing.setStatus(dto.getStatus());
+        // Solo los usuarios autorizados (Admin, Operador, Distribuidor o el Responsable titular asignado)
+        // pueden modificar manualmente el estado de la solicitud.
+        if (canEditStatus && dto.getStatus() != null && !dto.getStatus().trim().isEmpty()) {
+            existing.setStatus(dto.getStatus());
+        }
         existing.setZone(dto.getZone());
         existing.setContactDate(dto.getContactDate());
         existing.setResolutionDate(dto.getResolutionDate());
@@ -534,8 +546,8 @@ public class SolicitudService {
         // 7. Sincronizar asignaciones de resolutores (Punto 8)
         processAssignments(saved, dto.getAssignments(), currentUser, isCreator, isOperadorOrAdmin);
 
-        // 8. Recalcular estado automático (solo si no se cambió de forma manual en el DTO)
-        boolean statusChangedManually = dto.getStatus() != null && !dto.getStatus().equalsIgnoreCase(oldStatus);
+        // 8. Recalcular estado automático (solo si no se cambió de forma manual autorizada en el DTO)
+        boolean statusChangedManually = canEditStatus && dto.getStatus() != null && !dto.getStatus().equalsIgnoreCase(oldStatus);
         if (!statusChangedManually) {
             updateSolicitudStatus(saved);
         }
