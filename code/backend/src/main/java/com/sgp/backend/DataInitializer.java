@@ -99,6 +99,8 @@ public class DataInitializer implements CommandLineRunner {
                 "barbarabrancatto@gmail.com",
                 "egestticarlos@gmail.com",
                 "ledesmamartin089@gmail.com",
+                "mariana_altuna@hotmail.com",
+                "oesquerivan@gmail.com",
                 // 4 cuentas de sistema
                 "admin@sgp.com",
                 "auditor.sheets@gmail.com",
@@ -210,7 +212,7 @@ public class DataInitializer implements CommandLineRunner {
             createUserIfNotFound("caraffamaxi@gmail.com", "Maxi!2026$Lh", "RESPONSABLE,DISTRIBUIDOR", "Maxi", "Caraffa", LocalDate.of(1990, 1, 1), "3425129767", null, "33568046");
             createUserIfNotFound("matias.ippolito@gmail.com", "Matias_Dist_SGP_2026!", "RESPONSABLE,DISTRIBUIDOR", "Matías", "Ippólito", LocalDate.of(1990, 1, 1), "3426148609", "NORTE", "28925931");
             createUserIfNotFound("nacho.bonadeo@gmail.com", "Juan@2026$Fa", "RESPONSABLE", "Juan", "Bonadeo", LocalDate.of(1990, 1, 1), "3424781312", "NOROESTE", "34301949");
-            createUserIfNotFound("victorhugogonzalez618@gmail.com", "Victor@2026!Rk", "RESPONSABLE", "Victor Hugo", "Gonzalez", LocalDate.of(1990, 1, 1), "3424348588", "OESTE", "16203521");
+            createUserIfNotFound("victorhugogonzalez618@gmail.com", "Victor@2026!Rk", "RESPONSABLE", "Victor Hugo", "Gonzalez", LocalDate.of(1990, 1, 1), "3424348588", "OESTE, DEPORTIVO", "16203521");
             createUserIfNotFound("axeldariomenor@gmail.com", "Axel&2026!Gf", "RESPONSABLE", "Axel Dario", "Menor", LocalDate.of(1990, 1, 1), "3424297493", null, "21412093");
             createUserIfNotFound("lea.aufranc@gmail.com", "Leandro&2026&Kb", "RESPONSABLE", "Leandro", "Suarez Aufranc", LocalDate.of(1990, 1, 1), "3425009056", null, "35468210");
             createUserIfNotFound("javier.i.cuello@gmail.com", "Javier#2026&Tu", "RESPONSABLE", "Javier", "Cuello", LocalDate.of(1990, 1, 1), "3425289616", "SUROESTE", "29618855");
@@ -222,6 +224,8 @@ public class DataInitializer implements CommandLineRunner {
             createUserIfNotFound("barbarabrancatto@gmail.com", "Barbara_Resp_SGP_2026!", "RESPONSABLE", "Barbara", "Brancatto", LocalDate.of(1990, 1, 1), "3424216840", null, "26972841");
             createUserIfNotFound("egestticarlos@gmail.com", "Carlos&XjzM#Eg", "RESPONSABLE", "Carlos", "Egestti", LocalDate.of(1990, 1, 1), "3420000000", "PRIMER CORDON", "21411650");
             createUserIfNotFound("ledesmamartin089@gmail.com", "Martin!p3hK$Ld", "RESPONSABLE", "Martín", "Ledesma", LocalDate.of(1990, 1, 1), "3420000000", "COSTA", "30432225");
+            createUserIfNotFound("mariana_altuna@hotmail.com", "Mariana_Resp_SGP_2026!", "RESPONSABLE", "Mariana", "Altuna", LocalDate.of(1990, 1, 1), "3420000000", "SANTO TOME", "28948636");
+            createUserIfNotFound("oesquerivan@gmail.com", "Ivan_Resp_SGP_2026!", "RESPONSABLE", "Ivan", "Oesquer", LocalDate.of(1990, 1, 1), "3420000000", "SUR, EDUCACION", "32097341");
 
             // 2. Initialize Locations from dataset
             initializeLocations();

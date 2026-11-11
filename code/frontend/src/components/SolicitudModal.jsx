@@ -79,7 +79,12 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     // Condición de autorización para seleccionar/ver la opción 'Consideración' (Administrador, Responsable o Resolutor de Subsidio, o si ya está en consideración).
     // Se desplaza esta declaración después de formData para evitar ReferenceError por acceso previo a la inicialización de formData.
     const canPonerConsideracion = user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN' || user?.role === 'RESPONSABLE' || isResolutorSubsidio === true || formData.status === 'consideracion';
-    const canTomar = Boolean(formData.id && !formData.responsableId && (user?.role === 'RESPONSABLE' || user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN') && (!formData.zone || !user?.zone || formData.zone.toLowerCase() === user?.zone.toLowerCase() || user?.role?.includes('ADMIN')));
+    const canTomar = Boolean(
+        formData.id && !formData.responsableId &&
+        (user?.role === 'RESPONSABLE' || user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN') &&
+        (!formData.zone || !user?.zone || user?.role?.includes('ADMIN') ||
+         user.zone.split(',').map(z => z.trim().toLowerCase()).includes(formData.zone.trim().toLowerCase()))
+    );
     const isSubsidio = (formData.type && formData.type.toUpperCase().includes('SUBSIDIO')) || (formData.assignments || []).some(a => a.tipoResolucion && a.tipoResolucion.toUpperCase().includes('SUBSIDIO'));
 
     // Permisos Etapa 2 (Punto 6 y Punto 8)
@@ -1111,12 +1116,12 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         }
     }, [showApproveConfirm, myAssignment?.tipoResolucion, formData.type, formData.id, formData.person, formData.resolutionDate, formData.locationName, formData.barrio, formData.description, approveObservations, asistencia]);
 
-    // Computar zonas únicas de responsables
-    const uniqueZones = [...new Set(responsables.map(r => r.zone).filter(Boolean))].sort();
+    // Computar zonas únicas de responsables (soportando múltiples zonas separadas por coma)
+    const uniqueZones = [...new Set(responsables.flatMap(r => (r.zone || '').split(',').map(z => z.trim()).filter(Boolean)))].sort();
 
     // Filtrar responsables por zona seleccionada
     const filteredResponsables = selectedZone
-        ? responsables.filter(r => r.zone === selectedZone)
+        ? responsables.filter(r => (r.zone || '').split(',').map(z => z.trim().toLowerCase()).includes(selectedZone.trim().toLowerCase()))
         : [];
 
     if (!isOpen) return null;
@@ -1219,7 +1224,9 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     value={formData.status}
                                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                                 >
-                                    <option value="pendiente">Pendiente</option>
+                                    <option value="pendiente" disabled={Boolean(formData.responsableId)}>
+                                        Pendiente {formData.responsableId ? '(Desasignar responsable para volver a pendiente)' : ''}
+                                    </option>
                                     <option value="en proceso">Asignadas</option>
                                     <option value="en resolucion">En Resolución</option>
                                     <option value="completadas">Resueltas</option>
@@ -1646,9 +1653,13 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                         onChange={(e) => {
                                             const respId = e.target.value;
                                             const selectedResp = responsables.find(r => r.id.toString() === respId.toString());
+                                            const nextStatus = (respId && formData.status === 'pendiente')
+                                                ? 'en proceso'
+                                                : (!respId && formData.status === 'en proceso' ? 'pendiente' : formData.status);
                                             setFormData({ 
                                                 ...formData, 
                                                 responsableId: respId,
+                                                status: nextStatus,
                                                 zone: selectedResp ? (selectedResp.zone || selectedZone) : selectedZone
                                             });
                                         }}

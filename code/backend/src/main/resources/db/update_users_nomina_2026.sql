@@ -109,9 +109,9 @@ INSERT INTO users (email, password, role, first_name, last_name, birth_date, pho
 VALUES ('nacho.bonadeo@gmail.com', '$2a$10$N2a9H1rUe0K8F.Zk2M7dOuFp6q7vN9tB1d7kP1nK3Qy3Bq.w8y38r', 'RESPONSABLE', 'Juan', 'Bonadeo', '1990-01-01', '3424781312', 'NOROESTE', '34301949', 1)
 ON DUPLICATE KEY UPDATE role = VALUES(role), first_name = VALUES(first_name), last_name = VALUES(last_name), phone = VALUES(phone), zone = VALUES(zone), dni = VALUES(dni), activo = 1;
 
--- 20. Victor Hugo Gonzalez (RESPONSABLE - Zona Oeste)
+-- 20. Victor Hugo Gonzalez (RESPONSABLE - Zona Oeste y Deportivo)
 INSERT INTO users (email, password, role, first_name, last_name, birth_date, phone, zone, dni, activo)
-VALUES ('victorhugogonzalez618@gmail.com', '$2a$10$O2b0H1rUe0K8F.Zk2M7dOuFp6q7vN9tB1d7kP1nK3Qy3Bq.w8y39s', 'RESPONSABLE', 'Victor Hugo', 'Gonzalez', '1990-01-01', '3424348588', 'OESTE', '16203521', 1)
+VALUES ('victorhugogonzalez618@gmail.com', '$2a$10$O2b0H1rUe0K8F.Zk2M7dOuFp6q7vN9tB1d7kP1nK3Qy3Bq.w8y39s', 'RESPONSABLE', 'Victor Hugo', 'Gonzalez', '1990-01-01', '3424348588', 'OESTE, DEPORTIVO', '16203521', 1)
 ON DUPLICATE KEY UPDATE role = VALUES(role), first_name = VALUES(first_name), last_name = VALUES(last_name), phone = VALUES(phone), zone = VALUES(zone), dni = VALUES(dni), activo = 1;
 
 -- 21. Axel Dario Menor (RESPONSABLE)
@@ -167,6 +167,16 @@ ON DUPLICATE KEY UPDATE role = VALUES(role), first_name = VALUES(first_name), la
 -- 31. Martín Ledesma (RESPONSABLE - Costa)
 INSERT INTO users (email, password, role, first_name, last_name, birth_date, phone, zone, dni, activo)
 VALUES ('ledesmamartin089@gmail.com', '$2a$10$t0T1RHdLM6T8QGfF3DSv5.VneDfc7LcbOy0ezq7Ld5hvUVMz0/aoO', 'RESPONSABLE', 'Martín', 'Ledesma', '1990-01-01', '3420000000', 'COSTA', '30432225', 1)
+ON DUPLICATE KEY UPDATE role = VALUES(role), first_name = VALUES(first_name), last_name = VALUES(last_name), phone = VALUES(phone), zone = VALUES(zone), dni = VALUES(dni), activo = 1;
+
+-- 32. Mariana Altuna (RESPONSABLE - Santo Tomé)
+INSERT INTO users (email, password, role, first_name, last_name, birth_date, phone, zone, dni, activo)
+VALUES ('mariana_altuna@hotmail.com', '$2a$10$4l3EuG2vBQkNev7GVlbzzuTEep1YVvuW6nI.wd2nK2.LoIdCaH9Si', 'RESPONSABLE', 'Mariana', 'Altuna', '1990-01-01', '3420000000', 'SANTO TOME', '28948636', 1)
+ON DUPLICATE KEY UPDATE role = VALUES(role), first_name = VALUES(first_name), last_name = VALUES(last_name), phone = VALUES(phone), zone = VALUES(zone), dni = VALUES(dni), activo = 1;
+
+-- 33. Ivan Oesquer (RESPONSABLE - Sur / Educación)
+INSERT INTO users (email, password, role, first_name, last_name, birth_date, phone, zone, dni, activo)
+VALUES ('oesquerivan@gmail.com', '$2a$10$k/9Wghj5RE3JyB5r2FrXEOpK3pBljsfGc3pQnZzxd6nD3GO6/PYQO', 'RESPONSABLE', 'Ivan', 'Oesquer', '1990-01-01', '3420000000', 'SUR, EDUCACION', '32097341', 1)
 ON DUPLICATE KEY UPDATE role = VALUES(role), first_name = VALUES(first_name), last_name = VALUES(last_name), phone = VALUES(phone), zone = VALUES(zone), dni = VALUES(dni), activo = 1;
 
 -- 3. Vinculación de Resolutores a Tipos de Resolución

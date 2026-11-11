@@ -155,11 +155,23 @@ public class SolicitudService {
                             jakarta.persistence.criteria.Predicate isAssignedToMe = cb.equal(root.get("responsable"), user);
                             final String zoneStr = user.getZone();
                             if (zoneStr != null && !zoneStr.trim().isEmpty()) {
-                                jakarta.persistence.criteria.Predicate isUnassignedInMyZone = cb.and(
-                                    cb.isNull(root.get("responsable")),
-                                    cb.equal(cb.lower(cb.trim(root.get("zone"))), zoneStr.trim().toLowerCase())
-                                );
-                                orPredicates.add(cb.or(isAssignedToMe, isUnassignedInMyZone));
+                                String[] zones = zoneStr.split(",");
+                                List<jakarta.persistence.criteria.Predicate> zonePreds = new java.util.ArrayList<>();
+                                for (String z : zones) {
+                                    String trimmedZ = z.trim().toLowerCase();
+                                    if (!trimmedZ.isEmpty()) {
+                                        zonePreds.add(cb.equal(cb.lower(cb.trim(root.get("zone"))), trimmedZ));
+                                    }
+                                }
+                                if (!zonePreds.isEmpty()) {
+                                    jakarta.persistence.criteria.Predicate isUnassignedInMyZone = cb.and(
+                                        cb.isNull(root.get("responsable")),
+                                        cb.or(zonePreds.toArray(new jakarta.persistence.criteria.Predicate[0]))
+                                    );
+                                    orPredicates.add(cb.or(isAssignedToMe, isUnassignedInMyZone));
+                                } else {
+                                    orPredicates.add(isAssignedToMe);
+                                }
                             } else {
                                 orPredicates.add(isAssignedToMe);
                             }
@@ -547,7 +559,14 @@ public class SolicitudService {
         processAssignments(saved, dto.getAssignments(), currentUser, isCreator, isOperadorOrAdmin);
 
         // 8. Recalcular estado automático (solo si no se cambió de forma manual autorizada en el DTO)
+        // Regla inviolable: Si la solicitud tiene responsable asignado, bajo ningún concepto puede quedar en "pendiente".
+        boolean hasResponsable = saved.getResponsable() != null;
         boolean statusChangedManually = canEditStatus && dto.getStatus() != null && !dto.getStatus().equalsIgnoreCase(oldStatus);
+        
+        if (hasResponsable && "pendiente".equalsIgnoreCase(saved.getStatus())) {
+            statusChangedManually = false;
+        }
+
         if (!statusChangedManually) {
             updateSolicitudStatus(saved);
         }
@@ -1031,7 +1050,12 @@ public class SolicitudService {
         if (!activeRole.contains("ADMIN")) {
             if (solicitud.getZone() != null && !solicitud.getZone().trim().isEmpty()
                     && currentUser.getZone() != null && !currentUser.getZone().trim().isEmpty()) {
-                if (!solicitud.getZone().trim().equalsIgnoreCase(currentUser.getZone().trim())) {
+                java.util.List<String> userZones = java.util.Arrays.stream(currentUser.getZone().split(","))
+                        .map(String::trim)
+                        .map(String::toLowerCase)
+                        .filter(s -> !s.isEmpty())
+                        .collect(java.util.stream.Collectors.toList());
+                if (!userZones.contains(solicitud.getZone().trim().toLowerCase())) {
                     throw new org.springframework.web.server.ResponseStatusException(
                             org.springframework.http.HttpStatus.FORBIDDEN,
                             "La solicitud pertenece a la zona " + solicitud.getZone() + " y tu zona asignada es " + currentUser.getZone());

@@ -236,12 +236,12 @@ export default function UsersPage({ isEmbedded = false }) {
 
             {/* User Modal */}
             {showUserModal && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-gray-800 rounded-2xl border border-gray-700 shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95">
-                        <h2 className="text-xl font-bold text-white mb-6">
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex justify-center items-start z-50 p-4 pt-6 sm:pt-10 overflow-y-auto">
+                    <div className="bg-gray-800 rounded-2xl border border-gray-700 shadow-2xl max-w-md w-full p-6 mb-8 max-h-[90vh] flex flex-col animate-in zoom-in-95">
+                        <h2 className="text-xl font-bold text-white mb-4 shrink-0">
                             {editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
                         </h2>
-                        <form onSubmit={handleUserSubmit} className="space-y-4">
+                        <form onSubmit={handleUserSubmit} className="space-y-4 overflow-y-auto pr-1">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nombre</label>
@@ -358,7 +358,7 @@ export default function UsersPage({ isEmbedded = false }) {
                                 </div>
                             )}
 
-                            <div className="flex gap-3 pt-4">
+                            <div className="flex gap-3 pt-4 shrink-0">
                                 <button type="button" onClick={() => setShowUserModal(false)} className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors font-medium">Cancelar</button>
                                 <button type="submit" className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors font-bold text-white">{editingUser ? 'Guardar Cambios' : 'Crear Usuario'}</button>
                             </div>

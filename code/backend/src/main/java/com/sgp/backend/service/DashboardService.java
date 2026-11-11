@@ -50,11 +50,23 @@ public class DashboardService {
                             final String zoneStr = user.getZone();
                             jakarta.persistence.criteria.Predicate respPredicate = cb.equal(root.get("responsable"), user);
                             if (zoneStr != null && !zoneStr.trim().isEmpty()) {
-                                jakarta.persistence.criteria.Predicate unassignedInZone = cb.and(
-                                        cb.isNull(root.get("responsable")),
-                                        cb.equal(cb.lower(cb.trim(root.get("zone"))), zoneStr.trim().toLowerCase())
-                                );
-                                orPredicates.add(cb.or(respPredicate, unassignedInZone));
+                                String[] zones = zoneStr.split(",");
+                                List<jakarta.persistence.criteria.Predicate> zonePreds = new java.util.ArrayList<>();
+                                for (String z : zones) {
+                                    String trimmedZ = z.trim().toLowerCase();
+                                    if (!trimmedZ.isEmpty()) {
+                                        zonePreds.add(cb.equal(cb.lower(cb.trim(root.get("zone"))), trimmedZ));
+                                    }
+                                }
+                                if (!zonePreds.isEmpty()) {
+                                    jakarta.persistence.criteria.Predicate unassignedInZone = cb.and(
+                                            cb.isNull(root.get("responsable")),
+                                            cb.or(zonePreds.toArray(new jakarta.persistence.criteria.Predicate[0]))
+                                    );
+                                    orPredicates.add(cb.or(respPredicate, unassignedInZone));
+                                } else {
+                                    orPredicates.add(respPredicate);
+                                }
                             } else {
                                 orPredicates.add(respPredicate);
                             }
