@@ -173,9 +173,7 @@ public class GeneradorCredenciales {
                            "|----|--------------------------|----------------------------|----------------------------------|--------------------------------|--------------------------|-------------|------------|";
 
         File txtRoot = new File("c:/Users/fran/dev/projects/SGP/usuarios_contrasenas_sgp.txt");
-        File txtDocs = new File("c:/Users/fran/dev/projects/SGP/docs/usuarios_contrasenas_sgp.txt");
-
-        List<File> txtFiles = Arrays.asList(txtRoot, txtDocs);
+        List<File> txtFiles = Collections.singletonList(txtRoot);
         for (File f : txtFiles) {
             try (PrintWriter pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(f), StandardCharsets.UTF_8))) {
                 pw.println(headerTxt);
