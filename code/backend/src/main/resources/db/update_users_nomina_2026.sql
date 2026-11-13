@@ -179,6 +179,11 @@ INSERT INTO users (email, password, role, first_name, last_name, birth_date, pho
 VALUES ('oesquerivan@gmail.com', '$2a$10$k/9Wghj5RE3JyB5r2FrXEOpK3pBljsfGc3pQnZzxd6nD3GO6/PYQO', 'RESPONSABLE', 'Ivan', 'Oesquer', '1990-01-01', '3420000000', 'SUR, EDUCACION', '32097341', 1)
 ON DUPLICATE KEY UPDATE role = VALUES(role), first_name = VALUES(first_name), last_name = VALUES(last_name), phone = VALUES(phone), zone = VALUES(zone), dni = VALUES(dni), activo = 1;
 
+-- 34. Bianca Scalenghe (RESPONSABLE - Noreste)
+INSERT INTO users (email, password, role, first_name, last_name, birth_date, phone, zone, dni, activo)
+VALUES ('scalenghebianca@gmail.com', '$2a$10$HM9uWkJ7Fv/KSclJPZnYV.vvXkkRJDfFFx8s.9.4NzviBXt/Xl.82', 'RESPONSABLE', 'Bianca', 'Scalenghe', '1990-01-01', '3420000000', 'NORESTE', '37797942', 1)
+ON DUPLICATE KEY UPDATE role = VALUES(role), first_name = VALUES(first_name), last_name = VALUES(last_name), phone = VALUES(phone), zone = VALUES(zone), dni = VALUES(dni), activo = 1;
+
 -- 3. Vinculación de Resolutores a Tipos de Resolución
 -- AGENDA -> Verónica González
 SET @id_user_agenda = (SELECT id FROM users WHERE email = 'mveronicagonzalez79@gmail.com' LIMIT 1);

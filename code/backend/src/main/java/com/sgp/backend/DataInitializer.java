@@ -101,6 +101,7 @@ public class DataInitializer implements CommandLineRunner {
                 "ledesmamartin089@gmail.com",
                 "mariana_altuna@hotmail.com",
                 "oesquerivan@gmail.com",
+                "scalenghebianca@gmail.com",
                 // 4 cuentas de sistema
                 "admin@sgp.com",
                 "auditor.sheets@gmail.com",
@@ -226,6 +227,7 @@ public class DataInitializer implements CommandLineRunner {
             createUserIfNotFound("ledesmamartin089@gmail.com", "Martin!p3hK$Ld", "RESPONSABLE", "Martín", "Ledesma", LocalDate.of(1990, 1, 1), "3420000000", "COSTA", "30432225");
             createUserIfNotFound("mariana_altuna@hotmail.com", "Mariana_Resp_SGP_2026!", "RESPONSABLE", "Mariana", "Altuna", LocalDate.of(1990, 1, 1), "3420000000", "SANTO TOME", "28948636");
             createUserIfNotFound("oesquerivan@gmail.com", "Ivan_Resp_SGP_2026!", "RESPONSABLE", "Ivan", "Oesquer", LocalDate.of(1990, 1, 1), "3420000000", "SUR, EDUCACION", "32097341");
+            createUserIfNotFound("scalenghebianca@gmail.com", "Bianca_Resp_SGP_2026!", "RESPONSABLE", "Bianca", "Scalenghe", LocalDate.of(1990, 1, 1), "3420000000", "NORESTE", "37797942");
 
             // 2. Initialize Locations from dataset
             initializeLocations();
