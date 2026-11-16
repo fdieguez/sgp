@@ -86,6 +86,12 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
          user.zone.split(',').map(z => z.trim().toLowerCase()).includes(formData.zone.trim().toLowerCase()))
     );
     const isSubsidio = (formData.type && formData.type.toUpperCase().includes('SUBSIDIO')) || (formData.assignments || []).some(a => a.tipoResolucion && a.tipoResolucion.toUpperCase().includes('SUBSIDIO'));
+    // El DNI del solicitante no es obligatorio para entidades institucionales ni para subsidios exclusivamente en especie
+    const isInstitucional = (formData.person?.type || '').trim().toLowerCase() === 'institucional';
+    const hasOnlySubsidioEnEspecie = (formData.type || '').toUpperCase() !== 'SUBSIDIO' &&
+        (formData.assignments || []).some(a => (a.tipoResolucion || '').toUpperCase().includes('SUBSIDIO')) &&
+        (formData.assignments || []).every(a => !(a.tipoResolucion || '').toUpperCase().includes('SUBSIDIO') || (a.tipoResolucion || '').trim().toUpperCase() === 'SUBSIDIO EN ESPECIE');
+    const requiresPersonDni = isSubsidio && !isInstitucional && !hasOnlySubsidioEnEspecie;
 
     // Permisos Etapa 2 (Punto 6 y Punto 8)
     const isNewSolicitud = !formData.id;
@@ -737,8 +743,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             return;
         }
 
-        // Validación obligatoria de DNI para subsidios
-        if (isSubsidio && (!formData.person?.dni || !String(formData.person.dni).trim())) {
+        // Validación obligatoria de DNI para subsidios personales/en dinero
+        if (requiresPersonDni && (!formData.person?.dni || !String(formData.person.dni).trim())) {
             toast.error("El DNI del solicitante/beneficiario es obligatorio para tramitar un subsidio.");
             return;
         }
@@ -1551,11 +1557,11 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top-2 p-4 bg-emerald-900/20 rounded-xl border border-emerald-800/50">
                             <div>
                                 <label className="block text-sm font-medium text-emerald-400 mb-1 flex items-center gap-1">
-                                    <UserIcon className="h-3 w-3" /> DNI Beneficiario <span className="text-red-400 font-bold">*</span>
+                                    <UserIcon className="h-3 w-3" /> DNI Beneficiario {requiresPersonDni ? <span className="text-red-400 font-bold">*</span> : <span className="text-xs text-gray-400 font-normal">(Opcional)</span>}
                                 </label>
                                 <input
                                     type="text"
-                                    required
+                                    required={requiresPersonDni}
                                     placeholder="Ej: 34567890"
                                     className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-emerald-500"
                                     value={formData.person?.dni || ''}
@@ -1791,7 +1797,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                 const isAssignedResolutor = Boolean(
                                                     (assignment.resolutorEmail && user?.email && assignment.resolutorEmail.toLowerCase() === user.email.toLowerCase())
                                                 );
-                                                const canEditThisAsgn = isNewSolicitud || (isSubsidioAssoc ? (isCreator || isAssignedResolutor || isOperadorOrAdmin) : (!isResolutor || isAssignedResolutor || isOperadorOrAdmin || isCreator));
+                                                const canEditThisAsgn = isNewSolicitud || (isSubsidioAssoc ? (isCreator || isAssignedResponsable || isAssignedResolutor || isOperadorOrAdmin) : (!isResolutor || isAssignedResolutor || isOperadorOrAdmin || isCreator));
                                                 
                                                 return !isReadOnly && canEditThisAsgn && (!isResolutor || isOperadorOrAdmin) && (
                                                     <button 
@@ -1815,8 +1821,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                     const isAssignedResolutor = Boolean(
                                                         (assignment.resolutorEmail && user?.email && assignment.resolutorEmail.toLowerCase() === user.email.toLowerCase())
                                                     );
-                                                    // Punto 8: Nadie más que el propio responsable que propone una resolución, o el resolutor asignado deberían poder cambiar los datos de un subsidio propuesto
-                                                    const canEditThis = isNewSolicitud || (isSubsidioAssoc ? (isCreator || isAssignedResolutor || isOperadorOrAdmin) : (!isResolutor || isAssignedResolutor || isOperadorOrAdmin || isCreator));
+                                                    // Punto 8: El responsable asignado, el creador, el resolutor asignado u operador/admin pueden editar los datos de un subsidio propuesto
+                                                    const canEditThis = isNewSolicitud || (isSubsidioAssoc ? (isCreator || isAssignedResponsable || isAssignedResolutor || isOperadorOrAdmin) : (!isResolutor || isAssignedResolutor || isOperadorOrAdmin || isCreator));
                                                     if (config && config.atributosConfig && config.atributosConfig.length > 0) {
                                                         const sortedCampos = [...config.atributosConfig].sort((a,b) => a.orden - b.orden);
                                                         const currentData = typeof assignment.detalle === 'object' && assignment.detalle !== null ? { ...assignment.detalle } : {};

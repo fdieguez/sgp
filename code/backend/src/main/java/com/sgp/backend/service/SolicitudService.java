@@ -249,16 +249,43 @@ public class SolicitudService {
         }
     }
 
+    /**
+     * Valida que el DNI del solicitante esté presente cuando corresponde a un subsidio personal/en dinero.
+     * No exige DNI si el solicitante es Institucional o si las asignaciones de subsidio son exclusivamente en especie.
+     */
+    private void validateSubsidioDni(boolean isTypeSubsidio, String personType, String personDni, List<String> assignmentTypes) {
+        List<String> subsidioAssignments = assignmentTypes == null ? java.util.Collections.emptyList()
+                : assignmentTypes.stream()
+                        .filter(t -> t != null && t.toUpperCase().contains("SUBSIDIO"))
+                        .toList();
+        boolean isSubsidio = isTypeSubsidio || !subsidioAssignments.isEmpty();
+        if (!isSubsidio) {
+            return;
+        }
+        boolean isInstitucional = personType != null && "Institucional".equalsIgnoreCase(personType.trim());
+        boolean onlySubsidioEnEspecie = !isTypeSubsidio
+                && !subsidioAssignments.isEmpty()
+                && subsidioAssignments.stream().allMatch(t -> "SUBSIDIO EN ESPECIE".equalsIgnoreCase(t.trim()));
+        if (isInstitucional || onlySubsidioEnEspecie) {
+            return;
+        }
+        if (personDni == null || personDni.trim().isEmpty()) {
+            throw new IllegalArgumentException("El DNI del solicitante/beneficiario es obligatorio para tramitar un subsidio.");
+        }
+    }
+
     @org.springframework.transaction.annotation.Transactional
     public Solicitud createSolicitud(Solicitud solicitud) {
-        // Validación obligatoria de DNI para subsidios
-        boolean isSubsidio = (solicitud.getType() != null && solicitud.getType().toUpperCase().contains("SUBSIDIO")) ||
-                (solicitud.getResolutorAssignments() != null && solicitud.getResolutorAssignments().stream().anyMatch(a -> a.getTipoResolucion() != null && a.getTipoResolucion().toUpperCase().contains("SUBSIDIO")));
-        if (isSubsidio) {
-            if (solicitud.getPerson() == null || solicitud.getPerson().getDni() == null || solicitud.getPerson().getDni().trim().isEmpty()) {
-                throw new IllegalArgumentException("El DNI del solicitante/beneficiario es obligatorio para tramitar un subsidio.");
-            }
-        }
+        // Validación obligatoria de DNI para subsidios (excepto Institucional o exclusivamente en especie)
+        boolean isTypeSubsidio = solicitud.getType() != null && solicitud.getType().toUpperCase().contains("SUBSIDIO");
+        List<String> assignmentTypes = solicitud.getResolutorAssignments() == null ? java.util.Collections.emptyList()
+                : solicitud.getResolutorAssignments().stream().map(SolicitudResolutorAssignment::getTipoResolucion).toList();
+        validateSubsidioDni(
+                isTypeSubsidio,
+                solicitud.getPerson() != null ? solicitud.getPerson().getType() : null,
+                solicitud.getPerson() != null ? solicitud.getPerson().getDni() : null,
+                assignmentTypes
+        );
 
         // 1. Procesar Persona
         if (solicitud.getPerson() != null) {
@@ -359,7 +386,7 @@ public class SolicitudService {
                 (currentUser.getRole().equalsIgnoreCase("OPERADOR") ||
                  currentUser.getRole().equalsIgnoreCase("ADMINISTRADOR") ||
                  currentUser.getRole().equalsIgnoreCase("ADMIN"));
-        processAssignments(saved, solicitud.getAssignments(), currentUser, isCreator, isOperadorOrAdmin);
+        processAssignments(saved, solicitud.getAssignments(), currentUser, isCreator, false, isOperadorOrAdmin);
 
         // Actualizar estado automático según reglas de negocio (Punto 9)
         updateSolicitudStatus(saved);
@@ -410,16 +437,18 @@ public class SolicitudService {
 
         boolean canEditInitialData = isOperadorOrAdmin || isCreator;
 
-        // Validación obligatoria de DNI para subsidios
-        boolean isSubsidio = (dto.getType() != null && dto.getType().toUpperCase().contains("SUBSIDIO")) ||
-                (existing.getType() != null && existing.getType().toUpperCase().contains("SUBSIDIO")) ||
-                (dto.getAssignments() != null && dto.getAssignments().stream().anyMatch(a -> a.getTipoResolucion() != null && a.getTipoResolucion().toUpperCase().contains("SUBSIDIO")));
-        if (isSubsidio) {
-            String dni = dto.getPerson() != null ? dto.getPerson().getDni() : (existing.getPerson() != null ? existing.getPerson().getDni() : null);
-            if (dni == null || dni.trim().isEmpty()) {
-                throw new IllegalArgumentException("El DNI del solicitante/beneficiario es obligatorio para tramitar un subsidio.");
-            }
-        }
+        // Validación obligatoria de DNI para subsidios (excepto Institucional o exclusivamente en especie)
+        boolean isTypeSubsidio = (dto.getType() != null && dto.getType().toUpperCase().contains("SUBSIDIO")) ||
+                (existing.getType() != null && existing.getType().toUpperCase().contains("SUBSIDIO"));
+        List<String> dtoAssignmentTypes = dto.getAssignments() == null ? java.util.Collections.emptyList()
+                : dto.getAssignments().stream().map(ResolutorAssignmentDTO::getTipoResolucion).toList();
+        String effectivePersonType = dto.getPerson() != null && dto.getPerson().getType() != null
+                ? dto.getPerson().getType()
+                : (existing.getPerson() != null ? existing.getPerson().getType() : null);
+        String effectivePersonDni = dto.getPerson() != null
+                ? dto.getPerson().getDni()
+                : (existing.getPerson() != null ? existing.getPerson().getDni() : null);
+        validateSubsidioDni(isTypeSubsidio, effectivePersonType, effectivePersonDni, dtoAssignmentTypes);
 
         // 1. Actualizar beneficiario (Solo si tiene permiso sobre carga original - Punto 6)
         if (canEditInitialData && dto.getPerson() != null) {
@@ -519,8 +548,8 @@ public class SolicitudService {
         existing.setDetail(dto.getDetail());
         existing.setFirstContactControl(dto.getFirstContactControl());
 
-        // 4. Campos específicos de Subsidio (Punto 8)
-        boolean canEditSubsidioData = isCreator || isOperadorOrAdmin;
+        // 4. Campos específicos de Subsidio (Punto 8: incluye al responsable asignado para casos derivados)
+        boolean canEditSubsidioData = isCreator || isAssignedResponsable || isOperadorOrAdmin;
         if (canEditSubsidioData) {
             if (dto.getAmount() != null) existing.setAmount(dto.getAmount());
             if (dto.getGrantDate() != null) existing.setGrantDate(dto.getGrantDate());
@@ -556,7 +585,7 @@ public class SolicitudService {
         Solicitud saved = solicitudRepository.save(existing);
 
         // 7. Sincronizar asignaciones de resolutores (Punto 8)
-        processAssignments(saved, dto.getAssignments(), currentUser, isCreator, isOperadorOrAdmin);
+        processAssignments(saved, dto.getAssignments(), currentUser, isCreator, isAssignedResponsable, isOperadorOrAdmin);
 
         // 8. Recalcular estado automático (solo si no se cambió de forma manual autorizada en el DTO)
         // Regla inviolable: Si la solicitud tiene responsable asignado, bajo ningún concepto puede quedar en "pendiente".
@@ -613,7 +642,7 @@ public class SolicitudService {
         asignacionHistorialRepository.save(history);
     }
 
-    private void processAssignments(Solicitud solicitud, List<ResolutorAssignmentDTO> dtos, User currentUser, boolean isCreator, boolean isOperadorOrAdmin) {
+    private void processAssignments(Solicitud solicitud, List<ResolutorAssignmentDTO> dtos, User currentUser, boolean isCreator, boolean isAssignedResponsable, boolean isOperadorOrAdmin) {
         if (dtos == null) return;
         
         List<SolicitudResolutorAssignment> currentAssignments = solicitud.getResolutorAssignments();
@@ -629,7 +658,7 @@ public class SolicitudService {
             if (isSubsidio) {
                 boolean isAssignedResolutor = existingAssignment.getResolutor() != null &&
                         currentUser != null && existingAssignment.getResolutor().getId().equals(currentUser.getId());
-                boolean canDeleteSubsidio = isCreator || isAssignedResolutor || isOperadorOrAdmin;
+                boolean canDeleteSubsidio = isCreator || isAssignedResponsable || isAssignedResolutor || isOperadorOrAdmin;
                 if (!canDeleteSubsidio) {
                     return false; // Proteger asignación de subsidio si no tiene permisos (Punto 8)
                 }
@@ -658,7 +687,7 @@ public class SolicitudService {
                         
                 boolean isSubsidio = dto.getTipoResolucion().toUpperCase().contains("SUBSIDIO");
                 boolean isAssignedResolutor = currentUser != null && resolutor.getId().equals(currentUser.getId());
-                boolean canEditThisAssignment = !isSubsidio || isCreator || isAssignedResolutor || isOperadorOrAdmin;
+                boolean canEditThisAssignment = !isSubsidio || isCreator || isAssignedResponsable || isAssignedResolutor || isOperadorOrAdmin;
 
                 if (existing != null) {
                     // Actualizar el detalle de la asignación existente solo si tiene permiso (Punto 8)

@@ -30,6 +30,7 @@ public class DataInitializer implements CommandLineRunner {
 
     private final TipoResolucionRepository tipoResolucionRepository;
     private final AtributoResolucionRepository atributoRepository;
+    private final com.sgp.backend.repository.ConfigRepository configRepository;
     private final jakarta.persistence.EntityManager entityManager;
 
     @org.springframework.beans.factory.annotation.Value("${sgp.seed.overwrite-users:true}")
@@ -407,6 +408,15 @@ public class DataInitializer implements CommandLineRunner {
             }
 
             // La siembra automática de solicitudes y beneficiarios de ejemplo ha sido removida para que producción permanezca limpio.
+
+            // Inicialización de versión de base de datos en tabla config
+            if (configRepository.count() == 0) {
+                configRepository.save(com.sgp.backend.entity.Config.builder()
+                        .dbVersion("1.2.9")
+                        .descripcion("Creación inicial de tabla config para control de versionado de BD")
+                        .build());
+                System.out.println("✅ Versión inicial de BD registrada en tabla config: 1.2.9");
+            }
 
             System.out.println("✅ DataInitializer finalizado exitosamente.");
         } catch (Exception e) {

@@ -42,6 +42,9 @@ Este skill define el protocolo estricto y desatendido para realizar un pase a pr
 
 ## 🛠️ Protocolo de Ejecución Paso a Paso
 
+### Paso 0: Registro de Versión en `docs/release/`
+Antes de confirmar y subir los cambios a `main`, verificar que la versión en `code/frontend/src/config/version.js` y `code/frontend/package.json` esté actualizada y que exista el archivo de release correspondiente en `docs/release/v<VERSION>.ods` (siguiendo `.agents/rules/versionado.md`). Si no existe, generarlo con el detalle de cambios de la versión.
+
 ### Paso 1: Generar Copia de Seguridad Preventiva de la Base de Datos
 Ejecutar por SSH en el VPS:
 ```bash
@@ -88,4 +91,4 @@ plink -ssh -P 5287 -pw 1.2.3.Fnd.2026 -batch root@149.50.128.168 "cd /root/deplo
 4. Confirmar que la cantidad de solicitudes en la base de datos (`SELECT count(*) FROM solicitudes`) y usuarios (`SELECT count(*) FROM users`) se mantenga íntegra.
 
 ### Paso 7: Notificar al Usuario
-Entregar un informe resumido con el commit desplegado, el estado del backup, la integridad de los datos y la confirmación de disponibilidad del sistema.
+Entregar un informe resumido con el commit desplegado, el estado del backup, la integridad de los datos, la confirmación de disponibilidad del sistema y **un mensaje corto y escueto listo para copiar y difundir los cambios/correcciones por WhatsApp**.
