@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Save, User as UserIcon, MapPin, Clipboard, Phone, DollarSign, Calendar, Users, Plus, Trash2, History, FileText, UploadCloud, Download, ArrowRight, MessageSquare, Check, Eye, LayoutDashboard, UserCheck, AlertTriangle, Lock } from 'lucide-react';
 import api from '../config/axios';
 import { useAuth } from '../context/AuthContext';
@@ -51,6 +51,11 @@ const DEFAULT_CITIES = [
 export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData, configId, cachedLocations = [] }) {
     const { user } = useAuth();
     const isResponsable = user?.role === 'RESPONSABLE' || user?.role === 'RESOLUTOR';
+    const userZones = (user?.responsable?.zone || user?.zone || '')
+        .split(',')
+        .map(z => z.trim())
+        .filter(Boolean);
+    const hasMultipleUserZones = isResponsable && userZones.length > 1;
     const isReadOnly = user?.role === 'AUDITOR';
     const canSuggestResolutor = user?.role === 'RESPONSABLE';
     const isResolutor = user?.role === 'RESOLUTOR';
@@ -129,6 +134,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     };
 
     const [responsables, setResponsables] = useState([]);
+    const descriptionRef = useRef(null);
     const [selectedZone, setSelectedZone] = useState('');
     const [locations, setLocations] = useState([]);
     const [tiposResolucion, setTiposResolucion] = useState([]);
@@ -220,6 +226,14 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             fetchHistorial();
         }
     }, [isOpen, formData.id, activeTab, fetchHistorial]);
+
+    // Auto-ajusta la altura del campo Descripción / Pedido según el contenido (mín. 4 filas, máx. 320px)
+    useEffect(() => {
+        const el = descriptionRef.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = `${Math.min(Math.max(el.scrollHeight, 110), 320)}px`;
+    }, [formData.description, isOpen, activeTab]);
 
 
     const handleDragOver = (e) => {
@@ -588,7 +602,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 setSelectedPersonStats(null);
                 setDniCollision(null);
                 const myRespId = isResponsable ? (user?.responsable?.id || user?.id || '') : '';
-                const myZone = isResponsable ? (user?.responsable?.zone || user?.zone || '') : '';
+                const myZone = isResponsable ? (userZones[0] || '') : '';
                 setFormData({
                     type: configId ? (configId.toString() === '1' ? 'AGENDA' : 'SUBSIDIO') : 'PEDIDO',
                     description: '',
@@ -1477,10 +1491,11 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     <div>
                         <label className="block text-sm font-medium text-gray-400 mb-1">Descripción / Pedido</label>
                         <textarea
+                            ref={descriptionRef}
                             required
-                            rows="2"
+                            rows="4"
                             disabled={!canEditInitialData || isReadOnly}
-                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                            className="w-full min-h-[110px] max-h-[320px] overflow-y-auto resize-y bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white leading-relaxed outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-80"
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                         />
@@ -1632,20 +1647,20 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     <select
                                         className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
                                         value={selectedZone}
-                                        disabled={isResponsable}
+                                        disabled={isResponsable && (!isNewSolicitud || !hasMultipleUserZones)}
                                         onChange={(e) => {
                                             const z = e.target.value;
                                             setSelectedZone(z);
-                                            // Al cambiar la zona, limpiamos el responsable anterior en formData
+                                            // Si es un responsable eligiendo entre sus propias zonas, conserva su asignación propia
                                             setFormData(prev => ({ 
                                                 ...prev, 
-                                                responsableId: '',
+                                                responsableId: isResponsable ? prev.responsableId : '',
                                                 zone: z
                                             }));
                                         }}
                                     >
                                         <option value="">Seleccionar Zona...</option>
-                                        {uniqueZones.map(z => (
+                                        {(isResponsable && hasMultipleUserZones ? userZones : uniqueZones).map(z => (
                                             <option key={z} value={z}>{z}</option>
                                         ))}
                                     </select>
@@ -1666,7 +1681,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                 ...formData, 
                                                 responsableId: respId,
                                                 status: nextStatus,
-                                                zone: selectedResp ? (selectedResp.zone || selectedZone) : selectedZone
+                                                zone: selectedZone || (selectedResp ? selectedResp.zone : '')
                                             });
                                         }}
                                     >

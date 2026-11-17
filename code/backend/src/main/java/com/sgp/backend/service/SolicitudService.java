@@ -49,23 +49,35 @@ public class SolicitudService {
     private final ObjectMapper objectMapper;
 
     public org.springframework.data.domain.Page<Solicitud> getAllSolicitudes(String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, org.springframework.data.domain.Pageable pageable) {
-        org.springframework.data.jpa.domain.Specification<Solicitud> spec = buildSpecification(status, search, responsableId, locationId, origin, dateFrom, dateTo);
+        return getAllSolicitudes(status, search, responsableId, locationId, origin, dateFrom, dateTo, null, pageable);
+    }
+
+    public org.springframework.data.domain.Page<Solicitud> getAllSolicitudes(String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, String tipoPedido, org.springframework.data.domain.Pageable pageable) {
+        org.springframework.data.jpa.domain.Specification<Solicitud> spec = buildSpecification(status, search, responsableId, locationId, origin, dateFrom, dateTo, tipoPedido);
         return solicitudRepository.findAll(spec, pageable);
     }
 
     public org.springframework.data.domain.Page<Solicitud> getSolicitudesByConfig(Long configId, String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, org.springframework.data.domain.Pageable pageable) {
+        return getSolicitudesByConfig(configId, status, search, responsableId, locationId, origin, dateFrom, dateTo, null, pageable);
+    }
+
+    public org.springframework.data.domain.Page<Solicitud> getSolicitudesByConfig(Long configId, String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, String tipoPedido, org.springframework.data.domain.Pageable pageable) {
         org.springframework.data.jpa.domain.Specification<Solicitud> baseSpec = org.springframework.data.jpa.domain.Specification
                 .where((root, query, cb) -> cb.equal(root.get("sheetsConfig").get("id"), configId));
-        org.springframework.data.jpa.domain.Specification<Solicitud> spec = baseSpec.and(buildSpecification(status, search, responsableId, locationId, origin, dateFrom, dateTo));
+        org.springframework.data.jpa.domain.Specification<Solicitud> spec = baseSpec.and(buildSpecification(status, search, responsableId, locationId, origin, dateFrom, dateTo, tipoPedido));
         return solicitudRepository.findAll(spec, pageable);
     }
 
     public java.util.Map<String, Object> getSolicitudStats(Long configId, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo) {
+        return getSolicitudStats(configId, search, responsableId, locationId, origin, dateFrom, dateTo, null);
+    }
+
+    public java.util.Map<String, Object> getSolicitudStats(Long configId, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, String tipoPedido) {
         org.springframework.data.jpa.domain.Specification<Solicitud> spec = org.springframework.data.jpa.domain.Specification.where(null);
         if (configId != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("sheetsConfig").get("id"), configId));
         }
-        spec = spec.and(buildSpecification(null, search, responsableId, locationId, origin, dateFrom, dateTo));
+        spec = spec.and(buildSpecification(null, search, responsableId, locationId, origin, dateFrom, dateTo, tipoPedido));
         
         List<Solicitud> allMatching = solicitudRepository.findAll(spec);
         
@@ -94,7 +106,7 @@ public class SolicitudService {
         return stats;
     }
 
-    private org.springframework.data.jpa.domain.Specification<Solicitud> buildSpecification(String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo) {
+    private org.springframework.data.jpa.domain.Specification<Solicitud> buildSpecification(String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, String tipoPedido) {
         org.springframework.data.jpa.domain.Specification<Solicitud> spec = org.springframework.data.jpa.domain.Specification.where(null);
 
         if (status != null && !status.isEmpty()) {
@@ -131,6 +143,45 @@ public class SolicitudService {
 
         if (dateTo != null) {
             spec = spec.and((root, query, cb) -> cb.lessThanOrEqualTo(root.get("entryDate"), dateTo));
+        }
+
+        // Filtro por tipo de pedido de subsidio (Personal, Institucional en dinero, Institucional en especie)
+        if (tipoPedido != null && !tipoPedido.trim().isEmpty()) {
+            final String tpLower = tipoPedido.trim().toLowerCase();
+            spec = spec.and((root, query, cb) -> {
+                jakarta.persistence.criteria.Subquery<Long> sub = query.subquery(Long.class);
+                jakarta.persistence.criteria.Root<SolicitudResolutorAssignment> aRoot = sub.from(SolicitudResolutorAssignment.class);
+                sub.select(aRoot.get("solicitud").get("id"));
+
+                jakarta.persistence.criteria.Predicate isSubsidioAsgn = cb.like(cb.upper(aRoot.get("tipoResolucion")), "%SUBSIDIO%");
+                jakarta.persistence.criteria.Predicate matchTipo;
+                if ("personal".equals(tpLower)) {
+                    matchTipo = cb.or(
+                            cb.like(cb.lower(aRoot.get("detalle")), "%\"tipo de pedido\":\"personal\"%"),
+                            cb.like(cb.lower(aRoot.get("detalle")), "%\"tipo de pedido\": \"personal\"%"),
+                            cb.equal(cb.lower(root.get("person").get("type")), "personal")
+                    );
+                } else if (tpLower.contains("especie")) {
+                    matchTipo = cb.or(
+                            cb.like(cb.lower(aRoot.get("detalle")), "%institucional en especie%"),
+                            cb.equal(cb.upper(aRoot.get("tipoResolucion")), "SUBSIDIO EN ESPECIE")
+                    );
+                } else {
+                    // Institucional en dinero
+                    matchTipo = cb.or(
+                            cb.like(cb.lower(aRoot.get("detalle")), "%institucional en dinero%"),
+                            cb.and(
+                                    cb.notEqual(cb.upper(aRoot.get("tipoResolucion")), "SUBSIDIO EN ESPECIE"),
+                                    cb.notEqual(cb.lower(cb.coalesce(root.get("person").get("type"), "")), "personal"),
+                                    cb.notLike(cb.lower(cb.coalesce(aRoot.get("detalle"), "")), "%\"tipo de pedido\":\"personal\"%"),
+                                    cb.notLike(cb.lower(cb.coalesce(aRoot.get("detalle"), "")), "%\"tipo de pedido\": \"personal\"%"),
+                                    cb.notLike(cb.lower(cb.coalesce(aRoot.get("detalle"), "")), "%institucional en especie%")
+                            )
+                    );
+                }
+                sub.where(cb.and(isSubsidioAsgn, matchTipo));
+                return cb.in(root.get("id")).value(sub);
+            });
         }
 
         // Aplicar filtrado basado en roles
@@ -593,6 +644,10 @@ public class SolicitudService {
         boolean statusChangedManually = canEditStatus && dto.getStatus() != null && !dto.getStatus().equalsIgnoreCase(oldStatus);
         
         if (hasResponsable && "pendiente".equalsIgnoreCase(saved.getStatus())) {
+            statusChangedManually = false;
+        }
+        // Si pasó a "en proceso" por asignar responsable pero tiene asignaciones de resolutor pendientes, recalcular a "en resolucion"
+        if ("en proceso".equalsIgnoreCase(saved.getStatus()) && saved.getResolutorAssignments() != null && !saved.getResolutorAssignments().isEmpty()) {
             statusChangedManually = false;
         }
 

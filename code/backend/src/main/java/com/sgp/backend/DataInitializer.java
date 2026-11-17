@@ -229,6 +229,7 @@ public class DataInitializer implements CommandLineRunner {
             createUserIfNotFound("mariana_altuna@hotmail.com", "Mariana_Resp_SGP_2026!", "RESPONSABLE", "Mariana", "Altuna", LocalDate.of(1990, 1, 1), "3420000000", "SANTO TOME", "28948636");
             createUserIfNotFound("oesquerivan@gmail.com", "Ivan_Resp_SGP_2026!", "RESPONSABLE", "Ivan", "Oesquer", LocalDate.of(1990, 1, 1), "3420000000", "SUR, EDUCACION", "32097341");
             createUserIfNotFound("scalenghebianca@gmail.com", "Bianca_Resp_SGP_2026!", "RESPONSABLE", "Bianca", "Scalenghe", LocalDate.of(1990, 1, 1), "3420000000", "NORESTE", "37797942");
+            createUserIfNotFound("paco_gari@hotmail.com", "Paco_Aud_SGP_2026!", "AUDITOR", "Paco", "Garibaldi", LocalDate.of(1990, 1, 1), "3420000000", null, "30165812");
 
             // 2. Initialize Locations from dataset
             initializeLocations();

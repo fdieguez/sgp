@@ -145,6 +145,7 @@ export default function ProjectDetailsPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
+    const [localSortConfig, setLocalSortConfig] = useState({ key: null, direction: 'asc' });
     const [visColumn, setVisColumn] = useState('status'); // Gráfico por defecto por estado
     const [filters, setFilters] = useState({});
     const [showFilters, setShowFilters] = useState(false);
@@ -162,7 +163,29 @@ export default function ProjectDetailsPage() {
     });
 
     const SPREADSHEET_ID = config?.spreadsheetId || "1jPw9ni4BW_bRfw_M9ajA7jO5RGX5IFq8w43T3WOXz6g";
-    const isResolutorSubsidio = user?.role === 'RESOLUTOR' && user?.tiposResolucion?.some(t => t.tipo.toUpperCase() === 'SUBSIDIO');
+    const isResolutorSubsidio = user?.role === 'RESOLUTOR' && user?.tiposResolucion?.some(t => t.tipo.toUpperCase().includes('SUBSIDIO'));
+
+    // Extrae el detalle JSON de la asignación de subsidio y resuelve el Tipo de Pedido con fallback
+    const extractSubsidioData = (s) => {
+        const assignmentSubsidio = s.resolutorAssignments?.find(a => a.tipoResolucion?.toUpperCase().includes('SUBSIDIO'));
+        let subsidioMap = {};
+        if (assignmentSubsidio && assignmentSubsidio.detalle) {
+            try {
+                subsidioMap = JSON.parse(assignmentSubsidio.detalle);
+            } catch (e) {
+                console.error("Error al parsear detalle de resolucion SUBSIDIO", e);
+            }
+        }
+        const explicitTipo = subsidioMap['Tipo de pedido'] ? subsidioMap['Tipo de pedido'].toString().trim() : '';
+        let tipoPedido = explicitTipo;
+        if (!tipoPedido && assignmentSubsidio) {
+            const tipoRes = (assignmentSubsidio.tipoResolucion || '').toUpperCase();
+            if (tipoRes === 'SUBSIDIO EN ESPECIE') tipoPedido = 'Institucional en especie';
+            else if ((s.person?.type || '').toLowerCase() === 'personal') tipoPedido = 'Personal';
+            else if (tipoRes.includes('SUBSIDIO')) tipoPedido = 'Institucional en dinero';
+        }
+        return { assignmentSubsidio, subsidioMap, tipoPedido: tipoPedido || '-' };
+    };
 
     const handleExportPlanilla = async () => {
         setLoading(true);
@@ -342,6 +365,7 @@ export default function ProjectDetailsPage() {
                 status: filters.status || null,
                 search: searchTerm || null,
                 origin: filters.origin || null,
+                tipoPedido: filters.tipoPedido || null,
                 responsableId: filters.responsableId || null,
                 locationId: filters.locationId || null,
                 page: currentPage - 1, // La API utiliza índice basado en 0
@@ -378,6 +402,7 @@ export default function ProjectDetailsPage() {
             const statsParams = {
                 search: searchTerm || null,
                 origin: filters.origin || null,
+                tipoPedido: filters.tipoPedido || null,
                 responsableId: filters.responsableId || null,
                 locationId: filters.locationId || null,
             };
@@ -468,6 +493,7 @@ export default function ProjectDetailsPage() {
                 status: filters.status || null,
                 search: searchTerm || null,
                 origin: filters.origin || null,
+                tipoPedido: filters.tipoPedido || null,
                 responsableId: filters.responsableId || null,
                 locationId: filters.locationId || null,
                 page: 0,
@@ -560,19 +586,43 @@ export default function ProjectDetailsPage() {
             totalSubsidios: solicitudes.reduce((acc, s) => s.status?.trim().toLowerCase() === 'completadas' ? acc + (s.amount || 0) : acc, 0)
         };
 
-        return { rows: result, chartData, uniqueResponsables: [], uniqueOrigins: [], uniqueLocations: [], stats };
-    }, [solicitudes, visColumn]);
+            // Aplicar ordenamiento local si se seleccionó una columna JSON de Subsidio
+            if (localSortConfig.key && isResolutorSubsidio) {
+                result.sort((a, b) => {
+                    const dataA = extractSubsidioData(a);
+                    const dataB = extractSubsidioData(b);
+                    const getSortField = (s, data) => {
+                        if (localSortConfig.key === 'tipoPedido') return data.tipoPedido;
+                        return data.subsidioMap[localSortConfig.key] || '';
+                    };
+                    const valA = String(getSortField(a, dataA)).toLowerCase();
+                    const valB = String(getSortField(b, dataB)).toLowerCase();
+                    const cmp = valA.localeCompare(valB, 'es');
+                    return localSortConfig.direction === 'asc' ? cmp : -cmp;
+                });
+            }
+
+            return { rows: result, chartData, uniqueResponsables: [], uniqueOrigins: [], uniqueLocations: [], stats };
+    }, [solicitudes, visColumn, localSortConfig, isResolutorSubsidio]);
 
     // La paginación ahora es gestionada por el servidor
     const currentRows = processedData.rows;
 
     const handleSort = (key) => {
+        setLocalSortConfig({ key: null, direction: 'asc' });
         setSortConfig(prev => ({
             key,
             direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
         }));
         // Reiniciar página a 1 cuando se ordena
         setCurrentPage(1);
+    };
+
+    const handleLocalSort = (key) => {
+        setLocalSortConfig(prev => ({
+            key,
+            direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+        }));
     };
 
     const handleOpenABM = async (solicitud = null) => {
@@ -788,6 +838,21 @@ export default function ProjectDetailsPage() {
                                     {responsablesList.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                 </select>
                             </div>
+                            {isResolutorSubsidio && (
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Tipo de Pedido</label>
+                                    <select
+                                        className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        value={filters.tipoPedido || ''}
+                                        onChange={(e) => { setFilters(prev => ({ ...prev, tipoPedido: e.target.value })); setCurrentPage(1); }}
+                                    >
+                                        <option value="">Todos los Tipos</option>
+                                        <option value="Personal">Personal</option>
+                                        <option value="Institucional en dinero">Institucional en dinero</option>
+                                        <option value="Institucional en especie">Institucional en especie</option>
+                                    </select>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -972,26 +1037,52 @@ export default function ProjectDetailsPage() {
                                                 />
                                             </th>
                                         )}
-                                        <th className="p-3">ID</th>
-                                        <th className="p-3">Fecha Ingreso</th>
-                                        <th className="p-3">Origen</th>
-                                        <th className="p-3">Solicitante Nombre</th>
+                                        <th onClick={() => handleSort('id')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                            ID {sortConfig.key === 'id' && !localSortConfig.key && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        </th>
+                                        <th onClick={() => handleSort('entryDate')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                            Fecha Ingreso {sortConfig.key === 'entryDate' && !localSortConfig.key && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        </th>
+                                        <th onClick={() => handleSort('origin')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                            Origen {sortConfig.key === 'origin' && !localSortConfig.key && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        </th>
+                                        <th onClick={() => handleSort('person')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                            Solicitante Nombre {sortConfig.key === 'person' && !localSortConfig.key && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        </th>
                                         <th className="p-3">Solicitante Teléfono</th>
                                         <th className="p-3">Localidad</th>
                                         <th className="p-3">Barrio</th>
                                         <th className="p-3">Descripción</th>
-                                        <th className="p-3">Responsable</th>
-                                        <th className="p-3">Monto Solicitado</th>
-                                        <th className="p-3">Fecha Otorgamiento</th>
-                                        <th className="p-3">Estado</th>
-                                        <th className="p-3">Tipo Pedido</th>
-                                        <th className="p-3">Nombre y Apellido</th>
-                                        <th className="p-3">DNI</th>
-                                        <th className="p-3">Dirección de DNI</th>
+                                        <th onClick={() => handleSort('responsable')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                            Responsable {sortConfig.key === 'responsable' && !localSortConfig.key && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        </th>
+                                        <th onClick={() => handleSort('amount')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                            Monto Solicitado {sortConfig.key === 'amount' && !localSortConfig.key && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        </th>
+                                        <th onClick={() => handleSort('grantDate')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                            Fecha Otorgamiento {sortConfig.key === 'grantDate' && !localSortConfig.key && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        </th>
+                                        <th onClick={() => handleSort('status')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                            Estado {sortConfig.key === 'status' && !localSortConfig.key && (sortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        </th>
+                                        <th onClick={() => handleLocalSort('tipoPedido')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                            Tipo Pedido {localSortConfig.key === 'tipoPedido' && (localSortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        </th>
+                                        <th onClick={() => handleLocalSort('Nombre y apellido')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                            Nombre y Apellido {localSortConfig.key === 'Nombre y apellido' && (localSortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        </th>
+                                        <th onClick={() => handleLocalSort('DNI')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                            DNI {localSortConfig.key === 'DNI' && (localSortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        </th>
+                                        <th onClick={() => handleLocalSort('Dirección de DNI')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                            Dirección de DNI {localSortConfig.key === 'Dirección de DNI' && (localSortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        </th>
                                         <th className="p-3">DNI Frente</th>
                                         <th className="p-3">DNI Dorso</th>
                                         <th className="p-3">Constancia CBU</th>
-                                        <th className="p-3">Nombre Inst.</th>
+                                        <th onClick={() => handleLocalSort('Nombre de institución')} className="p-3 cursor-pointer hover:text-white transition-colors">
+                                            Nombre Inst. {localSortConfig.key === 'Nombre de institución' && (localSortConfig.direction === 'asc' ? <ArrowUp className="inline h-3 w-3" /> : <ArrowDown className="inline h-3 w-3" />)}
+                                        </th>
                                         <th className="p-3">Dirección Inst.</th>
                                         <th className="p-3">Localidad Inst.</th>
                                         <th className="p-3">Resp 1: Nombre</th>
@@ -1083,15 +1174,7 @@ export default function ProjectDetailsPage() {
                                     }
 
                                     if (isResolutorSubsidio) {
-                                        const assignmentSubsidio = s.resolutorAssignments?.find(a => a.tipoResolucion?.toUpperCase() === 'SUBSIDIO');
-                                        let subsidioMap = {};
-                                        if (assignmentSubsidio && assignmentSubsidio.detalle) {
-                                            try {
-                                                subsidioMap = JSON.parse(assignmentSubsidio.detalle);
-                                            } catch (e) {
-                                                console.error("Error al parsear detalle de resolucion SUBSIDIO", e);
-                                            }
-                                        }
+                                        const { subsidioMap, tipoPedido } = extractSubsidioData(s);
 
                                         const renderAttachmentLink = (val) => {
                                             if (!val) return <span className="text-gray-600">-</span>;
@@ -1169,9 +1252,9 @@ export default function ProjectDetailsPage() {
                                                 <td className="p-3 text-gray-300">
                                                     <StatusBadge status={s.status} />
                                                 </td>
-                                                <td className="p-3 text-gray-300">{getVal("Tipo de pedido")}</td>
-                                                <td className="p-3 text-gray-300">{getVal("Nombre y apellido")}</td>
-                                                <td className="p-3 text-gray-300">{getVal("DNI")}</td>
+                                                <td className="p-3 text-gray-300 font-medium">{tipoPedido}</td>
+                                                <td className="p-3 text-gray-300">{getVal("Nombre y apellido") !== '-' ? getVal("Nombre y apellido") : (tipoPedido === 'Personal' ? (s.person?.name || '-') : '-')}</td>
+                                                <td className="p-3 text-gray-300">{getVal("DNI") !== '-' ? getVal("DNI") : (tipoPedido === 'Personal' ? (s.person?.dni || '-') : '-')}</td>
                                                 <td className="p-3 text-gray-300">{getVal("Dirección de DNI")}</td>
                                                 <td className="p-3">{renderAttachmentLink(subsidioMap["DNI frente"])}</td>
                                                 <td className="p-3">{renderAttachmentLink(subsidioMap["DNI dorso"])}</td>

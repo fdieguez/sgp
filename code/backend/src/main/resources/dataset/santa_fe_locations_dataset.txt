@@ -28,6 +28,8 @@ NEIGHBORHOOD|Domingo F. Sarmiento
 NEIGHBORHOOD|El Pozo
 NEIGHBORHOOD|Escarafía
 NEIGHBORHOOD|Estanislao López
+NEIGHBORHOOD|Nueva Esperanza
+NEIGHBORHOOD|Villa Hipódromo
 NEIGHBORHOOD|Ex-Plaza España
 NEIGHBORHOOD|Facundo Quiroga
 NEIGHBORHOOD|Fomento 9 de Julio

@@ -238,4 +238,205 @@ test.describe('Validación de casos reportados: Responsable en derivados y Subsi
     await expect(page.locator('text=El DNI del solicitante/beneficiario es obligatorio para tramitar un subsidio.')).toBeVisible({ timeout: 6000 });
   });
 
+  test('Caso 4: Responsable con múltiples zonas puede elegir entre sus zonas, ve su nombre en Responsable y Descripción/Pedido auto-ajusta altura', async ({ page, request }) => {
+    // Obtener token admin para asegurar usuario responsable con doble zona en local
+    let token = null;
+    for (const p of ADMIN_PASSWORDS) {
+      const res = await request.post(`${API_URL}/api/auth/login`, {
+        data: { email: ADMIN_EMAIL, password: p }
+      });
+      if (res.ok()) {
+        token = (await res.json()).token;
+        break;
+      }
+    }
+    expect(token).toBeTruthy();
+
+    const multiResp = {
+      email: 'test.resp.multizona@sgp.com',
+      password: 'Test_SGP_2026!',
+      firstName: 'Hugo',
+      lastName: 'Multizona',
+      role: 'RESPONSABLE',
+      zone: 'OESTE, DEPORTIVO',
+      dni: '99222333',
+      phone: '3425000888'
+    };
+
+    const usersRes = await request.get(`${API_URL}/api/users`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const users = await usersRes.json();
+    if (!users.find(u => u.email === multiResp.email)) {
+      const createRes = await request.post(`${API_URL}/api/users`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: multiResp
+      });
+      expect(createRes.ok()).toBeTruthy();
+    }
+
+    await iniciarSesion(page, multiResp.email, multiResp.password);
+    await page.goto(`${BASE_URL}/mis-solicitudes`, { waitUntil: 'networkidle' });
+
+    await page.locator('button:has-text("Nueva Solicitud")').click();
+    const modal = page.locator('div.fixed.inset-0').filter({ hasText: 'Nueva Solicitud' }).first();
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    // 1. Verificar Zona Territorial habilitada y acotada a sus 2 zonas
+    const selectZona = modal.locator('label:text-is("Zona Territorial") + select');
+    await expect(selectZona).toBeEnabled();
+    await expect(selectZona).toHaveValue('OESTE');
+    const opcionesZona = await selectZona.locator('option').allInnerTexts();
+    expect(opcionesZona).toEqual(['Seleccionar Zona...', 'OESTE', 'DEPORTIVO']);
+
+    // Cambiar a la segunda zona
+    await selectZona.selectOption('DEPORTIVO');
+    await expect(selectZona).toHaveValue('DEPORTIVO');
+
+    // 2. Verificar que Responsable sigue bloqueado pero muestra el nombre del usuario (no vacío)
+    const selectResp = modal.locator('label:text-is("Responsable") + select');
+    await expect(selectResp).toBeDisabled();
+    const valorResp = await selectResp.inputValue();
+    expect(valorResp).not.toBe('');
+    const textoResp = await selectResp.locator(`option[value="${valorResp}"]`).innerText();
+    expect(textoResp.toLowerCase()).toContain('multizona');
+
+    // 3. Verificar que Descripción / Pedido inicia >= 110px y crece con texto largo
+    const textareaDesc = modal.locator('label:has-text("Descripción / Pedido") + textarea');
+    const boxInicial = await textareaDesc.boundingBox();
+    expect(boxInicial.height).toBeGreaterThanOrEqual(108);
+
+    await textareaDesc.fill('Línea 1\nLínea 2\nLínea 3\nLínea 4\nLínea 5\nLínea 6\nLínea 7\nLínea 8');
+    await page.waitForTimeout(150);
+    const boxExpandido = await textareaDesc.boundingBox();
+    expect(boxExpandido.height).toBeGreaterThan(boxInicial.height);
+  });
+
+  test('Caso 5: Resolutor de Subsidios ve Tipo Pedido en la tabla, puede filtrar por Tipo de Pedido y ordenar columnas', async ({ page, request }) => {
+    // Usar el resolutor de subsidio existente en producción/local (martinnocioni@gmail.com) o crear un resolutor de prueba vinculado
+    let token = null;
+    for (const p of ADMIN_PASSWORDS) {
+      const res = await request.post(`${API_URL}/api/auth/login`, {
+        data: { email: ADMIN_EMAIL, password: p }
+      });
+      if (res.ok()) {
+        token = (await res.json()).token;
+        break;
+      }
+    }
+    expect(token).toBeTruthy();
+
+    // Crear usuario resolutor temporal vinculado a SUBSIDIO EN DINERO para probar la vista de tabla
+    const resolutorUser = {
+      email: 'test.resolutor.sub@sgp.com',
+      password: 'Test_SGP_2026!',
+      firstName: 'Resolutor',
+      lastName: 'SubsidioE2E',
+      role: 'RESOLUTOR',
+      dni: '99333444',
+      phone: '3425000777'
+    };
+    const usersRes = await request.get(`${API_URL}/api/users`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const users = await usersRes.json();
+    let resUserObj = users.find(u => u.email === resolutorUser.email);
+    if (!resUserObj) {
+      const createRes = await request.post(`${API_URL}/api/users`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: resolutorUser
+      });
+      expect(createRes.ok()).toBeTruthy();
+      resUserObj = await createRes.json();
+    }
+
+    // Asignarle competencia SUBSIDIO EN DINERO vía API de configuración si existe o vía /api/tipos-resolucion
+    const tiposRes = await request.get(`${API_URL}/api/tipos-resolucion`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const tipos = await tiposRes.json();
+    const tipoSub = tipos.find(t => (t.tipo || '').toUpperCase().includes('SUBSIDIO'));
+    expect(tipoSub).toBeTruthy();
+    const putTipoRes = await request.put(`${API_URL}/api/tipos-resolucion/${tipoSub.id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      data: {
+        ...tipoSub,
+        resolutor: { id: resUserObj.id }
+      }
+    });
+    expect(putTipoRes.ok()).toBeTruthy();
+
+    // Crear una solicitud con asignación a este resolutor y Tipo de pedido Personal
+    const createSolRes = await request.post(`${API_URL}/api/solicitudes`, {
+      headers: { Authorization: `Bearer ${token}` },
+      data: {
+        type: 'SUBSIDIO',
+        status: 'pendiente',
+        description: 'Subsidio prueba tabla resolutor',
+        origin: 'Directo de paco',
+        locationName: 'Santa Fe',
+        barrio: 'Alto Verde',
+        person: { name: 'Beneficiario Tabla E2E', phone: '3425123456', dni: '33444555', type: 'Personal', subType: 'joven' },
+        assignments: [{
+          resolutorEmail: resolutorUser.email,
+          tipoResolucion: tipoSub.tipo,
+          detalle: JSON.stringify({ 'Tipo de pedido': 'Personal', 'Nombre y apellido': 'Beneficiario Tabla E2E', 'DNI': '33444555' })
+        }]
+      }
+    });
+    expect(createSolRes.ok()).toBeTruthy();
+
+    await iniciarSesion(page, resolutorUser.email, resolutorUser.password);
+    await page.goto(`${BASE_URL}/mis-solicitudes`, { waitUntil: 'networkidle' });
+
+    // Verificar columnas específicas de Resolutor Subsidio y que muestre "Personal" en Tipo Pedido
+    await expect(page.locator('th', { hasText: 'Tipo Pedido' })).toBeVisible({ timeout: 8000 });
+    await page.locator('input[placeholder*="Buscar por N° Orden"]').fill('Beneficiario Tabla E2E');
+    await page.waitForTimeout(600);
+    const fila = page.locator('tbody tr').filter({ hasText: 'Beneficiario Tabla E2E' }).first();
+    await expect(fila).toBeVisible({ timeout: 8000 });
+    await expect(fila).toContainText('Personal');
+
+    // Abrir filtros y filtrar por Tipo de Pedido = Personal
+    await page.locator('button.p-2.rounded-xl.border').first().click();
+    const selectTipoPedido = page.locator('label:text-is("Tipo de Pedido") + select');
+    await expect(selectTipoPedido).toBeVisible({ timeout: 5000 });
+    await selectTipoPedido.selectOption('Personal');
+    await page.waitForTimeout(500);
+    await expect(page.locator('tbody tr').filter({ hasText: 'Beneficiario Tabla E2E' }).first()).toBeVisible();
+
+    // Filtrar por Institucional en especie -> la fila Personal no debe aparecer
+    await selectTipoPedido.selectOption('Institucional en especie');
+    await page.waitForTimeout(500);
+    await expect(page.locator('tbody tr').filter({ hasText: 'Beneficiario Tabla E2E' })).toHaveCount(0);
+
+    // Volver a Todos y verificar ordenamiento por Tipo Pedido y Monto Solicitado
+    await selectTipoPedido.selectOption('');
+    await page.waitForTimeout(400);
+    await page.locator('th', { hasText: 'Tipo Pedido' }).click();
+    await page.locator('th', { hasText: 'Monto Solicitado' }).click();
+    await page.waitForTimeout(400);
+    await expect(page.locator('tbody tr').first()).toBeVisible();
+  });
+
+  test('Caso 6: Paco Garibaldi inicia sesión como AUDITOR y los nuevos barrios Villa Hipódromo y Nueva Esperanza existen', async ({ page }) => {
+    // 1. Login con Paco Garibaldi (creado con hash BCrypt oficial)
+    await iniciarSesion(page, 'paco_gari@hotmail.com', 'Paco_Aud_SGP_2026!');
+    await expect(page).toHaveURL(/.*(dashboard|mis-solicitudes).*/, { timeout: 10000 });
+
+    // 2. Verificar como Admin que los barrios Villa Hipódromo y Nueva Esperanza aparecen en Nueva Solicitud -> Santa Fe
+    let adminPass = ADMIN_PASSWORDS[0];
+    await iniciarSesion(page, ADMIN_EMAIL, adminPass, 'ADMINISTRADOR');
+    await page.goto(`${BASE_URL}/mis-solicitudes`, { waitUntil: 'networkidle' });
+    await page.locator('button:has-text("Nueva Solicitud")').click();
+    const modal = page.locator('div.fixed.inset-0').filter({ hasText: 'Nueva Solicitud' }).first();
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    await modal.locator('label:text-is("Localidad") + select').selectOption('Santa Fe');
+    await page.waitForTimeout(200);
+    const opcionesBarrio = await modal.locator('label:text-is("Barrio") + select option').allInnerTexts();
+    expect(opcionesBarrio).toContain('Villa Hipódromo');
+    expect(opcionesBarrio).toContain('Nueva Esperanza');
+  });
+
 });

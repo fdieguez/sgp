@@ -28,6 +28,7 @@ public class SolicitudController {
             @RequestParam(required = false) Long responsableId,
             @RequestParam(required = false) Long locationId,
             @RequestParam(required = false) String origin,
+            @RequestParam(required = false) String tipoPedido,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateTo,
             @RequestParam(defaultValue = "0") int page,
@@ -40,7 +41,7 @@ public class SolicitudController {
                 sortParams[0]
         ));
         
-        return ResponseEntity.ok(solicitudService.getAllSolicitudes(status, search, responsableId, locationId, origin, dateFrom, dateTo, pageable));
+        return ResponseEntity.ok(solicitudService.getAllSolicitudes(status, search, responsableId, locationId, origin, dateFrom, dateTo, tipoPedido, pageable));
     }
 
     @GetMapping("/config/{configId}")
@@ -51,6 +52,7 @@ public class SolicitudController {
             @RequestParam(required = false) Long responsableId,
             @RequestParam(required = false) Long locationId,
             @RequestParam(required = false) String origin,
+            @RequestParam(required = false) String tipoPedido,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateTo,
             @RequestParam(defaultValue = "0") int page,
@@ -63,7 +65,7 @@ public class SolicitudController {
                 sortParams[0]
         ));
         
-        return ResponseEntity.ok(solicitudService.getSolicitudesByConfig(configId, status, search, responsableId, locationId, origin, dateFrom, dateTo, pageable));
+        return ResponseEntity.ok(solicitudService.getSolicitudesByConfig(configId, status, search, responsableId, locationId, origin, dateFrom, dateTo, tipoPedido, pageable));
     }
 
     @GetMapping("/{id}")
@@ -178,9 +180,10 @@ public class SolicitudController {
             @RequestParam(required = false) Long responsableId,
             @RequestParam(required = false) Long locationId,
             @RequestParam(required = false) String origin,
+            @RequestParam(required = false) String tipoPedido,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateTo) {
-        return ResponseEntity.ok(solicitudService.getSolicitudStats(null, search, responsableId, locationId, origin, dateFrom, dateTo));
+        return ResponseEntity.ok(solicitudService.getSolicitudStats(null, search, responsableId, locationId, origin, dateFrom, dateTo, tipoPedido));
     }
 
     @GetMapping("/config/{configId}/stats")
@@ -190,8 +193,9 @@ public class SolicitudController {
             @RequestParam(required = false) Long responsableId,
             @RequestParam(required = false) Long locationId,
             @RequestParam(required = false) String origin,
+            @RequestParam(required = false) String tipoPedido,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateTo) {
-        return ResponseEntity.ok(solicitudService.getSolicitudStats(configId, search, responsableId, locationId, origin, dateFrom, dateTo));
+        return ResponseEntity.ok(solicitudService.getSolicitudStats(configId, search, responsableId, locationId, origin, dateFrom, dateTo, tipoPedido));
     }
 }
