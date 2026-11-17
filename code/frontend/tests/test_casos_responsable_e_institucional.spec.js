@@ -439,4 +439,38 @@ test.describe('Validación de casos reportados: Responsable en derivados y Subsi
     expect(opcionesBarrio).toContain('Nueva Esperanza');
   });
 
+  test('Caso 7: Selector de Área sin duplicados ni OTRA_TEST, y Subsidio en Especie separa Descripción de bienes y Monto', async ({ page }) => {
+    await iniciarSesion(page, TEST_RESP.email, TEST_RESP.password);
+    await page.goto(`${BASE_URL}/mis-solicitudes`, { waitUntil: 'networkidle' });
+
+    await page.locator('button:has-text("Nueva Solicitud")').click();
+    const modal = page.locator('div.fixed.inset-0').filter({ hasText: 'Nueva Solicitud' }).first();
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    await modal.locator('button:has-text("Agregar")').last().click();
+    await page.waitForTimeout(300);
+
+    const selectArea = modal.locator('select').filter({ hasText: 'Seleccione Área' }).last();
+    const opciones = await selectArea.locator('option').allInnerTexts();
+    // No debe existir OTRA_TEST ni opciones repetidas
+    expect(opciones.some(o => o.includes('TEST'))).toBeFalsy();
+    expect(opciones.filter(o => o === 'Subsidio en Dinero').length).toBe(1);
+    expect(opciones.filter(o => o === 'Otro').length).toBe(1);
+
+    // Al elegir Subsidio en Especie deben aparecer separados Descripción de bienes solicitados y Monto
+    await selectArea.selectOption({ label: 'Subsidio en Especie' });
+    await page.waitForTimeout(300);
+    const bloqueDetalle = modal.locator('div.bg-gray-800\\/80').last();
+    await expect(bloqueDetalle).toContainText('Descripción de bienes solicitados');
+    await expect(bloqueDetalle).toContainText('Monto');
+    await expect(bloqueDetalle).not.toContainText('Descripción del monto y bienes solicitados');
+
+    // Al cambiar de Subsidio en Especie a Subsidio en Dinero deben actualizarse los campos dinámicos
+    await selectArea.selectOption({ label: 'Subsidio en Dinero' });
+    await page.waitForTimeout(300);
+    await expect(bloqueDetalle).toContainText('Dirección de institución');
+    await expect(bloqueDetalle).toContainText('Responsable 1: Nombre');
+    await expect(bloqueDetalle).not.toContainText('Descripción de bienes solicitados');
+  });
+
 });

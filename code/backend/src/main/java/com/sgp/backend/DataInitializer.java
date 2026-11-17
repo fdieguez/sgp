@@ -608,7 +608,14 @@ public class DataInitializer implements CommandLineRunner {
         AtributoResolucion attrResp2Cargo = obtenerOCrearAtributo("Responsable 2: Cargo", "TEXT", null);
         AtributoResolucion attrNotaPedido = obtenerOCrearAtributo("Nota de pedido", "FILE", null);
         AtributoResolucion attrFechaEvento = obtenerOCrearAtributo("Fecha del evento", "DATE", null);
-        AtributoResolucion attrDescBienes = obtenerOCrearAtributo("Descripción del monto y bienes solicitados", "TEXTAREA", null);
+        AtributoResolucion attrDescBienes = atributoRepository.findAll().stream()
+                .filter(a -> "Descripción del monto y bienes solicitados".equalsIgnoreCase(a.getNombre()))
+                .findFirst()
+                .map(existing -> {
+                    existing.setNombre("Descripción de bienes solicitados");
+                    return atributoRepository.save(existing);
+                })
+                .orElseGet(() -> obtenerOCrearAtributo("Descripción de bienes solicitados", "TEXTAREA", null));
 
         // Atributos específicos de AGENDA para la Etapa 11 (13 campos ordenados)
         AtributoResolucion attrTipoActividad = obtenerOCrearAtributo("Tipo de actividad", "SELECT", "Reunión,Evento,Acto,Recorrido gestión,Recorrido territorial,Visita,Otro");
@@ -641,7 +648,7 @@ public class DataInitializer implements CommandLineRunner {
             new AtributoConfig(attrObservacion, true, 13)
         ));
 
-        upsertTipoResolucion("SUBSIDIO", resolutorDefault, List.of(
+        List<AtributoConfig> subsidioAtributos = List.of(
             new AtributoConfig(attrTipoPedido, false, 1),
             new AtributoConfig(attrNombreApellido, false, 2),
             new AtributoConfig(attrDni, false, 3),
@@ -665,7 +672,13 @@ public class DataInitializer implements CommandLineRunner {
             new AtributoConfig(attrDescBienes, false, 21),
             new AtributoConfig(attrMonto, false, 22),
             new AtributoConfig(attrDatoObs, false, 23)
-        ));
+        );
+        // Evitar duplicados: reutilizar SUBSIDIO EN DINERO si ya existe (o SUBSIDIO en instalaciones antiguas)
+        String tipoSubsidioDinero = tipoResolucionRepository.findByTipoIgnoreCase("SUBSIDIO EN DINERO").isPresent()
+                ? "SUBSIDIO EN DINERO"
+                : (tipoResolucionRepository.findByTipoIgnoreCase("SUBSIDIO").isPresent() ? "SUBSIDIO" : "SUBSIDIO EN DINERO");
+        upsertTipoResolucion(tipoSubsidioDinero, resolutorDefault, subsidioAtributos);
+        upsertTipoResolucion("SUBSIDIO EN ESPECIE", resolutorDefault, subsidioAtributos);
 
         // Atributos específicos de DECLARACION DE INTERES para la Etapa 11 (13 campos ordenados)
         AtributoResolucion attrNombreEvento = obtenerOCrearAtributo("Nombre completo del evento", "TEXT", null);
@@ -698,7 +711,10 @@ public class DataInitializer implements CommandLineRunner {
         AtributoResolucion attrDetalleResolucion = obtenerOCrearAtributo("Detalle de resolución", "TEXTAREA", null);
         AtributoResolucion attrAdjuntosAdicionales = obtenerOCrearAtributo("Adjuntos adicionales", "FILE", null);
 
-        upsertTipoResolucion("OTRA", resolutorDefault, List.of(
+        String tipoOtro = tipoResolucionRepository.findByTipoIgnoreCase("OTRO").isPresent()
+                ? "OTRO"
+                : (tipoResolucionRepository.findByTipoIgnoreCase("OTRA").isPresent() ? "OTRA" : "OTRO");
+        upsertTipoResolucion(tipoOtro, resolutorDefault, List.of(
             new AtributoConfig(attrDescCorta, true, 1),
             new AtributoConfig(attrDetalleResolucion, true, 2),
             new AtributoConfig(attrAdjuntosAdicionales, false, 3)

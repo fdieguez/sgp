@@ -1763,8 +1763,15 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                         if (!currentDet['Localidad'] && formData.locationName) {
                                                             currentDet['Localidad'] = formData.locationName;
                                                         }
-                                                        const defaultTipoPedido = formData.person?.type === 'Personal' ? 'Personal' : (type === 'SUBSIDIO EN ESPECIE' ? 'Institucional en especie' : 'Institucional en dinero');
-                                                        if (!currentDet['Tipo de pedido']) {
+                                                        const defaultTipoPedido = formData.person?.type === 'Personal' ? 'Personal' : (type.toUpperCase() === 'SUBSIDIO EN ESPECIE' ? 'Institucional en especie' : 'Institucional en dinero');
+                                                        if ((type || '').toUpperCase().includes('SUBSIDIO')) {
+                                                            // Actualizar Tipo de pedido al cambiar entre Subsidio en Especie y Subsidio en Dinero
+                                                            if (type.toUpperCase() === 'SUBSIDIO EN ESPECIE') {
+                                                                currentDet['Tipo de pedido'] = 'Institucional en especie';
+                                                            } else if (!currentDet['Tipo de pedido'] || currentDet['Tipo de pedido'] === 'Institucional en especie') {
+                                                                currentDet['Tipo de pedido'] = formData.person?.type === 'Personal' ? 'Personal' : 'Institucional en dinero';
+                                                            }
+                                                        } else if (!currentDet['Tipo de pedido']) {
                                                             currentDet['Tipo de pedido'] = defaultTipoPedido;
                                                         }
                                                         if ((type || '').includes('SUBSIDIO') && (currentDet['Tipo de pedido'] === 'Personal' || defaultTipoPedido === 'Personal')) {
@@ -1879,7 +1886,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                         'Nota de pedido'
                                                                     ];
                                                                     const camposInstitucionalEspecie = [
-                                                                        'Fecha del evento', 'Descripción del monto y bienes solicitados'
+                                                                        'Fecha del evento', 'Descripción de bienes solicitados', 'Descripción del monto y bienes solicitados'
                                                                     ];
 
                                                                     // Campos exclusivos de tipo Personal
@@ -1896,10 +1903,6 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                     }
                                                                     // Campos exclusivos de Institucional en especie
                                                                     if (camposInstitucionalEspecie.includes(campo.nombre) && tipoPedido !== 'Institucional en especie') {
-                                                                        return null;
-                                                                    }
-                                                                    // En Institucional en especie, el monto y los bienes se describen en su campo específico
-                                                                    if (campo.nombre === 'Monto' && tipoPedido === 'Institucional en especie') {
                                                                         return null;
                                                                     }
                                                                 }
