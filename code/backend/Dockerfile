@@ -24,5 +24,5 @@ COPY boot ./boot
 # Expose port
 EXPOSE 8080
 
-# Run application
-ENTRYPOINT ["java", "-Dfile.encoding=UTF-8", "-jar", "app.jar"]
+# Ejecutar aplicación (se fuerza -XX:UseAVX=2 para mitigar CVE-2026-114938 / Java4Shell en Base64 AVX-512)
+ENTRYPOINT ["java", "-XX:UseAVX=2", "-Dfile.encoding=UTF-8", "-jar", "app.jar"]
