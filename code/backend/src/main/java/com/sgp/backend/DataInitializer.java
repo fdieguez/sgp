@@ -103,6 +103,7 @@ public class DataInitializer implements CommandLineRunner {
                 "mariana_altuna@hotmail.com",
                 "oesquerivan@gmail.com",
                 "scalenghebianca@gmail.com",
+                "paco_gari@hotmail.com",
                 // 4 cuentas de sistema
                 "admin@sgp.com",
                 "auditor.sheets@gmail.com",
