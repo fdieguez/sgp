@@ -118,10 +118,12 @@ export default function ProjectDetailsPage() {
 
     // Estados de modales
     const [isABMOpen, setIsABMOpen] = useState(false);
+    const [openApproveOnMount, setOpenApproveOnMount] = useState(false);
     const [selectedSolicitud, setSelectedSolicitud] = useState(null);
     const [selectedRows, setSelectedRows] = useState([]);
     const [isAsociarModalOpen, setIsAsociarModalOpen] = useState(false);
     const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+    const [soloMisPendientes, setSoloMisPendientes] = useState(false);
 
     // Apertura automática de solicitud si viene referenciada por URL (?id=...)
     useEffect(() => {
@@ -437,15 +439,39 @@ export default function ProjectDetailsPage() {
         }
     };
 
-    const handleAprobarRapido = async (solicitudId) => {
-        if (!window.confirm("¿Confirmas la aprobación de esta solicitud?")) return;
+    /**
+     * Aprueba rápidamente la resolución pendiente del usuario actual desde la grilla.
+     * Si la resolución pendiente es AGENDA, abre directamente el modal de aprobación
+     * porque requiere seleccionar asistencia obligatoria (y opcionalmente crear evento en Calendar).
+     */
+    const handleAprobarRapido = async (solicitud, pendingAssignment) => {
+        const tipoPendiente = pendingAssignment?.tipoResolucion || '';
+        if (tipoPendiente.toUpperCase() === 'AGENDA') {
+            handleOpenABM(solicitud, true);
+            return;
+        }
+
+        const labelTipo = tipoPendiente ? ` (${tipoPendiente})` : '';
+        if (!window.confirm(`¿Confirmas la aprobación de tu resolución${labelTipo} en la solicitud #${solicitud.id}?`)) return;
+
         try {
-            await api.post(`/api/solicitudes/${solicitudId}/aprobar`, { observaciones: "Aprobación rápida desde grilla" });
-            toast.success("Solicitud aprobada");
+            await api.post(`/api/solicitudes/${solicitud.id}/aprobar`, { observaciones: "Aprobación rápida desde grilla" });
+            const otrasPendientes = (solicitud.resolutorAssignments || [])
+                .filter(a => a.id !== pendingAssignment?.id && !a.approved)
+                .map(a => a.tipoResolucion);
+
+            if (otrasPendientes.length > 0) {
+                toast.success(
+                    `Tu resolución${labelTipo} quedó aprobada. El pedido #${solicitud.id} sigue En Resolución pendiente de: ${otrasPendientes.join(', ')}.`,
+                    { duration: 6000 }
+                );
+            } else {
+                toast.success(`Resolución aprobada. La solicitud #${solicitud.id} pasó a Resueltas.`);
+            }
             fetchData();
         } catch (err) {
-            console.error("Error approving assignment", err);
-            toast.error("Error al aprobar la solicitud");
+            console.error("Error al aprobar asignación:", err);
+            toast.error(err.response?.data?.message || err.response?.data?.error || "Error al aprobar la solicitud");
         }
     };
 
@@ -550,6 +576,16 @@ export default function ProjectDetailsPage() {
     const processedData = useMemo(() => {
         let result = [...solicitudes];
 
+        // Filtro rápido para el rol Resolutor: mostrar solo pedidos donde SU resolución aún está pendiente
+        if (soloMisPendientes && user?.role === 'RESOLUTOR' && user?.email) {
+            const myEmail = user.email.toLowerCase();
+            result = result.filter(s =>
+                (s.resolutorAssignments || []).some(
+                    a => a.resolutor?.email?.toLowerCase() === myEmail && !a.approved
+                )
+            );
+        }
+
         // 1. Ya no se filtra por búsqueda local si se hace por servidor, pero lo dejamos por si acaso
         // 2. La ordenación ya no se hace localmente
         
@@ -603,7 +639,7 @@ export default function ProjectDetailsPage() {
             }
 
             return { rows: result, chartData, uniqueResponsables: [], uniqueOrigins: [], uniqueLocations: [], stats };
-    }, [solicitudes, visColumn, localSortConfig, isResolutorSubsidio]);
+    }, [solicitudes, visColumn, localSortConfig, isResolutorSubsidio, soloMisPendientes, user?.role, user?.email]);
 
     // La paginación ahora es gestionada por el servidor
     const currentRows = processedData.rows;
@@ -625,7 +661,8 @@ export default function ProjectDetailsPage() {
         }));
     };
 
-    const handleOpenABM = async (solicitud = null) => {
+    const handleOpenABM = async (solicitud = null, openApprove = false) => {
+        setOpenApproveOnMount(Boolean(openApprove));
         if (!solicitud || !solicitud.id) {
             setSelectedSolicitud(solicitud);
             setIsABMOpen(true);
@@ -717,6 +754,21 @@ export default function ProjectDetailsPage() {
                                     </div>
                                 )}
                             </div>
+                            {user?.role === 'RESOLUTOR' && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSoloMisPendientes(prev => !prev)}
+                                    className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
+                                        soloMisPendientes
+                                            ? 'bg-amber-600/90 border-amber-400 text-white shadow-lg shadow-amber-900/30'
+                                            : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
+                                    }`}
+                                    title="Mostrar únicamente solicitudes donde tu resolución aún está pendiente"
+                                >
+                                    <Check className="h-3.5 w-3.5" />
+                                    Solo mis pendientes
+                                </button>
+                            )}
                             <button
                                 onClick={() => setShowFilters(!showFilters)}
                             className={`p-2 rounded-xl border transition-all ${showFilters ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'}`}
@@ -1146,32 +1198,71 @@ export default function ProjectDetailsPage() {
                                         }
                                     }
 
-                                    // Renderizar detalles de resolución
+                                    // Renderizar detalles de resolución con estado individual claro (Aprobada / Pendiente)
                                     let resolucionContent = '-';
-                                    let hasPendingApproval = false;
+                                    const assignments = s.resolutorAssignments || [];
+                                    const approvedCount = assignments.filter(a => a.approved).length;
+                                    const pendingTypes = assignments
+                                        .filter(a => !a.approved)
+                                        .map(a => a.tipoResolucion)
+                                        .filter(Boolean);
+                                    const myPendingAssignment = assignments.find(
+                                        a => a.resolutor?.email?.toLowerCase() === user?.email?.toLowerCase() && !a.approved
+                                    );
+                                    const hasPendingApproval = Boolean(myPendingAssignment);
 
-                                    if (s.resolutorAssignments && s.resolutorAssignments.length > 0) {
-                                        resolucionContent = s.resolutorAssignments.map((assignment, index) => {
-                                            let text = `${assignment.tipoResolucion}: `;
+                                    if (assignments.length > 0) {
+                                        resolucionContent = assignments.map((assignment, index) => {
+                                            let detailText = '';
                                             try {
                                                 const parsed = JSON.parse(assignment.detalle);
-                                                text += Object.entries(parsed).map(([k, v]) => `${k}: ${v}`).join(' | ');
+                                                detailText = Object.entries(parsed).map(([k, v]) => `${k}: ${v}`).join(' | ');
                                             } catch (e) {
-                                                text += assignment.detalle;
+                                                detailText = assignment.detalle || '';
                                             }
-                                            
-                                            if (assignment.resolutor?.email === user?.email && !assignment.approved) {
-                                                hasPendingApproval = true;
-                                            }
-                                            
+
                                             return (
-                                                <div key={index} className="mb-1 pb-1 border-b border-gray-700/50 last:border-0">
-                                                    <span className="font-bold text-indigo-300">{assignment.resolutor?.name || assignment.resolutorEmail}:</span> {text}
-                                                    {assignment.approved && <Check className="inline h-3 w-3 text-emerald-500 ml-1" title="Aprobado" />}
+                                                <div key={assignment.id || index} className="mb-2 pb-2 border-b border-gray-700/50 last:border-0 last:mb-0 last:pb-0">
+                                                    <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                                                        {assignment.approved ? (
+                                                            <span
+                                                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-900/60 text-emerald-300 border border-emerald-700/60 text-[9px] font-bold uppercase"
+                                                                title="Esta resolución ya fue aprobada"
+                                                            >
+                                                                <Check className="h-2.5 w-2.5" /> Aprobada
+                                                            </span>
+                                                        ) : (
+                                                            <span
+                                                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-900/50 text-amber-300 border border-amber-700/60 text-[9px] font-bold uppercase"
+                                                                title="Resolución pendiente de aprobación"
+                                                            >
+                                                                Pendiente
+                                                            </span>
+                                                        )}
+                                                        <span className="font-bold text-indigo-300">{assignment.resolutor?.name || assignment.resolutorEmail}:</span>
+                                                        <span className="font-semibold text-gray-200">{assignment.tipoResolucion}</span>
+                                                    </div>
+                                                    {detailText && (
+                                                        <div className="text-gray-300">
+                                                            {detailText}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         });
                                     }
+
+                                    // Subtítulo de avance cuando existen múltiples resoluciones y el pedido sigue En Resolución
+                                    const multiResolutionProgress = assignments.length > 1 && s.status?.trim().toLowerCase() === 'en resolucion' ? (
+                                        <div className="mt-1 text-[10px] leading-tight text-amber-300/90 font-semibold">
+                                            {approvedCount}/{assignments.length} aprobadas
+                                            {pendingTypes.length > 0 && (
+                                                <span className="block text-gray-400 font-normal">
+                                                    Falta: {pendingTypes.join(', ')}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ) : null;
 
                                     if (isResolutorSubsidio) {
                                         const { subsidioMap, tipoPedido } = extractSubsidioData(s);
@@ -1251,6 +1342,7 @@ export default function ProjectDetailsPage() {
                                                 </td>
                                                 <td className="p-3 text-gray-300">
                                                     <StatusBadge status={s.status} />
+                                                    {multiResolutionProgress}
                                                 </td>
                                                 <td className="p-3 text-gray-300 font-medium">{tipoPedido}</td>
                                                 <td className="p-3 text-gray-300">{getVal("Nombre y apellido") !== '-' ? getVal("Nombre y apellido") : (tipoPedido === 'Personal' ? (s.person?.name || '-') : '-')}</td>
@@ -1348,6 +1440,7 @@ export default function ProjectDetailsPage() {
                                                 </td>
                                                 <td className="p-3 text-gray-300">
                                                     <StatusBadge status={s.status} />
+                                                    {multiResolutionProgress}
                                                 </td>
                                                 <td className="p-3 text-gray-300 text-[11px] leading-tight">
                                                     {resolucionContent}
@@ -1355,7 +1448,15 @@ export default function ProjectDetailsPage() {
                                                 <td className="p-3 sticky right-0 bg-gray-900/90 shadow-xl group-hover:bg-gray-800 transition-colors">
                                                     <div className="flex justify-end gap-1 opacity-60 group-hover:opacity-100">
                                                         {hasPendingApproval && (
-                                                            <button onClick={() => handleAprobarRapido(s.id)} title="Aprobar Rápidamente" className="p-1.5 hover:bg-emerald-600 bg-emerald-900/30 rounded text-emerald-400 hover:text-white transition-colors">
+                                                            <button
+                                                                onClick={() => handleAprobarRapido(s, myPendingAssignment)}
+                                                                title={
+                                                                    myPendingAssignment?.tipoResolucion?.toUpperCase() === 'AGENDA'
+                                                                        ? 'Abrir aprobación de AGENDA (requiere asistencia)'
+                                                                        : `Aprobar Rápidamente (${myPendingAssignment?.tipoResolucion || 'Resolución'})`
+                                                                }
+                                                                className="p-1.5 hover:bg-emerald-600 bg-emerald-900/30 rounded text-emerald-400 hover:text-white transition-colors"
+                                                            >
                                                                 <Check className="h-4 w-4" />
                                                             </button>
                                                         )}
@@ -1415,11 +1516,15 @@ export default function ProjectDetailsPage() {
             {/* Modales */}
             <SolicitudModal
                 isOpen={isABMOpen}
-                onClose={() => setIsABMOpen(false)}
+                onClose={() => {
+                    setIsABMOpen(false);
+                    setOpenApproveOnMount(false);
+                }}
                 onSuccess={fetchData}
                 initialData={selectedSolicitud}
                 configId={configId}
                 cachedLocations={locationsList}
+                openApproveOnMount={openApproveOnMount}
             />
             <AsociarPlanillaModal
                 isOpen={isAsociarModalOpen}

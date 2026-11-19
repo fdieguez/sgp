@@ -48,7 +48,7 @@ const DEFAULT_CITIES = [
     { id: 16, name: "Otra", type: "CITY" }
 ];
 
-export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData, configId, cachedLocations = [] }) {
+export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData, configId, cachedLocations = [], openApproveOnMount = false }) {
     const { user } = useAuth();
     const isResponsable = user?.role === 'RESPONSABLE' || user?.role === 'RESOLUTOR';
     const userZones = (user?.responsable?.zone || user?.zone || '')
@@ -188,10 +188,17 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const [saveProgress, setSaveProgress] = useState('');
 
     // Verificar si el usuario actual tiene una asignación pendiente o aprobada (declaradas de forma temprana)
-    const myAssignment = formData.assignments?.find(a => a.resolutorEmail === user?.email && !a.approved);
-    const myApprovedAssignment = formData.assignments?.find(a => a.resolutorEmail === user?.email && a.approved);
+    const myAssignment = formData.assignments?.find(a => a.resolutorEmail?.toLowerCase() === user?.email?.toLowerCase() && !a.approved);
+    const myApprovedAssignment = formData.assignments?.find(a => a.resolutorEmail?.toLowerCase() === user?.email?.toLowerCase() && a.approved);
     const isPendingResolutor = isResolutor && myAssignment && !myAssignment.approved;
     const isApproveDisabled = loading || (myAssignment?.tipoResolucion === 'AGENDA' && !asistencia);
+
+    // Abrir automáticamente el sub-modal de aprobación si el usuario ingresó desde el botón rápido de una AGENDA
+    useEffect(() => {
+        if (isOpen && openApproveOnMount && isPendingResolutor) {
+            setShowApproveConfirm(true);
+        }
+    }, [isOpen, openApproveOnMount, isPendingResolutor]);
 
     const fetchAdjuntos = useCallback(async () => {
         if (!formData.id) return;
@@ -1089,7 +1096,19 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 description: calendarDescription,
                 guestEmails: createCalendarEvent ? selectedGuests : []
             });
-            toast.success("Resolución aprobada");
+            const otrasPendientes = (formData.assignments || [])
+                .filter(a => !(a.resolutorEmail?.toLowerCase() === user?.email?.toLowerCase() && a.tipoResolucion === myAssignment?.tipoResolucion) && !a.approved)
+                .map(a => a.tipoResolucion)
+                .filter(Boolean);
+
+            if (otrasPendientes.length > 0) {
+                toast.success(
+                    `Tu resolución (${myAssignment?.tipoResolucion || 'asignada'}) quedó aprobada. El pedido #${formData.id} sigue En Resolución pendiente de: ${otrasPendientes.join(', ')}.`,
+                    { duration: 6000 }
+                );
+            } else {
+                toast.success(`Resolución aprobada. La solicitud #${formData.id} pasó a Resueltas.`);
+            }
             onSuccess();
             onClose();
         } catch (err) {
