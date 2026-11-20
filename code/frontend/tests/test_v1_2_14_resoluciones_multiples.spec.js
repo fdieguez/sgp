@@ -105,7 +105,20 @@ test.describe('🧪 Validación E2E v1.2.14: Resoluciones Múltiples y Claridad 
           {
             tipoResolucion: 'AGENDA',
             resolutorEmail: CREDENCIALES.VERONICA_AGENDA.email,
-            detalle: JSON.stringify({ 'Lugar - Localidad': 'Santa Fe', 'Tipo de actividad': 'Visita', 'Día': '2026-11-25', 'Hora': '11:00' })
+            detalle: JSON.stringify({
+              'Lugar - Localidad': 'Santa Fe',
+              'Lugar - Barrio': 'Los Hornos',
+              'Tipo de actividad': 'Visita',
+              'Organizada por nosotros?': 'si',
+              'Descripción/temario': 'Visita al taller mecánico premiado',
+              'Asistentes': 'Equipo y vecinos',
+              'Declaración de interés': 'si',
+              'Aporte?': 'no',
+              'Día': '2026-11-25',
+              'Hora': '11:00',
+              'Responsable': 'Carlos Egestti',
+              'Observación': 'Fecha tentativa'
+            })
           },
           {
             tipoResolucion: 'DECLARACION DE INTERES',

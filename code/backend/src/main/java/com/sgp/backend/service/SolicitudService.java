@@ -230,23 +230,32 @@ public class SolicitudService {
                         if (userRole.contains("RESOLUTOR")) {
                             List<String> tiposAsignados = user.getTiposResolucion().stream()
                                     .map(com.sgp.backend.entity.TipoResolucion::getTipo)
+                                    .filter(t -> t != null && !t.trim().isEmpty())
+                                    .map(t -> t.trim().toUpperCase())
                                     .collect(java.util.stream.Collectors.toList());
                             
                             if (tiposAsignados.isEmpty()) {
                                 orPredicates.add(cb.disjunction());
                             } else {
-                                jakarta.persistence.criteria.Predicate isAssignedAndCorrectType = cb.and(
+                                // Asignaciones ya tomadas por este resolutor
+                                jakarta.persistence.criteria.Predicate isAssignedToMe = cb.and(
                                     cb.equal(assignments.get("resolutor").get("id"), user.getId()),
-                                    assignments.get("tipoResolucion").in(tiposAsignados)
+                                    cb.upper(assignments.get("tipoResolucion")).in(tiposAsignados)
+                                );
+
+                                // Asignaciones en Pool compartido (sin resolutor asignado) de los tipos habilitados para este resolutor
+                                jakarta.persistence.criteria.Predicate isInPoolForMyTypes = cb.and(
+                                    cb.isNull(assignments.get("resolutor")),
+                                    cb.upper(assignments.get("tipoResolucion")).in(tiposAsignados)
                                 );
                                 
                                 jakarta.persistence.criteria.Predicate isLegacyResolutor = cb.and(
                                     cb.equal(root.get("resolutor").get("id"), user.getId()),
                                     cb.notEqual(root.get("status"), "completadas"),
-                                    root.get("suggestedResolutionType").in(tiposAsignados)
+                                    cb.upper(root.get("suggestedResolutionType")).in(tiposAsignados)
                                 );
                                 
-                                orPredicates.add(cb.or(isLegacyResolutor, isAssignedAndCorrectType));
+                                orPredicates.add(cb.or(isLegacyResolutor, isAssignedToMe, isInPoolForMyTypes));
                             }
                         }
                         
@@ -711,55 +720,83 @@ public class SolicitudService {
             boolean isSubsidio = existingAssignment.getTipoResolucion() != null &&
                     existingAssignment.getTipoResolucion().toUpperCase().contains("SUBSIDIO");
             if (isSubsidio) {
-                boolean isAssignedResolutor = existingAssignment.getResolutor() != null &&
-                        currentUser != null && existingAssignment.getResolutor().getId().equals(currentUser.getId());
-                boolean canDeleteSubsidio = isCreator || isAssignedResponsable || isAssignedResolutor || isOperadorOrAdmin;
+                boolean isAssignedResolutor = currentUser != null && existingAssignment.getResolutor() != null &&
+                        existingAssignment.getResolutor().getId().equals(currentUser.getId());
+                boolean isPoolResolutorOfType = currentUser != null && existingAssignment.getResolutor() == null &&
+                        tieneTipoResolucion(currentUser, existingAssignment.getTipoResolucion());
+                boolean canDeleteSubsidio = isCreator || isAssignedResponsable || isAssignedResolutor || isPoolResolutorOfType || isOperadorOrAdmin;
                 if (!canDeleteSubsidio) {
                     return false; // Proteger asignación de subsidio si no tiene permisos (Punto 8)
                 }
             }
-            return dtos.stream().noneMatch(dto ->
-                    dto.getResolutorEmail() != null &&
-                    dto.getTipoResolucion() != null &&
-                    existingAssignment.getResolutor() != null &&
-                    dto.getResolutorEmail().equalsIgnoreCase(existingAssignment.getResolutor().getEmail()) &&
-                    dto.getTipoResolucion().equalsIgnoreCase(existingAssignment.getTipoResolucion())
-            );
+            return dtos.stream().noneMatch(dto -> {
+                if (dto.getTipoResolucion() == null || existingAssignment.getTipoResolucion() == null) return false;
+                if (dto.getId() != null && existingAssignment.getId() != null) {
+                    return dto.getId().equals(existingAssignment.getId());
+                }
+                boolean sameType = dto.getTipoResolucion().equalsIgnoreCase(existingAssignment.getTipoResolucion());
+                if (!sameType) return false;
+                // Si ambos traen resolutor específico, comparar email; si alguno es pool (null/vacío), emparejar por tipo
+                boolean dtoHasEmail = dto.getResolutorEmail() != null && !dto.getResolutorEmail().trim().isEmpty();
+                if (dtoHasEmail && existingAssignment.getResolutor() != null) {
+                    return dto.getResolutorEmail().trim().equalsIgnoreCase(existingAssignment.getResolutor().getEmail());
+                }
+                return true;
+            });
         });
         
         // 2. Actualizar las asignaciones existentes o agregar las nuevas sin reiniciar la colección
         for (ResolutorAssignmentDTO dto : dtos) {
-            if (dto.getResolutorEmail() == null || dto.getTipoResolucion() == null) continue;
-            
-            User resolutor = userRepository.findByEmail(dto.getResolutorEmail()).orElse(null);
-            if (resolutor != null) {
-                SolicitudResolutorAssignment existing = currentAssignments.stream()
-                        .filter(a -> a.getResolutor() != null &&
-                                a.getResolutor().getId().equals(resolutor.getId()) &&
-                                a.getTipoResolucion().equalsIgnoreCase(dto.getTipoResolucion()))
+            if (dto.getTipoResolucion() == null || dto.getTipoResolucion().trim().isEmpty()) continue;
+
+            String emailLimpio = (dto.getResolutorEmail() != null && !dto.getResolutorEmail().trim().isEmpty())
+                    ? dto.getResolutorEmail().trim()
+                    : null;
+            User resolutor = emailLimpio != null ? userRepository.findByEmail(emailLimpio).orElse(null) : null;
+
+            SolicitudResolutorAssignment existing = null;
+            if (dto.getId() != null) {
+                existing = currentAssignments.stream()
+                        .filter(a -> dto.getId().equals(a.getId()))
                         .findFirst()
                         .orElse(null);
-                        
-                boolean isSubsidio = dto.getTipoResolucion().toUpperCase().contains("SUBSIDIO");
-                boolean isAssignedResolutor = currentUser != null && resolutor.getId().equals(currentUser.getId());
-                boolean canEditThisAssignment = !isSubsidio || isCreator || isAssignedResponsable || isAssignedResolutor || isOperadorOrAdmin;
+            }
+            if (existing == null) {
+                final User finalRes = resolutor;
+                existing = currentAssignments.stream()
+                        .filter(a -> a.getTipoResolucion() != null &&
+                                a.getTipoResolucion().equalsIgnoreCase(dto.getTipoResolucion()) &&
+                                (finalRes == null || a.getResolutor() == null || a.getResolutor().getId().equals(finalRes.getId())))
+                        .findFirst()
+                        .orElse(null);
+            }
 
-                if (existing != null) {
-                    // Actualizar el detalle de la asignación existente solo si tiene permiso (Punto 8)
-                    if (canEditThisAssignment) {
-                        existing.setDetalle(dto.getDetalle());
+            boolean isSubsidio = dto.getTipoResolucion().toUpperCase().contains("SUBSIDIO");
+            User effectiveResolutor = (existing != null && existing.getResolutor() != null) ? existing.getResolutor() : resolutor;
+            boolean isAssignedResolutor = currentUser != null && effectiveResolutor != null && effectiveResolutor.getId().equals(currentUser.getId());
+            boolean isPoolResolutorOfType = currentUser != null && effectiveResolutor == null && tieneTipoResolucion(currentUser, dto.getTipoResolucion());
+            boolean canEditThisAssignment = !isSubsidio || isCreator || isAssignedResponsable || isAssignedResolutor || isPoolResolutorOfType || isOperadorOrAdmin;
+
+            if (existing != null) {
+                // Actualizar el detalle de la asignación existente solo si tiene permiso (Punto 8)
+                if (canEditThisAssignment) {
+                    existing.setDetalle(dto.getDetalle());
+                    existing.setTipoResolucion(dto.getTipoResolucion());
+                    // Preservar el resolutor si ya tomó el caso; solo asignar si aún estaba en pool y vino explícito
+                    if (existing.getResolutor() == null && resolutor != null) {
+                        existing.setResolutor(resolutor);
                     }
-                } else {
-                    // Solo quien puede crear/proponer subsidio puede agregar nueva asignación de subsidio
-                    if (canEditThisAssignment) {
-                        SolicitudResolutorAssignment assignment = SolicitudResolutorAssignment.builder()
-                                .solicitud(solicitud)
-                                .resolutor(resolutor)
-                                .tipoResolucion(dto.getTipoResolucion())
-                                .detalle(dto.getDetalle())
-                                .build();
-                        currentAssignments.add(assignment);
-                    }
+                }
+            } else {
+                // Solo quien puede crear/proponer subsidio puede agregar nueva asignación de subsidio
+                if (canEditThisAssignment) {
+                    SolicitudResolutorAssignment assignment = SolicitudResolutorAssignment.builder()
+                            .solicitud(solicitud)
+                            .resolutor(resolutor) // Puede ser null (Pool compartido del tipo de resolución)
+                            .tipoResolucion(dto.getTipoResolucion())
+                            .detalle(dto.getDetalle())
+                            .build();
+                    currentAssignments.add(assignment);
                 }
             }
 
@@ -897,6 +934,79 @@ public class SolicitudService {
         solicitudRepository.deleteById(id);
     }
 
+    /**
+     * Verifica si el usuario posee habilitado el tipo de resolución indicado (comparación insensible a mayúsculas).
+     */
+    private boolean tieneTipoResolucion(User user, String tipoResolucion) {
+        if (user == null || tipoResolucion == null || tipoResolucion.trim().isEmpty() || user.getTiposResolucion() == null) {
+            return false;
+        }
+        String target = tipoResolucion.trim();
+        return user.getTiposResolucion().stream()
+                .anyMatch(tr -> tr.getTipo() != null && tr.getTipo().trim().equalsIgnoreCase(target));
+    }
+
+    /**
+     * Permite a un usuario con rol RESOLUTOR (habilitado en ese tipo de resolución) o ADMINISTRADOR
+     * tomar una asignación de resolución que se encuentre en el pool compartido (sin resolutor asignado).
+     * Controla concurrencia con HTTP 409 si otro resolutor ya la tomó y registra el movimiento en auditoría.
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public Solicitud tomarAsignacionResolutor(Long solicitudId, Long assignmentId) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equals(auth.getName())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED, "Usuario no autenticado");
+        }
+
+        User currentUser = userRepository.findByEmail(auth.getName())
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Usuario no encontrado"));
+
+        String activeRole = com.sgp.backend.security.SecurityUtils.getActiveRole(currentUser);
+        boolean isAdmin = activeRole != null && activeRole.contains("ADMIN");
+        boolean isResolutor = activeRole != null && activeRole.contains("RESOLUTOR");
+        if (!isAdmin && !isResolutor) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "No tienes permisos para tomar esta resolución");
+        }
+
+        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Solicitud no encontrada"));
+
+        SolicitudResolutorAssignment assignment = solicitud.getResolutorAssignments().stream()
+                .filter(a -> assignmentId.equals(a.getId()))
+                .findFirst()
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Asignación de resolución no encontrada"));
+
+        if (Boolean.TRUE.equals(assignment.getApproved())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT, "Esta resolución ya fue aprobada anteriormente");
+        }
+
+        if (!isAdmin && !tieneTipoResolucion(currentUser, assignment.getTipoResolucion())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN,
+                    "No tienes habilitado el tipo de resolución " + assignment.getTipoResolucion() + " para tomar este caso");
+        }
+
+        if (assignment.getResolutor() != null) {
+            if (assignment.getResolutor().getId().equals(currentUser.getId())) {
+                return solicitud; // Idempotente: ya fue tomada por este mismo resolutor
+            }
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT,
+                    "Esta resolución ya fue tomada por otro resolutor: " + assignment.getResolutor().getName());
+        }
+
+        assignment.setResolutor(currentUser);
+        Solicitud saved = solicitudRepository.save(solicitud);
+        logAssignmentChange(saved, currentUser, "RESOLUCIÓN TOMADA (" + assignment.getTipoResolucion() + ")");
+        return saved;
+    }
+
     @org.springframework.transaction.annotation.Transactional
     public void aprobarAsignacion(Long solicitudId, String emailResolutor, String observaciones, String asistencia, java.util.Map<String, Object> calendarData) {
         Solicitud solicitud = solicitudRepository.findById(solicitudId)
@@ -905,11 +1015,36 @@ public class SolicitudService {
         User resolutor = userRepository.findByEmail(emailResolutor)
                 .orElseThrow(() -> new RuntimeException("Resolutor no encontrado"));
 
-        // Buscar la asignación específica para este resolutor en esta solicitud
+        Long requestedAssignmentId = null;
+        if (calendarData != null && calendarData.get("assignmentId") != null) {
+            try {
+                requestedAssignmentId = Long.valueOf(calendarData.get("assignmentId").toString());
+            } catch (NumberFormatException ignored) {
+                requestedAssignmentId = null;
+            }
+        }
+
+        final Long targetAssignmentId = requestedAssignmentId;
+        // 1. Buscar asignación pendiente ya tomada por este resolutor (priorizando assignmentId si se indicó)
         SolicitudResolutorAssignment assignment = solicitud.getResolutorAssignments().stream()
-                .filter(a -> a.getResolutor().getId().equals(resolutor.getId()) && !a.getApproved())
+                .filter(a -> !Boolean.TRUE.equals(a.getApproved())
+                        && a.getResolutor() != null
+                        && a.getResolutor().getId().equals(resolutor.getId())
+                        && (targetAssignmentId == null || targetAssignmentId.equals(a.getId())))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Asignación pendiente no encontrada para este resolutor"));
+                // 2. Respaldo: si la resolución aún está en el pool compartido del tipo que atiende este resolutor, se la auto-asigna y aprueba
+                .orElseGet(() -> solicitud.getResolutorAssignments().stream()
+                        .filter(a -> !Boolean.TRUE.equals(a.getApproved())
+                                && a.getResolutor() == null
+                                && tieneTipoResolucion(resolutor, a.getTipoResolucion())
+                                && (targetAssignmentId == null || targetAssignmentId.equals(a.getId())))
+                        .findFirst()
+                        .orElseThrow(() -> new RuntimeException("Asignación pendiente no encontrada para este resolutor")));
+
+        // Asegurar que siempre quede guardado quién resolvió el caso
+        if (assignment.getResolutor() == null) {
+            assignment.setResolutor(resolutor);
+        }
 
         // Validar y registrar la asistencia de forma obligatoria si la asignación es de tipo AGENDA
         if ("AGENDA".equalsIgnoreCase(assignment.getTipoResolucion())) {
@@ -921,6 +1056,7 @@ public class SolicitudService {
 
         assignment.setApproved(true);
         
+        String obsLimpia = observaciones != null ? observaciones.trim() : "";
         String eventInfo = "";
         if ("AGENDA".equalsIgnoreCase(assignment.getTipoResolucion()) && calendarData != null) {
             String date = calendarData.get("date") != null ? calendarData.get("date").toString() : null;
@@ -929,10 +1065,14 @@ public class SolicitudService {
                 eventInfo = " (📅 Evento agendado para el día: " + date + (time != null && !time.trim().isEmpty() ? " a las " + time + " hs" : "") + ")";
             }
         }
-        assignment.setObservaciones(observaciones + eventInfo);
+        String finalObs = (obsLimpia + eventInfo).trim();
+        assignment.setObservaciones(finalObs);
         
-        // Registrar en historial
-        logAssignmentChange(solicitud, resolutor, "RESOLUCIÓN APROBADA: " + observaciones + (asistencia != null ? " | Asistencia: " + asistencia : ""));
+        // Registrar en historial quién aprobó la resolución (observaciones opcionales)
+        String detalleHistorial = "RESOLUCIÓN APROBADA (" + assignment.getTipoResolucion() + ")"
+                + (!obsLimpia.isEmpty() ? ": " + obsLimpia : "")
+                + (asistencia != null && !asistencia.trim().isEmpty() ? " | Asistencia: " + asistencia.trim() : "");
+        logAssignmentChange(solicitud, resolutor, detalleHistorial);
 
         // Recalcular estado de la solicitud
         updateSolicitudStatus(solicitud);

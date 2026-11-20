@@ -414,10 +414,10 @@ public class DataInitializer implements CommandLineRunner {
             // Inicialización de versión de base de datos en tabla config
             if (configRepository.count() == 0) {
                 configRepository.save(com.sgp.backend.entity.Config.builder()
-                        .dbVersion("1.2.9")
-                        .descripcion("Creación inicial de tabla config para control de versionado de BD")
+                        .dbVersion("1.3.0")
+                        .descripcion("Soporte multi-resolutor y pool compartido por tipo de resolución")
                         .build());
-                System.out.println("✅ Versión inicial de BD registrada en tabla config: 1.2.9");
+                System.out.println("✅ Versión inicial de BD registrada en tabla config: 1.3.0");
             }
 
             System.out.println("✅ DataInitializer finalizado exitosamente.");

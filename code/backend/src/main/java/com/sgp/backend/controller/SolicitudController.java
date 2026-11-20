@@ -132,6 +132,14 @@ public class SolicitudController {
         return ResponseEntity.ok(solicitudService.tomarSolicitud(id));
     }
 
+    /**
+     * Permite a un resolutor habilitado tomar una asignación del pool compartido y asignársela.
+     */
+    @PostMapping("/{id}/asignaciones/{assignmentId}/tomar")
+    public ResponseEntity<Solicitud> tomarAsignacionResolutor(@PathVariable Long id, @PathVariable Long assignmentId) {
+        return ResponseEntity.ok(solicitudService.tomarAsignacionResolutor(id, assignmentId));
+    }
+
     @PostMapping("/{id}/consideracion")
     public ResponseEntity<Solicitud> ponerEnConsideracion(@PathVariable Long id) {
         Solicitud saved = solicitudService.ponerEnConsideracion(id);

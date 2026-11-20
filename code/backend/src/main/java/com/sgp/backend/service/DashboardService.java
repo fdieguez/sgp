@@ -72,10 +72,30 @@ public class DashboardService {
                             }
                         }
                         if (userRole.contains("RESOLUTOR")) {
+                            List<String> tiposAsignados = user.getTiposResolucion() != null
+                                    ? user.getTiposResolucion().stream()
+                                        .map(com.sgp.backend.entity.TipoResolucion::getTipo)
+                                        .filter(t -> t != null && !t.trim().isEmpty())
+                                        .map(t -> t.trim().toUpperCase())
+                                        .collect(java.util.stream.Collectors.toList())
+                                    : java.util.Collections.emptyList();
+
                             Subquery<Long> subquery = query.subquery(Long.class);
                             Root<SolicitudResolutorAssignment> assignmentRoot = subquery.from(SolicitudResolutorAssignment.class);
-                            subquery.select(assignmentRoot.get("solicitud").get("id"))
-                                    .where(cb.equal(assignmentRoot.get("resolutor"), user));
+                            if (tiposAsignados.isEmpty()) {
+                                subquery.select(assignmentRoot.get("solicitud").get("id"))
+                                        .where(cb.equal(assignmentRoot.get("resolutor"), user));
+                            } else {
+                                // Incluye asignaciones ya tomadas por el resolutor + asignaciones en pool de sus tipos habilitados
+                                subquery.select(assignmentRoot.get("solicitud").get("id"))
+                                        .where(cb.or(
+                                                cb.equal(assignmentRoot.get("resolutor"), user),
+                                                cb.and(
+                                                        cb.isNull(assignmentRoot.get("resolutor")),
+                                                        cb.upper(assignmentRoot.get("tipoResolucion")).in(tiposAsignados)
+                                                )
+                                        ));
+                            }
                             
                             orPredicates.add(cb.or(
                                 cb.equal(root.get("resolutor"), user),

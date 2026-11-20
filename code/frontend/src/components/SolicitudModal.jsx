@@ -187,11 +187,20 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const [pendingGeneralFiles, setPendingGeneralFiles] = useState([]);
     const [saveProgress, setSaveProgress] = useState('');
 
-    // Verificar si el usuario actual tiene una asignación pendiente o aprobada (declaradas de forma temprana)
+    // Tipos de resolución habilitados en el perfil del usuario actual (para pool compartido multi-resolutor)
+    const userTiposResolucion = (user?.tiposResolucion || [])
+        .map(t => (t?.tipo || '').trim().toUpperCase())
+        .filter(Boolean);
+
+    // Verificar si el usuario actual tiene una asignación tomada, en pool de su tipo o aprobada
     const myAssignment = formData.assignments?.find(a => a.resolutorEmail?.toLowerCase() === user?.email?.toLowerCase() && !a.approved);
+    const myPoolAssignment = formData.assignments?.find(
+        a => !a.resolutorEmail && !a.approved && userTiposResolucion.includes((a.tipoResolucion || '').trim().toUpperCase())
+    );
+    const activeResolutorAssignment = myAssignment || myPoolAssignment;
     const myApprovedAssignment = formData.assignments?.find(a => a.resolutorEmail?.toLowerCase() === user?.email?.toLowerCase() && a.approved);
-    const isPendingResolutor = isResolutor && myAssignment && !myAssignment.approved;
-    const isApproveDisabled = loading || (myAssignment?.tipoResolucion === 'AGENDA' && !asistencia);
+    const isPendingResolutor = isResolutor && Boolean(activeResolutorAssignment && !activeResolutorAssignment.approved);
+    const isApproveDisabled = loading || (activeResolutorAssignment?.tipoResolucion === 'AGENDA' && !asistencia);
 
     // Abrir automáticamente el sub-modal de aprobación si el usuario ingresó desde el botón rápido de una AGENDA
     useEffect(() => {
@@ -199,6 +208,32 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             setShowApproveConfirm(true);
         }
     }, [isOpen, openApproveOnMount, isPendingResolutor]);
+
+    /**
+     * Permite a un resolutor tomar una asignación disponible en el pool compartido de su tipo de resolución.
+     */
+    const handleTomarResolucion = async () => {
+        if (!formData.id || !myPoolAssignment?.id) return;
+        setLoading(true);
+        try {
+            await api.post(`/api/solicitudes/${formData.id}/asignaciones/${myPoolAssignment.id}/tomar`);
+            toast.success(`Resolución (${myPoolAssignment.tipoResolucion}) tomada y asignada a tu bandeja.`);
+            setFormData(prev => ({
+                ...prev,
+                assignments: (prev.assignments || []).map(a =>
+                    a.id === myPoolAssignment.id
+                        ? { ...a, resolutorEmail: user?.email || '', resolutorName: user?.name || user?.email || '' }
+                        : a
+                )
+            }));
+            onSuccess();
+        } catch (err) {
+            console.error("Error al tomar la resolución:", err);
+            toast.error(err.response?.data?.message || err.response?.data?.error || "Error al tomar la resolución.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const fetchAdjuntos = useCallback(async () => {
         if (!formData.id) return;
@@ -586,7 +621,9 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 }
                             } catch (e) {}
                             return {
+                                id: a.id || null,
                                 resolutorEmail: a.resolutor?.email || '',
+                                resolutorName: a.resolutor?.name || '',
                                 tipoResolucion: a.tipoResolucion || '',
                                 detalle: parsedDetalle,
                                 approved: a.approved || false,
@@ -703,8 +740,9 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         : [{ id: 'OTRO', name: 'Otro' }];
 
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e, options = {}) => {
         if (e) e.preventDefault();
+        const { silent = false, closeAfter = true } = options;
 
         // Validaciones estrictas de campos obligatorios (Etapa 9)
         if (!formData.description || !formData.description.trim()) {
@@ -778,8 +816,16 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             }
         }
 
-        // Validación estricta de campos obligatorios para asignaciones de tipo AGENDA (Etapa 11)
+        // Validación estricta de campos obligatorios para asignaciones de tipo AGENDA y DECLARACION DE INTERES
         for (const a of (formData.assignments || [])) {
+            // Si el usuario es Resolutor (no Admin), no bloquear el guardado por campos de asignaciones de otra área en solo lectura
+            if (isResolutor && !isOperadorOrAdmin) {
+                const esMia = a.resolutorEmail && user?.email && a.resolutorEmail.toLowerCase() === user.email.toLowerCase();
+                const esMiPool = !a.resolutorEmail && userTiposResolucion.includes((a.tipoResolucion || '').trim().toUpperCase());
+                if (!esMia && !esMiPool) {
+                    continue;
+                }
+            }
             if (a.tipoResolucion === 'AGENDA') {
                 const det = typeof a.detalle === 'object' && a.detalle !== null ? a.detalle : {};
                 if (!det['Tipo de actividad'] || !det['Tipo de actividad'].trim()) {
@@ -887,9 +933,9 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
 
         setLoading(true);
         try {
-            // Limpiar asignaciones: filtrar vacías y serializar el detalle
+            // Limpiar asignaciones: permitir asignaciones en Pool sin resolutorEmail asignado todavía
             const assignments = formData.assignments
-                .filter(a => a.resolutorEmail && a.tipoResolucion)
+                .filter(a => a.tipoResolucion && String(a.tipoResolucion).trim() !== '')
                 .map(a => {
                     let detalleFinal = a.detalle;
                     if (typeof a.detalle === 'object' && a.detalle !== null) {
@@ -910,7 +956,9 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         detalleFinal = JSON.stringify(copy);
                     }
                     return {
-                        ...a,
+                        id: a.id || null,
+                        tipoResolucion: a.tipoResolucion,
+                        resolutorEmail: a.resolutorEmail || null,
                         detalle: detalleFinal || ''
                     };
                 });
@@ -1043,13 +1091,19 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 }
             }
 
-            toast.success(formData.id ? "Solicitud actualizada con éxito" : `¡Solicitud #${newId} y adjuntos guardados con éxito!`);
-            onSuccess();
-            onClose();
+            if (!silent) {
+                toast.success(formData.id ? "Solicitud actualizada con éxito" : `¡Solicitud #${newId} y adjuntos guardados con éxito!`);
+            }
+            if (closeAfter) {
+                onSuccess();
+                onClose();
+            }
+            return true;
         } catch (err) {
             console.error("Error saving solicitud", err);
             const errMsg = err.response?.data?.message || err.response?.data?.error || (typeof err.response?.data === 'string' ? err.response?.data : "Error al guardar la solicitud");
             toast.error(errMsg);
+            return false;
         } finally {
             setLoading(false);
         }
@@ -1057,7 +1111,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
 
     const handleAprobar = async () => {
         // Validaciones estrictas de campos nuevos al resolver como AGENDA
-        if (myAssignment?.tipoResolucion === 'AGENDA') {
+        if (activeResolutorAssignment?.tipoResolucion === 'AGENDA') {
             if (!asistencia || !asistencia.trim()) {
                 toast.error("La selección de asistencia es obligatoria.");
                 return;
@@ -1078,16 +1132,19 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             }
         }
 
-        if (!approveObservations || !approveObservations.trim()) {
-            toast.error("Las observaciones de la resolución son obligatorias.");
+        // 1. Guardar primero cualquier cambio realizado en la solicitud para evitar pérdida de datos
+        const savedOk = await handleSubmit(null, { silent: true, closeAfter: false });
+        if (!savedOk) {
             return;
         }
 
+        // 2. Aprobar la resolución (observaciones son opcionales)
         setLoading(true);
         try {
             await api.post(`/api/solicitudes/${formData.id}/aprobar`, { 
-                observaciones: approveObservations,
-                asistencia: myAssignment?.tipoResolucion === 'AGENDA' ? asistencia : undefined,
+                assignmentId: activeResolutorAssignment?.id || undefined,
+                observaciones: approveObservations ? approveObservations.trim() : "",
+                asistencia: activeResolutorAssignment?.tipoResolucion === 'AGENDA' ? asistencia : undefined,
                 createEvent: createCalendarEvent ? 'true' : 'false',
                 title: calendarTitle,
                 date: calendarDate,
@@ -1097,13 +1154,18 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 guestEmails: createCalendarEvent ? selectedGuests : []
             });
             const otrasPendientes = (formData.assignments || [])
-                .filter(a => !(a.resolutorEmail?.toLowerCase() === user?.email?.toLowerCase() && a.tipoResolucion === myAssignment?.tipoResolucion) && !a.approved)
+                .filter(a => {
+                    if (activeResolutorAssignment?.id && a.id) {
+                        return a.id !== activeResolutorAssignment.id && !a.approved;
+                    }
+                    return !(a.tipoResolucion === activeResolutorAssignment?.tipoResolucion) && !a.approved;
+                })
                 .map(a => a.tipoResolucion)
                 .filter(Boolean);
 
             if (otrasPendientes.length > 0) {
                 toast.success(
-                    `Tu resolución (${myAssignment?.tipoResolucion || 'asignada'}) quedó aprobada. El pedido #${formData.id} sigue En Resolución pendiente de: ${otrasPendientes.join(', ')}.`,
+                    `Tu resolución (${activeResolutorAssignment?.tipoResolucion || 'asignada'}) quedó aprobada. El pedido #${formData.id} sigue En Resolución pendiente de: ${otrasPendientes.join(', ')}.`,
                     { duration: 6000 }
                 );
             } else {
@@ -1113,7 +1175,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             onClose();
         } catch (err) {
             console.error("Error approving assignment", err);
-            toast.error("Error al finalizar la resolución");
+            toast.error(err.response?.data?.message || err.response?.data?.error || "Error al finalizar la resolución");
         } finally {
             setLoading(false);
             setShowApproveConfirm(false);
@@ -1808,7 +1870,9 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                     newAssignments[index] = { 
                                                         ...assignment, 
                                                         tipoResolucion: type,
-                                                        resolutorEmail: config?.resolutor?.email || '',
+                                                        // Queda en Pool compartido (sin resolutor nominal) para que cualquier resolutor de este tipo pueda tomarlo
+                                                        resolutorEmail: '',
+                                                        resolutorName: '',
                                                         detalle: currentDet
                                                     };
                                                     setFormData({ ...formData, assignments: newAssignments });
@@ -1838,7 +1902,10 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                 const isAssignedResolutor = Boolean(
                                                     (assignment.resolutorEmail && user?.email && assignment.resolutorEmail.toLowerCase() === user.email.toLowerCase())
                                                 );
-                                                const canEditThisAsgn = isNewSolicitud || (isSubsidioAssoc ? (isCreator || isAssignedResponsable || isAssignedResolutor || isOperadorOrAdmin) : (!isResolutor || isAssignedResolutor || isOperadorOrAdmin || isCreator));
+                                                const isPoolResolutorOfType = Boolean(
+                                                    !assignment.resolutorEmail && userTiposResolucion.includes((assignment.tipoResolucion || '').trim().toUpperCase())
+                                                );
+                                                const canEditThisAsgn = isNewSolicitud || (isSubsidioAssoc ? (isCreator || isAssignedResponsable || isAssignedResolutor || isPoolResolutorOfType || isOperadorOrAdmin) : (!isResolutor || isAssignedResolutor || isPoolResolutorOfType || isOperadorOrAdmin || isCreator));
                                                 
                                                 return !isReadOnly && canEditThisAsgn && (!isResolutor || isOperadorOrAdmin) && (
                                                     <button 
@@ -1862,8 +1929,11 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                     const isAssignedResolutor = Boolean(
                                                         (assignment.resolutorEmail && user?.email && assignment.resolutorEmail.toLowerCase() === user.email.toLowerCase())
                                                     );
-                                                    // Punto 8: El responsable asignado, el creador, el resolutor asignado u operador/admin pueden editar los datos de un subsidio propuesto
-                                                    const canEditThis = isNewSolicitud || (isSubsidioAssoc ? (isCreator || isAssignedResponsable || isAssignedResolutor || isOperadorOrAdmin) : (!isResolutor || isAssignedResolutor || isOperadorOrAdmin || isCreator));
+                                                    const isPoolResolutorOfType = Boolean(
+                                                        !assignment.resolutorEmail && userTiposResolucion.includes((assignment.tipoResolucion || '').trim().toUpperCase())
+                                                    );
+                                                    // Punto 8: El responsable asignado, el creador, el resolutor asignado (o del pool de ese tipo) u operador/admin pueden editar los datos
+                                                    const canEditThis = isNewSolicitud || (isSubsidioAssoc ? (isCreator || isAssignedResponsable || isAssignedResolutor || isPoolResolutorOfType || isOperadorOrAdmin) : (!isResolutor || isAssignedResolutor || isPoolResolutorOfType || isOperadorOrAdmin || isCreator));
                                                     if (config && config.atributosConfig && config.atributosConfig.length > 0) {
                                                         const sortedCampos = [...config.atributosConfig].sort((a,b) => a.orden - b.orden);
                                                         const currentData = typeof assignment.detalle === 'object' && assignment.detalle !== null ? { ...assignment.detalle } : {};
@@ -2246,11 +2316,18 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                 }
                                             })()}
 
-                                            {assignment.resolutorEmail && (
+                                            {assignment.resolutorEmail ? (
                                                 <span className="text-[10px] text-gray-400 mt-2 ml-1">
-                                                    Asignado a: <span className="font-semibold text-gray-300">{assignment.resolutorEmail}</span>
+                                                    {assignment.approved ? 'Resuelto por:' : 'Asignado a:'}{' '}
+                                                    <span className="font-semibold text-gray-300">
+                                                        {assignment.resolutorName || assignment.resolutorEmail}
+                                                    </span>
                                                 </span>
-                                            )}
+                                            ) : assignment.tipoResolucion ? (
+                                                <span className="inline-flex items-center gap-1 text-[10px] text-amber-300 bg-amber-950/40 border border-amber-800/50 px-2 py-0.5 rounded mt-2 w-fit">
+                                                    Pool: <span className="font-bold">{assignment.tipoResolucion}</span> (Disponible para resolutores del área)
+                                                </span>
+                                            ) : null}
                                             {assignment.approved && (
                                                 <div className="mt-2 p-2.5 bg-emerald-950/30 rounded-lg border border-emerald-800/40 text-xs text-emerald-200">
                                                     <span className="font-bold text-emerald-400 flex items-center gap-1.5 mb-1">
@@ -2544,12 +2621,25 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 </div>
 
                 <div className="p-6 border-t border-gray-700 bg-gray-800/50 flex justify-between items-center gap-3">
-                    <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {!isReadOnly && isResolutor && myPoolAssignment?.id && (
+                            <button
+                                type="button"
+                                onClick={handleTomarResolucion}
+                                disabled={loading}
+                                className="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-lg font-bold transition-all shadow-lg flex items-center gap-2 disabled:opacity-50"
+                                title={`Tomar y asignarme la resolución (${myPoolAssignment.tipoResolucion})`}
+                            >
+                                <UserCheck className="h-4 w-4" />
+                                Tomar Resolución ({myPoolAssignment.tipoResolucion})
+                            </button>
+                        )}
                         {!isReadOnly && isPendingResolutor && (
                             <button
                                 type="button"
                                 onClick={() => setShowApproveConfirm(true)}
-                                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold transition-all shadow-lg flex items-center gap-2"
+                                disabled={loading}
+                                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold transition-all shadow-lg flex items-center gap-2 disabled:opacity-50"
                             >
                                 <Save className="h-4 w-4" />
                                 Aprobar Resolución
@@ -2597,19 +2687,19 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 <Save className="h-5 w-5" /> ¿Aprobar Resolución?
                             </h3>
                             <p className="text-sm text-gray-300">
-                                Esta acción marcará su parte como resuelta y la solicitud desaparecerá de su bandeja principal.
+                                Esta acción guardará los cambios realizados en la solicitud y marcará su resolución como aprobada.
                             </p>
                             <div>
-                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-2">Mis Observaciones</label>
+                                <label className="block text-xs font-semibold text-gray-500 uppercase mb-2">Mis Observaciones (Opcional)</label>
                                 <textarea
                                     className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white text-sm outline-none focus:ring-2 focus:ring-emerald-500"
                                     rows="4"
-                                    placeholder="Escriba aquí los detalles de la resolución..."
+                                    placeholder="Escriba aquí observaciones opcionales de la resolución..."
                                     value={approveObservations}
                                     onChange={(e) => setApproveObservations(e.target.value)}
                                 />
                             </div>
-                            {myAssignment?.tipoResolucion === 'AGENDA' && (
+                            {activeResolutorAssignment?.tipoResolucion === 'AGENDA' && (
                                 <div className="space-y-2 bg-gray-900/50 p-3 rounded-xl border border-gray-700">
                                     <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Asistencia Obligatoria</label>
                                     <div className="flex gap-4">
@@ -2639,7 +2729,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 </div>
                             )}
 
-                            {myAssignment?.tipoResolucion === 'AGENDA' && (
+                            {activeResolutorAssignment?.tipoResolucion === 'AGENDA' && (
                                 <div className="space-y-3 bg-blue-950/30 p-4 rounded-xl border border-blue-500/30">
                                     <label className="flex items-center gap-2 cursor-pointer mb-2">
                                         <input

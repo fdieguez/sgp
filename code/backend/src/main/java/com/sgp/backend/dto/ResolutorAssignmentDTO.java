@@ -15,7 +15,10 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ResolutorAssignmentDTO {
 
-    /** Email del resolutor asignado. */
+    /** Identificador opcional de una asignación ya existente. */
+    private Long id;
+
+    /** Email del resolutor asignado (puede ser null o vacío si queda en el pool del tipo de resolución). */
     private String resolutorEmail;
 
     /** Tipo de resolución seleccionado (ej: "Subsidio", "Lentes", etc.). */
@@ -23,4 +26,11 @@ public class ResolutorAssignmentDTO {
 
     /** Detalle libre o JSON serializado de los atributos del formulario dinámico. */
     private String detalle;
+
+    /** Constructor retrocompatible de 3 argumentos (sin id). */
+    public ResolutorAssignmentDTO(String resolutorEmail, String tipoResolucion, String detalle) {
+        this.resolutorEmail = resolutorEmail;
+        this.tipoResolucion = tipoResolucion;
+        this.detalle = detalle;
+    }
 }

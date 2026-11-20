@@ -27,8 +27,13 @@ public class SolicitudResolutorAssignment {
     @com.fasterxml.jackson.annotation.JsonIgnore
     private Solicitud solicitud;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "resolutor_id")
+    /**
+     * Resolutor asignado a esta resolución.
+     * Puede ser null cuando la resolución ingresa al pool compartido del tipo de resolución,
+     * hasta que un resolutor del área tome el caso o lo apruebe.
+     */
+    @ManyToOne(optional = true)
+    @JoinColumn(name = "resolutor_id", nullable = true)
     private User resolutor;
 
     /**

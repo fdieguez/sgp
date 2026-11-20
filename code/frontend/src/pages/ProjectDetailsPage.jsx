@@ -455,7 +455,10 @@ export default function ProjectDetailsPage() {
         if (!window.confirm(`¿Confirmas la aprobación de tu resolución${labelTipo} en la solicitud #${solicitud.id}?`)) return;
 
         try {
-            await api.post(`/api/solicitudes/${solicitud.id}/aprobar`, { observaciones: "Aprobación rápida desde grilla" });
+            await api.post(`/api/solicitudes/${solicitud.id}/aprobar`, {
+                assignmentId: pendingAssignment?.id || undefined,
+                observaciones: ""
+            });
             const otrasPendientes = (solicitud.resolutorAssignments || [])
                 .filter(a => a.id !== pendingAssignment?.id && !a.approved)
                 .map(a => a.tipoResolucion);
@@ -472,6 +475,25 @@ export default function ProjectDetailsPage() {
         } catch (err) {
             console.error("Error al aprobar asignación:", err);
             toast.error(err.response?.data?.message || err.response?.data?.error || "Error al aprobar la solicitud");
+        }
+    };
+
+    /**
+     * Permite a un resolutor tomar una asignación disponible en el pool compartido de su tipo de resolución.
+     */
+    const handleTomarResolucion = async (solicitudId, assignment) => {
+        if (!assignment?.id) return;
+        if (!window.confirm(`¿Deseas tomar y asignarte la resolución (${assignment.tipoResolucion}) de la solicitud #${solicitudId}?`)) return;
+        setLoading(true);
+        try {
+            await api.post(`/api/solicitudes/${solicitudId}/asignaciones/${assignment.id}/tomar`);
+            toast.success(`¡Resolución (${assignment.tipoResolucion}) de la solicitud #${solicitudId} asignada a tu bandeja!`);
+            fetchData();
+        } catch (err) {
+            console.error("Error al tomar resolución:", err);
+            toast.error(err.response?.data?.message || err.response?.data?.error || "Error al tomar la resolución.");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -576,12 +598,16 @@ export default function ProjectDetailsPage() {
     const processedData = useMemo(() => {
         let result = [...solicitudes];
 
-        // Filtro rápido para el rol Resolutor: mostrar solo pedidos donde SU resolución aún está pendiente
+        // Filtro rápido para el rol Resolutor: mostrar solo pedidos donde SU resolución (tomada o en pool de su tipo) aún está pendiente
         if (soloMisPendientes && user?.role === 'RESOLUTOR' && user?.email) {
             const myEmail = user.email.toLowerCase();
+            const myTipos = (user?.tiposResolucion || []).map(t => (t?.tipo || '').trim().toUpperCase()).filter(Boolean);
             result = result.filter(s =>
-                (s.resolutorAssignments || []).some(
-                    a => a.resolutor?.email?.toLowerCase() === myEmail && !a.approved
+                (s.resolutorAssignments || []).some(a =>
+                    !a.approved && (
+                        a.resolutor?.email?.toLowerCase() === myEmail ||
+                        (!a.resolutor && myTipos.includes((a.tipoResolucion || '').trim().toUpperCase()))
+                    )
                 )
             );
         }
@@ -1198,7 +1224,7 @@ export default function ProjectDetailsPage() {
                                         }
                                     }
 
-                                    // Renderizar detalles de resolución con estado individual claro (Aprobada / Pendiente)
+                                    // Renderizar detalles de resolución con estado individual claro (Aprobada / Pendiente / Pool)
                                     let resolucionContent = '-';
                                     const assignments = s.resolutorAssignments || [];
                                     const approvedCount = assignments.filter(a => a.approved).length;
@@ -1206,8 +1232,14 @@ export default function ProjectDetailsPage() {
                                         .filter(a => !a.approved)
                                         .map(a => a.tipoResolucion)
                                         .filter(Boolean);
+                                    const userTiposResolucion = (user?.tiposResolucion || [])
+                                        .map(t => (t?.tipo || '').trim().toUpperCase())
+                                        .filter(Boolean);
                                     const myPendingAssignment = assignments.find(
                                         a => a.resolutor?.email?.toLowerCase() === user?.email?.toLowerCase() && !a.approved
+                                    );
+                                    const myPoolAssignment = assignments.find(
+                                        a => !a.resolutor && !a.approved && userTiposResolucion.includes((a.tipoResolucion || '').trim().toUpperCase())
                                     );
                                     const hasPendingApproval = Boolean(myPendingAssignment);
 
@@ -1239,7 +1271,18 @@ export default function ProjectDetailsPage() {
                                                                 Pendiente
                                                             </span>
                                                         )}
-                                                        <span className="font-bold text-indigo-300">{assignment.resolutor?.name || assignment.resolutorEmail}:</span>
+                                                        {assignment.resolutor ? (
+                                                            <span className="font-bold text-indigo-300">
+                                                                {assignment.resolutor?.name || assignment.resolutor?.email}:
+                                                            </span>
+                                                        ) : (
+                                                            <span
+                                                                className="inline-flex items-center px-1.5 py-0.5 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-700/60 text-[9px] font-bold uppercase"
+                                                                title="Disponible en pool para todos los resolutores de este tipo"
+                                                            >
+                                                                Pool
+                                                            </span>
+                                                        )}
                                                         <span className="font-semibold text-gray-200">{assignment.tipoResolucion}</span>
                                                     </div>
                                                     {detailText && (
@@ -1364,6 +1407,16 @@ export default function ProjectDetailsPage() {
                                                 <td className="p-3 text-indigo-300 font-mono font-bold">{s.porDonde || '-'}</td>
                                                 <td className="p-3 sticky right-0 bg-gray-900/90 shadow-xl group-hover:bg-gray-800 transition-colors">
                                                     <div className="flex justify-end gap-1 opacity-60 group-hover:opacity-100">
+                                                        {/* Botón Tomar Resolución (Pool Multi-Resolutor) */}
+                                                        {user?.role === 'RESOLUTOR' && myPoolAssignment && (
+                                                            <button
+                                                                onClick={() => handleTomarResolucion(s.id, myPoolAssignment)}
+                                                                title={`Tomar Resolución (${myPoolAssignment.tipoResolucion})`}
+                                                                className="p-1.5 hover:bg-cyan-600 bg-cyan-900/40 rounded text-cyan-300 hover:text-white transition-colors"
+                                                            >
+                                                                <UserCheck className="h-4 w-4" />
+                                                            </button>
+                                                        )}
                                                         {/* Botón Tomar Solicitud */}
                                                         {!s.responsable && (user?.role === 'RESPONSABLE' || user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN') && (!s.zone || !user?.zone || s.zone.toLowerCase() === user?.zone.toLowerCase() || user?.role?.includes('ADMIN')) && (
                                                             <button onClick={() => handleTomarSolicitud(s.id)} title="Tomar Solicitud (Asignármela)" className="p-1.5 hover:bg-emerald-600 bg-emerald-900/40 rounded text-emerald-400 hover:text-white transition-colors">
@@ -1447,6 +1500,16 @@ export default function ProjectDetailsPage() {
                                                 </td>
                                                 <td className="p-3 sticky right-0 bg-gray-900/90 shadow-xl group-hover:bg-gray-800 transition-colors">
                                                     <div className="flex justify-end gap-1 opacity-60 group-hover:opacity-100">
+                                                        {/* Botón Tomar Resolución (Pool Multi-Resolutor) */}
+                                                        {user?.role === 'RESOLUTOR' && myPoolAssignment && (
+                                                            <button
+                                                                onClick={() => handleTomarResolucion(s.id, myPoolAssignment)}
+                                                                title={`Tomar Resolución (${myPoolAssignment.tipoResolucion})`}
+                                                                className="p-1.5 hover:bg-cyan-600 bg-cyan-900/40 rounded text-cyan-300 hover:text-white transition-colors"
+                                                            >
+                                                                <UserCheck className="h-4 w-4" />
+                                                            </button>
+                                                        )}
                                                         {hasPendingApproval && (
                                                             <button
                                                                 onClick={() => handleAprobarRapido(s, myPendingAssignment)}
