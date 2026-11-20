@@ -17,6 +17,7 @@ const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8080';
 
 const CREDENCIALES = {
   ADMIN: { email: 'admin@sgp.com', password: process.env.TEST_ADMIN_PASS || 'password' },
+  OPERADOR: { email: 'celeste_solari19@hotmail.com', password: process.env.TEST_OPERADOR_PASS || 'password' },
   EDUARDO: { email: 'ealfaro.51@gmail.com', password: process.env.TEST_EDUARDO_PASS || 'password' },
   VERONICA: { email: 'mveronicagonzalez79@gmail.com', password: process.env.TEST_VERONICA_PASS || 'password' }
 };
@@ -238,5 +239,123 @@ test.describe('🧪 Validación E2E v1.3.0: Pool Multi-Resolutor, Guardar al Apr
     expect(finalAsgn.approved).toBe(true);
     expect(finalAsgn.resolutor?.email).toBe(CREDENCIALES.EDUARDO.email);
     expect(finalAsgn.detalle).toContain('Institución Editada Al Aprobar v1.3.0');
+  });
+
+  test('Subsidio en Especie: muestra Monto solicitado y Monto real; Operador puede completar Monto real estando la solicitud Resuelta', async ({ page, request }) => {
+    const nombreClub = `Club Especie MontoReal ${Date.now()}`;
+    let especieId = null;
+
+    try {
+      // 1. Crear solicitud de Subsidio en Especie con Monto solicitado y aprobarla (estado Resueltas / completadas)
+      const createRes = await request.post(`${BACKEND_URL}/api/solicitudes`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+        data: {
+          description: 'Pedido de pelotas e indumentaria deportiva (Subsidio en Especie)',
+          origin: 'Oficina',
+          tema: 'DEPORTE',
+          type: 'PEDIDO',
+          status: 'en resolucion',
+          person: {
+            name: nombreClub,
+            phone: '3424889900',
+            type: 'Institucional',
+            subType: 'Club'
+          }
+        }
+      });
+      expect(createRes.ok()).toBeTruthy();
+      const created = await createRes.json();
+      especieId = created.id;
+
+      const updRes = await request.put(`${BACKEND_URL}/api/solicitudes/${especieId}`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+        data: {
+          description: created.description,
+          origin: 'Oficina',
+          tema: 'DEPORTE',
+          status: 'completadas',
+          responsableId: 61,
+          person: {
+            name: nombreClub,
+            phone: '3424889900',
+            type: 'Institucional',
+            subType: 'Club'
+          },
+          locationName: 'Santa Fe',
+          barrio: 'Los Hornos',
+          assignments: [
+            {
+              tipoResolucion: 'SUBSIDIO EN ESPECIE',
+              resolutorEmail: null,
+              detalle: JSON.stringify({
+                'Tipo de pedido': 'Institucional en especie',
+                'Nombre de institución': nombreClub,
+                'Fecha del evento': '2026-12-05',
+                'Descripción de bienes solicitados': '10 pelotas de fútbol y 15 camisetas',
+                'Monto solicitado': '150000'
+              })
+            }
+          ]
+        }
+      });
+      expect(updRes.ok()).toBeTruthy();
+
+      // Marcar como completadas explícitamente (simula solicitud ya resuelta)
+      const statusRes = await request.put(`${BACKEND_URL}/api/solicitudes/${especieId}/status`, {
+        headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'text/plain' },
+        data: 'completadas'
+      });
+      expect(statusRes.ok()).toBeTruthy();
+
+      // 2. Inicia sesión un OPERADOR, abre la solicitud ya RESUELTA y completa "Monto real"
+      await iniciarSesionUI(page, CREDENCIALES.OPERADOR.email, CREDENCIALES.OPERADOR.password, 'OPERADOR');
+      await page.goto(`${BASE_URL}/mis-solicitudes`, { waitUntil: 'networkidle' });
+
+      await page.locator('input[placeholder*="Buscar"]').first().fill(nombreClub);
+      await page.waitForTimeout(800);
+
+      const row = page.locator(`tr:has-text("${nombreClub}")`).first();
+      await expect(row).toBeVisible({ timeout: 10000 });
+      await expect(row).toContainText('Resueltas');
+
+      await row.locator('button[title="Ver / Editar Detalles"]').first().click();
+      const modal = page.locator('div[role="dialog"], .fixed.inset-0').last();
+      await expect(modal).toBeVisible({ timeout: 8000 });
+
+      // Verificar que existen las etiquetas "Monto solicitado" y "Monto real", y NO el campo plano "Monto"
+      await expect(modal.locator('label:text-is("Monto solicitado")')).toBeVisible();
+      await expect(modal.locator('label:text-is("Monto real")')).toBeVisible();
+      await expect(modal.locator('label:text-is("Monto")')).toHaveCount(0);
+
+      // Verificar valor precargado de Monto solicitado y completar Monto real
+      const inputMontoSolicitado = modal.locator('label:text-is("Monto solicitado") + input');
+      await expect(inputMontoSolicitado).toHaveValue('150000');
+
+      const inputMontoReal = modal.locator('label:text-is("Monto real") + input');
+      await inputMontoReal.fill('178500');
+
+      // Guardar la solicitud estando en estado Resueltas
+      await modal.locator('button:has-text("Guardar Solicitud")').click();
+      await expect(modal).toHaveCount(0, { timeout: 12000 });
+
+      // 3. Verificar en backend que mantuvo estado "completadas", guardó ambos montos y actualizó amount al Monto real
+      const verifyRes = await request.get(`${BACKEND_URL}/api/solicitudes/${especieId}`, {
+        headers: { Authorization: `Bearer ${adminToken}` }
+      });
+      expect(verifyRes.ok()).toBeTruthy();
+      const finalSol = await verifyRes.json();
+
+      expect(finalSol.status.toLowerCase()).toBe('completadas');
+      expect(Number(finalSol.amount)).toBe(178500);
+      const detJson = JSON.parse(finalSol.resolutorAssignments[0].detalle);
+      expect(String(detJson['Monto solicitado'])).toBe('150000');
+      expect(String(detJson['Monto real'])).toBe('178500');
+    } finally {
+      if (especieId && adminToken) {
+        await request.delete(`${BACKEND_URL}/api/solicitudes/${especieId}`, {
+          headers: { Authorization: `Bearer ${adminToken}` }
+        });
+      }
+    }
   });
 });

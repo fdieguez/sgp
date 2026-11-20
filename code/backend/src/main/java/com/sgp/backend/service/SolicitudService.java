@@ -660,7 +660,12 @@ public class SolicitudService {
             statusChangedManually = false;
         }
 
-        if (!statusChangedManually) {
+        // Si la solicitud ya estaba en "completadas" (Resueltas) y el usuario no pidió cambiar el estado manualmente
+        // (ej: un Operador cargando el Monto real post-aprobación), preservar el estado "completadas".
+        boolean keepCompleted = "completadas".equalsIgnoreCase(oldStatus)
+                && (dto.getStatus() == null || "completadas".equalsIgnoreCase(dto.getStatus().trim()));
+
+        if (!statusChangedManually && !keepCompleted) {
             updateSolicitudStatus(saved);
         }
         solicitudRepository.save(saved);
@@ -811,7 +816,12 @@ public class SolicitudService {
                     try {
                         JsonNode rootNode = objectMapper.readTree(dto.getDetalle());
                         JsonNode montoNode = null;
-                        if (rootNode.has("Monto")) {
+                        // En Subsidios en Especie se prioriza "Monto real" si ya fue cargado; si no, "Monto solicitado"
+                        if (rootNode.has("Monto real") && !rootNode.get("Monto real").isNull() && !rootNode.get("Monto real").asText("").trim().isEmpty()) {
+                            montoNode = rootNode.get("Monto real");
+                        } else if (rootNode.has("Monto solicitado") && !rootNode.get("Monto solicitado").isNull() && !rootNode.get("Monto solicitado").asText("").trim().isEmpty()) {
+                            montoNode = rootNode.get("Monto solicitado");
+                        } else if (rootNode.has("Monto")) {
                             montoNode = rootNode.get("Monto");
                         } else if (rootNode.has("monto")) {
                             montoNode = rootNode.get("monto");

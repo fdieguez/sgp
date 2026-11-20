@@ -586,6 +586,8 @@ public class DataInitializer implements CommandLineRunner {
         AtributoResolucion attrDatoObs = obtenerOCrearAtributo("Observaciones", "TEXTAREA", null);
         AtributoResolucion attrFecha = obtenerOCrearAtributo("Fecha", "DATE", null);
         AtributoResolucion attrMonto = obtenerOCrearAtributo("Monto", "NUMBER", null);
+        AtributoResolucion attrMontoSolicitado = obtenerOCrearAtributo("Monto solicitado", "NUMBER", null);
+        AtributoResolucion attrMontoReal = obtenerOCrearAtributo("Monto real", "NUMBER", null);
         AtributoResolucion attrInstitucion = obtenerOCrearAtributo("Nombre de institución", "TEXT", null);
         AtributoResolucion attrDecInteres = obtenerOCrearAtributo("Declaración de interés", "SELECT", "si,no");
         AtributoResolucion attrCBU = obtenerOCrearAtributo("Constancia de CBU", "FILE", null);
@@ -672,7 +674,9 @@ public class DataInitializer implements CommandLineRunner {
             new AtributoConfig(attrFechaEvento, false, 20),
             new AtributoConfig(attrDescBienes, false, 21),
             new AtributoConfig(attrMonto, false, 22),
-            new AtributoConfig(attrDatoObs, false, 23)
+            new AtributoConfig(attrMontoSolicitado, false, 23),
+            new AtributoConfig(attrMontoReal, false, 24),
+            new AtributoConfig(attrDatoObs, false, 25)
         );
         // Evitar duplicados: reutilizar SUBSIDIO EN DINERO si ya existe (o SUBSIDIO en instalaciones antiguas)
         String tipoSubsidioDinero = tipoResolucionRepository.findByTipoIgnoreCase("SUBSIDIO EN DINERO").isPresent()

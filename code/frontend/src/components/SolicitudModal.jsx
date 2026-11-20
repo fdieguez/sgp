@@ -1964,6 +1964,13 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                         else if (assignment.tipoResolucion === 'SUBSIDIO EN ESPECIE') tipoPedido = 'Institucional en especie';
                                                                         else tipoPedido = 'Institucional en dinero';
                                                                     }
+                                                                    const isEspecie = tipoPedido === 'Institucional en especie' || (assignment.tipoResolucion || '').trim().toUpperCase() === 'SUBSIDIO EN ESPECIE';
+
+                                                                    // Retrocompatibilidad: si un subsidio en especie histórico tenía "Monto", reflejarlo en "Monto solicitado"
+                                                                    if (isEspecie && currentData['Monto solicitado'] === undefined && currentData['Monto'] !== undefined && currentData['Monto'] !== '') {
+                                                                        currentData['Monto solicitado'] = currentData['Monto'];
+                                                                    }
+
                                                                     const camposPersonal = [
                                                                         'Nombre y apellido', 'DNI', 'Teléfono', 'Compañía', 'Dirección de DNI',
                                                                         'DNI frente', 'DNI dorso', 'Constancia de CBU'
@@ -1975,9 +1982,14 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                         'Nota de pedido'
                                                                     ];
                                                                     const camposInstitucionalEspecie = [
-                                                                        'Fecha del evento', 'Descripción de bienes solicitados', 'Descripción del monto y bienes solicitados'
+                                                                        'Fecha del evento', 'Descripción de bienes solicitados', 'Descripción del monto y bienes solicitados',
+                                                                        'Monto solicitado', 'Monto real'
                                                                     ];
 
+                                                                    // En Subsidio en Especie se reemplaza "Monto" por "Monto solicitado" y "Monto real"
+                                                                    if (campo.nombre === 'Monto' && isEspecie) {
+                                                                        return null;
+                                                                    }
                                                                     // Campos exclusivos de tipo Personal
                                                                     if (camposPersonal.includes(campo.nombre) && tipoPedido !== 'Personal') {
                                                                         return null;
@@ -1990,8 +2002,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                                     if (camposInstitucionalDinero.includes(campo.nombre) && tipoPedido !== 'Institucional en dinero') {
                                                                         return null;
                                                                     }
-                                                                    // Campos exclusivos de Institucional en especie
-                                                                    if (camposInstitucionalEspecie.includes(campo.nombre) && tipoPedido !== 'Institucional en especie') {
+                                                                    // Campos exclusivos de Subsidio en especie
+                                                                    if (camposInstitucionalEspecie.includes(campo.nombre) && !isEspecie) {
                                                                         return null;
                                                                     }
                                                                 }
