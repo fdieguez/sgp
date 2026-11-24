@@ -40,20 +40,6 @@ export default function HelpPage() {
                             Manual rápido de uso, flujos por rol y preguntas frecuentes ({APP_VERSION_LABEL}).
                         </p>
                     </div>
-
-                    <div className="sm:self-end">
-                        <a
-                            href="/Manual_de_Usuario_SGP.pdf"
-                            download="Manual_de_Usuario_SGP.pdf"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 border border-indigo-400/30 transition-all hover:scale-105 active:scale-95"
-                            title="Descargar Manual Oficial SGP en formato PDF"
-                        >
-                            <Download className="h-5 w-5 text-indigo-200" />
-                            <span>Descargar Manual Oficial (PDF)</span>
-                        </a>
-                    </div>
                 </div>
 
                 {/* Banner Destacado Descarga Manual Oficial */}

@@ -2,11 +2,15 @@
 
 > **Propósito**: Este archivo registra todos los cambios, mejoras y decisiones técnicas del proyecto SGP para facilitar la continuidad entre sesiones de desarrollo.
 
-**Versión Actual**: `1.3.1` *(Producción)* | **BD (`db_version`):** `1.3.0`
+**Versión Actual**: `1.3.2` *(Local / Listo para desplegar)* | **BD (`db_version`):** `1.3.0`
 
 ## 📅 Noviembre 2026
 
 ### 24/11/2026
+- **🔧 Limpieza de Botón Duplicado en Centro de Ayuda (Versión 1.3.2):**
+    - **Centro de Ayuda (`HelpPage.jsx`):** Se eliminó el botón redundante de descarga de manual en el encabezado, dejando un único botón destacado dentro del banner del Manual Oficial.
+    - **Release:** Registro `docs/release/v1.3.2.ods` (`db_version`: `1.3.0`).
+
 - **📚 Actualización Integral del Centro de Ayuda y Manual Oficial PDF (Versión 1.3.1):**
     - **Centro de Ayuda In-App (`HelpPage.jsx`):** Actualizado con roles y estados reales, explicación de campos nuevos (*Redes Sociales, 12 Temas, 8 Orígenes, regla DNI, Monto solicitado / Monto real*), Pool Territorial, Pool Multi-Resolutor, paso a paso por cada tipo de Resolutor y Google Calendar con invitados frecuentes.
     - **Manual Oficial (`docs/manualdeusuario.md` y `Manual_de_Usuario_SGP.pdf`):** Regenerado PDF descargable desde el sistema actualizado a `v1.3.0+`.
