@@ -1,6 +1,9 @@
+import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
+import SolicitudModal from './components/SolicitudModal';
+import api from './config/axios';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ProjectDetailsPage from './pages/ProjectDetailsPage';
@@ -39,6 +42,53 @@ function ProtectedRoute({ children, adminOnly = false }) {
   }
 
   return <ErrorBoundary>{children}</ErrorBoundary>;
+}
+
+/**
+ * Host global que permite abrir el modal de una solicitud directamente en Notas de Seguimiento
+ * al hacer clic en una notificación desde cualquier pantalla de la aplicación.
+ */
+function GlobalNotificationModalHost() {
+  const { isAuthenticated } = useAuth();
+  const [solicitud, setSolicitud] = useState(null);
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOpenFromNotification = async (event) => {
+      const solicitudId = event.detail?.solicitudId;
+      if (!solicitudId || !isAuthenticated) return;
+      try {
+        const res = await api.get(`/api/solicitudes/${solicitudId}`);
+        if (res.data) {
+          setSolicitud(res.data);
+          setIsOpen(true);
+        }
+      } catch (err) {
+        console.error('Error abriendo solicitud desde notificación', err);
+      }
+    };
+
+    window.addEventListener('sgp:open-solicitud-notificacion', handleOpenFromNotification);
+    return () => window.removeEventListener('sgp:open-solicitud-notificacion', handleOpenFromNotification);
+  }, [isAuthenticated]);
+
+  if (!isAuthenticated || !isOpen || !solicitud) return null;
+
+  return (
+    <SolicitudModal
+      isOpen={isOpen}
+      onClose={() => {
+        setIsOpen(false);
+        setSolicitud(null);
+      }}
+      onSuccess={() => {
+        window.dispatchEvent(new CustomEvent('sgp:solicitud-updated'));
+      }}
+      initialData={solicitud}
+      configId={solicitud.config?.id}
+      initialTab="comentarios"
+    />
+  );
 }
 
 function App() {
@@ -107,6 +157,7 @@ function App() {
               </ProtectedRoute>
             } />
           </Routes>
+          <GlobalNotificationModalHost />
         </Router>
 
 

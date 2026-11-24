@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Briefcase, Settings, HelpCircle, LogOut, Sun, Moon, Users } from 'lucide-react';
 import { APP_VERSION_LABEL } from '../config/version';
+import NotificationBell from './NotificationBell';
 
 export default function Navbar() {
     const { user, logout, allRoles } = useAuth();
@@ -44,6 +45,7 @@ export default function Navbar() {
                                 </span>
                             </div>
                         )}
+                        {user && <NotificationBell />}
                         <button
                             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                             className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"

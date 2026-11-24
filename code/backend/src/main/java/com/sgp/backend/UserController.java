@@ -37,6 +37,32 @@ public class UserController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
+    /**
+     * Lista usuarios activos con datos mínimos no sensibles para el autocompletado de menciones (@).
+     * Accesible para cualquier usuario autenticado.
+     */
+    @GetMapping("/mentionable")
+    public ResponseEntity<List<Map<String, Object>>> getMentionableUsers() {
+        List<Map<String, Object>> result = userRepository.findByActivoTrueOrderByFirstNameAscLastNameAsc()
+                .stream()
+                .map(u -> {
+                    String email = u.getEmail() != null ? u.getEmail() : "";
+                    int atIdx = email.indexOf('@');
+                    String handle = atIdx > 0 ? email.substring(0, atIdx) : email;
+                    Map<String, Object> dto = new java.util.HashMap<>();
+                    dto.put("id", u.getId());
+                    dto.put("email", email);
+                    dto.put("firstName", u.getFirstName());
+                    dto.put("lastName", u.getLastName());
+                    dto.put("fullName", u.getName().trim());
+                    dto.put("role", u.getRole());
+                    dto.put("handle", handle);
+                    return dto;
+                })
+                .toList();
+        return ResponseEntity.ok(result);
+    }
+
     @GetMapping
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<List<User>> getAllUsers() {
