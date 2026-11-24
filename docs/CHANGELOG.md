@@ -2,11 +2,130 @@
 
 > **Propósito**: Este archivo registra todos los cambios, mejoras y decisiones técnicas del proyecto SGP para facilitar la continuidad entre sesiones de desarrollo.
 
-**Versión Actual**: `1.1.1` (Ajustes y Segmentación en Formularios de Resolución de Subsidios)
+**Versión Actual**: `1.2.13` *(Producción)* | `1.3.0` *(En rama local `fix/v1.2.14-claridad-resoluciones`)* | **BD (`db_version`):** `1.3.0` *(Local)* / `1.2.9` *(Producción)*
+
+## 📅 Noviembre 2026
+
+### 20/11/2026
+- **⭐️ Pool Multi-Resolutor por Tipo, Guardado Automático al Aprobar y Observaciones Opcionales (Versión 1.3.0 — Local):**
+    - **Soporte Multi-Resolutor y Pool Compartido por Tipo:**
+        - Entidad `SolicitudResolutorAssignment.java`: columna `resolutor_id` ahora nullable (`docs/migrations/v1.3.0_pool_resolutores.sql`, `db_version = 1.3.0`).
+        - Al asignar un tipo de resolución en una solicitud, queda en el **pool compartido** visible para todos los resolutores que tengan habilitado ese tipo en `user_tipo_resolucion` (tanto en `SolicitudService.buildSpecification` como en métricas de `DashboardService`).
+        - Nuevo endpoint transaccional `POST /api/solicitudes/{id}/asignaciones/{assignmentId}/tomar` con control de concurrencia (`HTTP 409 Conflict` si otro resolutor ya la tomó) y registro en historial (`RESOLUCIÓN TOMADA`).
+        - Botones **`Tomar Resolución`** y badge **`Pool`** incorporados en `ProjectDetailsPage.jsx` y `SolicitudModal.jsx`. Al resolverse queda siempre persistido qué resolutor aprobó el caso.
+    - **Guardado Automático al Aprobar (`SolicitudModal.jsx`):**
+        - Al confirmar **Aprobar Resolución**, el sistema ejecuta previamente la misma función de guardado (`handleSubmit`) que el botón *Guardar Solicitud* para evitar pérdida de cambios editados antes de aprobar.
+        - Se ajustó la validación para que un Resolutor valide únicamente sus propias asignaciones y no quede bloqueado por campos de otra área en modo solo lectura.
+    - **Observaciones Opcionales al Aprobar:**
+        - Se eliminó la obligatoriedad del campo `Observaciones` en frontend y backend (`Mis Observaciones (Opcional)`).
+    - **Subsidios en Especie — `Monto solicitado` y `Monto real`:**
+        - Se reemplazó el campo `Monto` por **`Monto solicitado`** y **`Monto real`** exclusivamente en *Subsidio en Especie* (`DataInitializer.java`, `SolicitudModal.jsx` y `docs/migrations/v1.3.0_pool_resolutores.sql`), con retrocompatibilidad para registros históricos.
+        - Se habilitó que un Operador pueda ingresar a una solicitud ya **Resuelta (`completadas`)**, completar el **`Monto real`** y guardar preservando intacto el estado `completadas` y actualizando el monto efectivo (`solicitud.amount`).
+    - **Testing E2E y Release:** Suite Playwright `code/frontend/tests/test_v1_3_0_pool_resolutores_y_aprobacion.spec.js` (2/2 PASSED) + regresión `test_v1_2_14_resoluciones_multiples.spec.js` y archivo `docs/release/v1.3.0.ods`.
+
+### 19/11/2026
+- **⭐️ Claridad en Resoluciones Múltiples, Filtro de Resolutor y Apertura Modal Agenda (Versión 1.2.14 — Rama `fix/v1.2.14-claridad-resoluciones`):**
+    - **Badges individuales por resolución (`ProjectDetailsPage.jsx`):** Incorporación de etiquetas visibles **`✓ APROBADA`** (verde) y **`PENDIENTE`** (ámbar) en el encabezado de cada asignación de resolución dentro de la tabla.
+    - **Progreso en solicitudes con múltiples resoluciones:** Subtítulo dinámico debajo del badge `En Resolución` indicando el avance exacto (ej: `1/2 aprobadas · Falta: AGENDA`).
+    - **Toasts precisos al aprobar (`ProjectDetailsPage.jsx` y `SolicitudModal.jsx`):** Diferenciación clara entre aprobación parcial (indicando qué áreas restan aprobar) y aprobación final (indicando que el pedido pasó a `Resueltas`).
+    - **Fix en botón rápido para `AGENDA`:** Si la asignación pendiente del resolutor es de tipo `AGENDA`, el botón verde de la grilla abre automáticamente el sub-modal de aprobación con selección obligatoria de asistencia y opción de Google Calendar.
+    - **Filtro rápido `"Solo mis pendientes"`:** Toggle en la barra superior del rol `RESOLUTOR` para ocultar solicitudes donde su resolución ya fue aprobada.
+    - **Testing E2E:** Nueva suite Playwright `code/frontend/tests/test_v1_2_14_resoluciones_multiples.spec.js` (1/1 PASSED) y registro `docs/release/v1.2.14.ods`.
+
+### 18/11/2026
+- **🛡️ Mitigación de Seguridad CVE-2026-114938 / "Java4Shell" (Versión 1.2.13):**
+    - **Backend / Docker (`code/backend/Dockerfile`):** Incorporación del flag `-XX:UseAVX=2` en el `ENTRYPOINT` de la JVM para desactivar la ruta AVX-512 VBMI del decodificador Base64.
+    - **Imagen base actualizada:** Reconstrucción en producción con `--pull` actualizando a `OpenJDK 17.0.21+9` (`Temurin-17.0.21+9`).
+    - **Release:** Registro `docs/release/v1.2.13.ods` (`db_version`: `1.2.9`).
+
+### 17/11/2026
+- **⭐️ Limpieza de Tipos de Subsidio y Actualización Dinámica de Formulario (Versión 1.2.12):**
+    - **Subsidios (`SolicitudModal.jsx`):** Limpieza de tipos duplicados, separación de descripción y monto en especie, y actualización automática de `Tipo de pedido` y campos al cambiar entre *Subsidio en Especie* y *Subsidio en Dinero*.
+    - **Usuarios y Skills:** Protección de Paco Garibaldi en `keepEmails` de `DataInitializer.java` y creación del skill `/newusersgp` para alta estandarizada de usuarios.
+    - **Release:** Registro `docs/release/v1.2.12.ods`.
+
+- **⭐️ Mejoras en Tabla Resolutor Subsidios, Multizona y Alta Auditor/Barrios (Versión 1.2.11):**
+    - **Modal Solicitudes:** Ampliación auto-ajustable del campo Descripción/Pedido y selección de zona para responsables con múltiples zonas.
+    - **Resolutor Subsidios:** Visualización correcta de `Tipo Pedido` y datos de subsidio en la grilla, con filtro por `Tipo de Pedido` y ordenamiento de columnas.
+    - **Estados:** Recálculo automático a `en resolucion` al asignar responsable y resolutor en un mismo guardado de edición.
+    - **Datos:** Alta del usuario Auditor Paco Garibaldi e incorporación de los barrios *Villa Hipódromo* y *Nueva Esperanza* en Santa Fe.
+    - **Release:** Registro `docs/release/v1.2.11.ods`.
+
+### 16/11/2026
+- **⭐️ Resolución de Subsidios para Responsables Asignados y Exención de DNI en Especie/Institucional (Versión 1.2.10):**
+    - **Permisos:** Habilitación al responsable asignado (`isAssignedResponsable`) para cargar, editar y eliminar resoluciones de tipo Subsidio en solicitudes derivadas.
+    - **Validación DNI:** Exención de la obligatoriedad de DNI del solicitante cuando el tipo es *Institucional* o la asignación es exclusivamente *Subsidio en Especie*.
+    - **Release:** Registro `docs/release/v1.2.10.ods`.
+
+- **⭐️ Versionado Formal de Base de Datos (`config.db_version`) y Regla de Releases `.ods` (Versión 1.2.9):**
+    - **Backend / BD:** Creación de entidad `Config.java` (tabla `config` con `db_version`, `descripcion`, `updated_at`), `ConfigRepository.java`, endpoint `GET /api/system-config/db-version` y migración `docs/migrations/v1.2.9_config_db_version.sql`.
+    - **Documentación y Reglas:** Creación de la carpeta `docs/release/` con registros `.ods` por cada versión liberada y actualización de `.agents/rules/versionado.md`.
+
+### 05/11/2026
+- **⭐️ Resolución Caso 37, Zona Múltiple y Nuevos Responsables (Versión 1.2.8):**
+    - **Solicitudes y Usuarios:** Resolución del caso #37, soporte de zona múltiple en responsables y centrado del modal de gestión de usuarios.
+    - **Nómina:** Alta de los responsables Carlos Egestti, Martín Ledesma y Bianca Scalenghe (Zona Noreste).
+    - **Release:** Registro `docs/release/v1.2.8.ods`.
 
 ## 📅 Octubre 2026
 
+### 29/10/2026
+- **🔒 Restricción de Cambio de Estado Manual para Rol Responsable (Versión 1.2.7):**
+    - **Control de Acceso:** Restricción del cambio manual de estado para el rol `RESPONSABLE` tanto en frontend como en backend.
+    - **Release:** Registro `docs/release/v1.2.7.ods`.
+
+### 28/10/2026
+- **🔧 Fix de Persistencia de Ubicación en Edición para Distribuidores (Versión 1.2.6):**
+    - **Frontend:** Corrección de persistencia y resolución de localidad/barrio al editar solicitudes con rol `DISTRIBUIDOR`.
+    - **Release:** Registro `docs/release/v1.2.6.ods`.
+
+### 26/10/2026
+- **🔧 Fix de Import Faltante en Modal de Solicitudes (Versión 1.2.5):**
+    - **Frontend:** Corrección del import faltante del icono `Lock` en `SolicitudModal.jsx`.
+    - **Release:** Registro `docs/release/v1.2.5.ods`.
+
+- **🔧 Corrección de Adjuntos para Rol Operador (Versión 1.2.4):**
+    - **Adjuntos:** Corrección de visualización y gestión de documentos adjuntos para el rol `OPERADOR`.
+    - **Release:** Registro `docs/release/v1.2.4.ods`.
+
+### 25/10/2026
+- **🛡️ Blindaje Integral de Seguridad Crítica (Versión 1.2.3):**
+    - **Seguridad / Backend:** Aislamiento de `test-helper`, configuración de `JWT_SECRET` dinámico y cierre de vulnerabilidades críticas.
+    - **Release:** Registro `docs/release/v1.2.3.ods`.
+
+### 24/10/2026
+- **🛡️ Anonimización de Pantalla de Login (Versión 1.2.2):**
+    - **Autenticación:** Mitigación de fuga de información en mensajes de error y pantalla de acceso.
+    - **Release:** Registro `docs/release/v1.2.2.ods`.
+
+### 23/10/2026
+- **🔧 Sanitización de Login y CCO en Envío de Credenciales (Versión 1.2.1):**
+    - **Autenticación:** Eliminación automática de espacios en blanco al iniciar sesión.
+    - **Correos:** Habilitación de copia oculta (CCO) en el envío de credenciales.
+    - **Release:** Registro `docs/release/v1.2.1.ods`.
+
+### 22/10/2026
+- **⭐️ Evolución Funcional Integral — Etapas 1 y 2 (Versión 1.2.0):**
+    - **Carga de Nuevas Solicitudes (Etapa 1):**
+        - DNI removido de la cabecera del solicitante (exigido solo al proponer subsidio).
+        - Tipo de Solicitante simplificado a `Institucional` y `Personal` con subtipos obligatorios.
+        - Incorporación de 12 Temas normalizados (`tema`), campo de Redes Sociales (`social_media`) y 8 Orígenes oficiales.
+        - Eliminación del check de primer contacto en creación y detalle.
+        - Limpieza de nombres nominales en selectores de resolutores e incorporación de la modalidad `Subsidio en Especie`.
+    - **Seguridad, Permisos y Automatización (Etapa 2):**
+        - Bloqueo de carga inicial para usuarios no creadores (solo Operador/Admin o Responsable creador).
+        - Protección del subsidio propuesto en modo solo lectura para terceros.
+        - Estados automáticos al cargar por Responsable: `Asignadas` (sin resolución) o `En Resolución` (con resolución).
+    - **Base de Datos y QA:** Migración `docs/migrations/v1.2.0_tema_redes_resoluciones.sql`, versionado de BD a `sgp_prod_v1_2` (congelando `sgp_prod_v1_1`) y certificación E2E Playwright 15/15 PASSED.
+    - **Release:** Registro `docs/release/v1.2.0.ods`.
+
 ### 20/10/2026
+- **🔧 Saneamiento UTF-8, Acentos y Validación DNI en Subsidios (Versión 1.1.2):**
+    - **Compatibilidad UTF-8:** Soporte homogéneo entre Linux, Windows, MySQL 8, backend y frontend.
+    - **Subsidios y Usuarios:** Validación obligatoria de DNI en subsidios, edición opcional de fecha de entrega y migración `docs/migrations/v1.1.2_fix_user_accents.sql`.
+    - **Reglas:** Formalización inicial de `.agents/rules/versionado.md`.
+    - **Release:** Registro `docs/release/v1.1.2.ods`.
+
 - **⭐️ Ajustes y Segmentación Condicional en Tipos de Resolución de Subsidios (Versión 1.1.1):**
     - **Tipo Personal:**
         - Precarga automática de los datos del Solicitante (`Nombre y apellido`, `DNI` y `Teléfono`) al seleccionar `Personal` en el formulario de resolución de subsidios.
