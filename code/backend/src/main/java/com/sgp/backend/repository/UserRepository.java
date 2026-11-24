@@ -12,4 +12,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     java.util.List<User> findByRole(String role);
     java.util.List<User> findByRoleIn(java.util.List<String> roles);
     java.util.List<User> findByRoleInAndActivoTrue(java.util.List<String> roles);
+    // Lista usuarios activos ordenados alfabéticamente para autocompletado de menciones
+    java.util.List<User> findByActivoTrueOrderByFirstNameAscLastNameAsc();
 }

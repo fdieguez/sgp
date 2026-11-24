@@ -48,7 +48,7 @@ const DEFAULT_CITIES = [
     { id: 16, name: "Otra", type: "CITY" }
 ];
 
-export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData, configId, cachedLocations = [], openApproveOnMount = false }) {
+export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData, configId, cachedLocations = [], openApproveOnMount = false, initialTab = 'detalles' }) {
     const { user } = useAuth();
     const isResponsable = user?.role === 'RESPONSABLE' || user?.role === 'RESOLUTOR';
     const userZones = (user?.responsable?.zone || user?.zone || '')
@@ -176,7 +176,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     };
 
     // Pestañas y estados adicionales
-    const [activeTab, setActiveTab] = useState('detalles');
+    const [activeTab, setActiveTab] = useState(initialTab || 'detalles');
     const [historial, setHistorial] = useState([]);
     const [adjuntos, setAdjuntos] = useState([]);
     const [isDragging, setIsDragging] = useState(false);
@@ -642,6 +642,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     setSelectedPersonStats(null);
                 }
                 setDniCollision(null);
+                setActiveTab(initialTab || 'detalles');
             } else {
                 setSelectedPersonStats(null);
                 setDniCollision(null);
@@ -721,7 +722,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             setSaveProgress('');
             setAdjuntos([]);
         }
-    }, [isOpen, initialData?.id, fetchResponsables, fetchLocations, fetchTiposResolucion, isResponsable, user?.responsable?.id, user?.responsable?.zone, user?.id, user?.zone]);
+    }, [isOpen, initialData?.id, initialTab, fetchResponsables, fetchLocations, fetchTiposResolucion, isResponsable, user?.responsable?.id, user?.responsable?.zone, user?.id, user?.zone]);
 
     // Computar listas dinámicas con resiliencia ante demoras de red
     const sourceLocations = locations.length > 0 ? locations : (cachedLocations.length > 0 ? cachedLocations : DEFAULT_CITIES);
