@@ -15,6 +15,7 @@ import com.sgp.backend.entity.SolicitudResolutorAssignment;
 import com.sgp.backend.repository.SolicitudResolutorAssignmentRepository;
 import com.sgp.backend.dto.ResolutorAssignmentDTO;
 import com.sgp.backend.dto.SolicitudUpdateDTO;
+import com.sgp.backend.security.SecurityUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -424,8 +425,9 @@ public class SolicitudService {
             currentUser = userRepository.findByEmail(auth.getName()).orElse(null);
             if (currentUser != null) {
                 solicitud.setCreatedBy(currentUser);
-                // Punto 9: Si el creador es Responsable y no se especificó otro responsable, auto-asignarlo
-                if (currentUser.getRole() != null && currentUser.getRole().equalsIgnoreCase("RESPONSABLE")) {
+                String activeRole = SecurityUtils.getActiveRole(currentUser);
+                // Punto 9: Si el creador actúa como Responsable y no se especificó otro responsable, auto-asignarlo
+                if (activeRole != null && activeRole.equalsIgnoreCase("RESPONSABLE")) {
                     if (solicitud.getResponsable() == null) {
                         solicitud.setResponsable(currentUser);
                     }
@@ -442,10 +444,11 @@ public class SolicitudService {
 
         // Procesar asignaciones si están presentes
         boolean isCreator = true;
-        boolean isOperadorOrAdmin = currentUser != null && currentUser.getRole() != null &&
-                (currentUser.getRole().equalsIgnoreCase("OPERADOR") ||
-                 currentUser.getRole().equalsIgnoreCase("ADMINISTRADOR") ||
-                 currentUser.getRole().equalsIgnoreCase("ADMIN"));
+        String activeRoleCreator = SecurityUtils.getActiveRole(currentUser);
+        boolean isOperadorOrAdmin = activeRoleCreator != null &&
+                (activeRoleCreator.equalsIgnoreCase("OPERADOR") ||
+                 activeRoleCreator.equalsIgnoreCase("ADMINISTRADOR") ||
+                 activeRoleCreator.equalsIgnoreCase("ADMIN"));
         processAssignments(saved, solicitud.getAssignments(), currentUser, isCreator, false, isOperadorOrAdmin);
 
         // Actualizar estado automático según reglas de negocio (Punto 9)
@@ -479,10 +482,11 @@ public class SolicitudService {
             currentUser = userRepository.findByEmail(auth.getName()).orElse(null);
         }
 
-        boolean isOperadorOrAdmin = currentUser != null && currentUser.getRole() != null &&
-                (currentUser.getRole().equalsIgnoreCase("OPERADOR") ||
-                 currentUser.getRole().equalsIgnoreCase("ADMINISTRADOR") ||
-                 currentUser.getRole().equalsIgnoreCase("ADMIN"));
+        String activeRoleUpdater = SecurityUtils.getActiveRole(currentUser);
+        boolean isOperadorOrAdmin = activeRoleUpdater != null &&
+                (activeRoleUpdater.equalsIgnoreCase("OPERADOR") ||
+                 activeRoleUpdater.equalsIgnoreCase("ADMINISTRADOR") ||
+                 activeRoleUpdater.equalsIgnoreCase("ADMIN"));
 
         boolean isCreator = currentUser != null && existing.getCreatedBy() != null &&
                 existing.getCreatedBy().getId().equals(currentUser.getId());

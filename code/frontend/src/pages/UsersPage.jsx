@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 export default function UsersPage({ isEmbedded = false }) {
+    const MAX_ROLES_PER_USER = 4;
     const { user: currentUser } = useAuth();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -24,13 +25,16 @@ export default function UsersPage({ isEmbedded = false }) {
     const [userFormData, setUserFormData] = useState({ 
         email: '', password: '', role: 'OPERADOR', 
         firstName: '', lastName: '', phone: '', zone: '', dni: '',
-        tipoResolucionIds: []
+        tipoResolucionIds: [],
+        sendWelcomeEmail: false
     });
     const [resolutionTypes, setResolutionTypes] = useState([]);
+    const [availableZones, setAvailableZones] = useState([]);
 
     useEffect(() => {
         fetchAll();
         fetchResolutionTypes();
+        fetchAvailableZones();
     }, []);
 
     const fetchResolutionTypes = async () => {
@@ -39,6 +43,17 @@ export default function UsersPage({ isEmbedded = false }) {
             setResolutionTypes(res.data);
         } catch (err) {
             console.error('Error fetching resolution types', err);
+        }
+    };
+
+    const fetchAvailableZones = async () => {
+        try {
+            const res = await api.get('/api/users/zones');
+            if (Array.isArray(res.data)) {
+                setAvailableZones(res.data);
+            }
+        } catch (err) {
+            console.error('Error cargando zonas territoriales', err);
         }
     };
 
@@ -81,7 +96,7 @@ export default function UsersPage({ isEmbedded = false }) {
                 await api.post('/api/users', payload);
             }
             setShowUserModal(false);
-            setUserFormData({ email: '', password: '', role: 'OPERADOR', firstName: '', lastName: '', phone: '', zone: '', dni: '', tipoResolucionIds: [] });
+            setUserFormData({ email: '', password: '', role: 'OPERADOR', firstName: '', lastName: '', phone: '', zone: '', dni: '', tipoResolucionIds: [], sendWelcomeEmail: false });
             setEditingUser(null);
             fetchAll();
         } catch (err) {
@@ -115,7 +130,8 @@ export default function UsersPage({ isEmbedded = false }) {
             phone: user.phone || '',
             zone: user.zone || '',
             dni: user.dni || '',
-            tipoResolucionIds: user.tiposResolucion ? user.tiposResolucion.map(t => t.id) : []
+            tipoResolucionIds: user.tiposResolucion ? user.tiposResolucion.map(t => t.id) : [],
+            sendWelcomeEmail: false
         });
         setShowUserModal(true);
     };
@@ -142,7 +158,7 @@ export default function UsersPage({ isEmbedded = false }) {
                         <button
                             onClick={() => {
                                 setEditingUser(null);
-                                setUserFormData({ email: '', password: '', role: 'OPERADOR', firstName: '', lastName: '', phone: '', zone: '', dni: '', tipoResolucionIds: [] });
+                                setUserFormData({ email: '', password: '', role: 'OPERADOR', firstName: '', lastName: '', phone: '', zone: '', dni: '', tipoResolucionIds: [], sendWelcomeEmail: false });
                                 setShowUserModal(true);
                             }}
                             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg flex items-center gap-2 transition-colors shadow-lg active:scale-95"
@@ -283,8 +299,8 @@ export default function UsersPage({ isEmbedded = false }) {
                                                         const checked = e.target.checked;
                                                         let newRoles = [...currentRoles];
                                                         if (checked) {
-                                                            if (newRoles.length >= 2) {
-                                                                alert('Solo se pueden seleccionar hasta 2 roles como máximo.');
+                                                            if (newRoles.length >= MAX_ROLES_PER_USER) {
+                                                                alert(`Solo se pueden seleccionar hasta ${MAX_ROLES_PER_USER} roles como máximo.`);
                                                                 return;
                                                             }
                                                             if (!newRoles.includes(r.val)) {
@@ -315,12 +331,50 @@ export default function UsersPage({ isEmbedded = false }) {
                                 </div>
                             </div>
 
-                            {(userFormData.role && userFormData.role.split(',').map(x => x.trim()).includes('RESPONSABLE')) && (
-                                <div className="animate-in fade-in slide-in-from-top-2">
-                                    <label className="block text-xs font-bold text-emerald-500 uppercase mb-1">Zona Territorial</label>
-                                    <input type="text" placeholder="Ej: Norte, Sur..." required value={userFormData.zone} onChange={(e) => setUserFormData({ ...userFormData, zone: e.target.value })} className="w-full px-4 py-2 bg-gray-900 border border-emerald-600/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-                                </div>
-                            )}
+                            {(userFormData.role && userFormData.role.split(',').map(x => x.trim()).includes('RESPONSABLE')) && (() => {
+                                const selectedZones = userFormData.zone
+                                    ? userFormData.zone.split(',').map(z => z.trim().toUpperCase()).filter(Boolean)
+                                    : [];
+                                const allZoneOptions = Array.from(new Set([...availableZones, ...selectedZones])).sort();
+                                return (
+                                    <div className="animate-in fade-in slide-in-from-top-2 space-y-2">
+                                        <label className="block text-xs font-bold text-emerald-400 uppercase mb-1">
+                                            Zonas Territoriales Asignadas ({selectedZones.length})
+                                        </label>
+                                        <div
+                                            data-testid="zones-checkbox-grid"
+                                            className="grid grid-cols-2 gap-2 bg-gray-900 p-3 rounded-xl border border-emerald-600/40 max-h-44 overflow-y-auto"
+                                        >
+                                            {allZoneOptions.map(zoneName => {
+                                                const isChecked = selectedZones.includes(zoneName);
+                                                return (
+                                                    <label key={zoneName} className="flex items-center gap-2 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            data-testid={`zone-checkbox-${zoneName}`}
+                                                            checked={isChecked}
+                                                            onChange={(e) => {
+                                                                const checked = e.target.checked;
+                                                                let nextZones = [...selectedZones];
+                                                                if (checked) {
+                                                                    if (!nextZones.includes(zoneName)) {
+                                                                        nextZones.push(zoneName);
+                                                                    }
+                                                                } else {
+                                                                    nextZones = nextZones.filter(z => z !== zoneName);
+                                                                }
+                                                                setUserFormData({ ...userFormData, zone: nextZones.join(', ') });
+                                                            }}
+                                                            className="rounded border-gray-600 text-emerald-600 focus:ring-emerald-500 bg-gray-800"
+                                                        />
+                                                        <span className="text-sm text-gray-300">{zoneName}</span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             {(userFormData.role && userFormData.role.split(',').map(x => x.trim()).includes('RESOLUTOR')) && (
                                 <div className="animate-in fade-in slide-in-from-top-2 space-y-2">
@@ -355,6 +409,23 @@ export default function UsersPage({ isEmbedded = false }) {
                                             <span className="text-xs text-gray-500 col-span-2 italic">No hay tipos de resolución activos</span>
                                         )}
                                     </div>
+                                </div>
+                            )}
+
+                            {!editingUser && (
+                                <div className="bg-gray-900/80 border border-indigo-500/30 rounded-xl p-3">
+                                    <label className="flex items-center gap-2.5 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            data-testid="send-welcome-email-checkbox"
+                                            checked={Boolean(userFormData.sendWelcomeEmail)}
+                                            onChange={(e) => setUserFormData({ ...userFormData, sendWelcomeEmail: e.target.checked })}
+                                            className="rounded border-gray-600 text-indigo-600 focus:ring-indigo-500 bg-gray-800"
+                                        />
+                                        <span className="text-sm text-gray-200 font-medium">
+                                            Enviar correo con credenciales de acceso al usuario
+                                        </span>
+                                    </label>
                                 </div>
                             )}
 
