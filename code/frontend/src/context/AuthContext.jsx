@@ -13,6 +13,7 @@ export const AuthProvider = ({ children }) => {
     });
 
     const [activeRole, setActiveRole] = useState(localStorage.getItem('activeRole'));
+    const [activeTipoResolucion, setActiveTipoResolucion] = useState(localStorage.getItem('activeTipoResolucion'));
 
     useEffect(() => {
         if (token) {
@@ -30,12 +31,27 @@ export const AuthProvider = ({ children }) => {
         }
     }, [user]);
 
-    const selectRole = (role) => {
+    const selectTipoResolucion = (tipo) => {
+        setActiveTipoResolucion(tipo);
+        if (tipo) {
+            localStorage.setItem('activeTipoResolucion', tipo);
+        } else {
+            localStorage.removeItem('activeTipoResolucion');
+        }
+    };
+
+    const selectRole = (role, tipoResolucion = null) => {
         setActiveRole(role);
         if (role) {
             localStorage.setItem('activeRole', role);
         } else {
             localStorage.removeItem('activeRole');
+        }
+
+        if (role && role.toUpperCase() === 'RESOLUTOR') {
+            selectTipoResolucion(tipoResolucion || null);
+        } else {
+            selectTipoResolucion(null);
         }
     };
 
@@ -63,9 +79,12 @@ export const AuthProvider = ({ children }) => {
                 // Si el usuario tiene un solo rol, lo seleccionamos por defecto
                 const roles = finalUser.role ? finalUser.role.split(',') : [];
                 if (roles.length === 1) {
-                    selectRole(roles[0].trim());
+                    const onlyRole = roles[0].trim();
+                    const tipos = finalUser.tiposResolucion || [];
+                    const defaultTipo = onlyRole.toUpperCase() === 'RESOLUTOR' && tipos.length === 1 ? tipos[0].tipo : null;
+                    selectRole(onlyRole, defaultTipo);
                 } else {
-                    selectRole(null); // Obliga a elegir
+                    selectRole(null, null); // Obliga a elegir
                 }
                 
                 setUser(finalUser);
@@ -98,9 +117,11 @@ export const AuthProvider = ({ children }) => {
         setToken(null);
         setUser(null);
         setActiveRole(null);
+        setActiveTipoResolucion(null);
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         localStorage.removeItem('activeRole');
+        localStorage.removeItem('activeTipoResolucion');
     };
 
     const [loading, setLoading] = useState(false);
@@ -160,8 +181,10 @@ export const AuthProvider = ({ children }) => {
         allRoles,
         selectRole,
         activeRole,
+        activeTipoResolucion,
+        selectTipoResolucion,
         loading
-    }), [token, virtualUser, allRoles, activeRole, loading]);
+    }), [token, virtualUser, allRoles, activeRole, activeTipoResolucion, loading]);
 
     return (
         <AuthContext.Provider value={contextValue}>

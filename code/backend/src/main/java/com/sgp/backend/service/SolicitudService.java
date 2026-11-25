@@ -229,11 +229,14 @@ public class SolicitudService {
                             }
                         }
                         if (userRole.contains("RESOLUTOR")) {
-                            List<String> tiposAsignados = user.getTiposResolucion().stream()
-                                    .map(com.sgp.backend.entity.TipoResolucion::getTipo)
-                                    .filter(t -> t != null && !t.trim().isEmpty())
-                                    .map(t -> t.trim().toUpperCase())
-                                    .collect(java.util.stream.Collectors.toList());
+                            String activeTipoResolucion = SecurityUtils.getActiveTipoResolucion(user);
+                            List<String> tiposAsignados = activeTipoResolucion != null
+                                    ? java.util.List.of(activeTipoResolucion)
+                                    : user.getTiposResolucion().stream()
+                                            .map(com.sgp.backend.entity.TipoResolucion::getTipo)
+                                            .filter(t -> t != null && !t.trim().isEmpty())
+                                            .map(t -> t.trim().toUpperCase())
+                                            .collect(java.util.stream.Collectors.toList());
                             
                             if (tiposAsignados.isEmpty()) {
                                 orPredicates.add(cb.disjunction());

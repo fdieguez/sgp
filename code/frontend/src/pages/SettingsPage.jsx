@@ -3,7 +3,8 @@ import Navbar from '../components/Navbar';
 import UsersPage from './UsersPage';
 import TiposResolucionABM from '../components/TiposResolucionABM';
 import AtributosABM from '../components/AtributosABM';
-import { Users, FileText, Settings, Key, ShieldAlert } from 'lucide-react';
+import AparienciaPanel from '../components/AparienciaPanel';
+import { Users, FileText, Settings, Key, ShieldAlert, Sun } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -47,6 +48,13 @@ export default function SettingsPage() {
                         <Settings className="h-4 w-4" />
                         Catálogo de Atributos
                     </button>
+                    <button
+                        onClick={() => setActiveTab('APARIENCIA')}
+                        className={`pb-4 flex items-center gap-2 font-bold uppercase text-xs tracking-widest transition-all ${activeTab === 'APARIENCIA' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'}`}
+                    >
+                        <Sun className="h-4 w-4" />
+                        Apariencia
+                    </button>
                     {isAdmin && (
                         <button
                             onClick={() => setActiveTab('MAINTENANCE')}
@@ -66,6 +74,7 @@ export default function SettingsPage() {
                     )}
                     {activeTab === 'TIPOS' && <TiposResolucionABM />}
                     {activeTab === 'ATRIBUTOS' && <AtributosABM />}
+                    {activeTab === 'APARIENCIA' && <AparienciaPanel />}
                     {activeTab === 'MAINTENANCE' && isAdmin && <MaintenancePanel />}
                 </div>
             </div>
