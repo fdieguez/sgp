@@ -1,6 +1,6 @@
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Shield, ClipboardList, Briefcase, FileCheck, LogOut, BarChart } from 'lucide-react';
+import { Shield, ClipboardList, Briefcase, FileCheck, LogOut, BarChart, Share2 } from 'lucide-react';
 import { APP_VERSION_LABEL } from '../config/version';
 
 export default function SelectRolPage() {
@@ -28,6 +28,13 @@ export default function SelectRolPage() {
             icon: ClipboardList,
             color: 'from-blue-500 to-indigo-600',
             glow: 'shadow-indigo-500/20'
+        },
+        'DISTRIBUIDOR': {
+            title: 'Distribuidor',
+            description: 'Derivación y asignación territorial de solicitudes entrantes a responsables.',
+            icon: Share2,
+            color: 'from-cyan-500 to-sky-600',
+            glow: 'shadow-cyan-500/20'
         },
         'RESPONSABLE': {
             title: 'Responsable',
@@ -92,7 +99,11 @@ export default function SelectRolPage() {
                 </div>
 
                 {/* Grilla de Roles */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-3xl pt-4">
+                <div className={`grid gap-6 w-full pt-4 ${
+                    allRoles.length === 3
+                        ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 max-w-5xl'
+                        : 'grid-cols-1 sm:grid-cols-2 max-w-3xl'
+                }`}>
                     {allRoles.map((role) => {
                         const details = roleDetails[role.toUpperCase()] || {
                             title: role,

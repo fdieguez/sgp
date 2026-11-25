@@ -18,7 +18,7 @@ public class UserService {
     private final com.sgp.backend.repository.TipoResolucionRepository tipoResolucionRepository;
     private final jakarta.persistence.EntityManager entityManager;
 
-    @org.springframework.beans.factory.annotation.Value("${sgp.max.roles.per.user:2}")
+    @org.springframework.beans.factory.annotation.Value("${sgp.max.roles.per.user:4}")
     private int maxRolesPerUser;
 
     public List<User> getAllUsers() {

@@ -1,6 +1,7 @@
 package com.sgp.backend;
 
 import com.sgp.backend.entity.User;
+import com.sgp.backend.service.EmailService;
 import com.sgp.backend.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,15 @@ import java.util.Map;
 public class UserController {
     private final UserService userService;
     private final UserRepository userRepository;
+    private final EmailService emailService;
+
+    // Catálogo base oficial de zonas territoriales/ejes para el ABM de usuarios
+    private static final List<String> DEFAULT_ZONES = List.of(
+            "ARROYO LEYES", "CENTRO", "COSTA", "CULTURA", "DEPORTIVO", "EDUCACION",
+            "ESTE", "GENERAL", "JUVENTUDES", "MONTE VERA", "NORESTE", "NOROESTE",
+            "NORTE", "OESTE", "PRIMER CORDON", "RECREO", "RESTO DEPTO", "RINCON",
+            "SANTO TOME", "SAUCE VIEJO", "SUR", "SUROESTE"
+    );
 
     @GetMapping("/me")
     public ResponseEntity<?> getCurrentUser() {
@@ -63,6 +73,26 @@ public class UserController {
         return ResponseEntity.ok(result);
     }
 
+    /**
+     * Devuelve el catálogo ordenado y sin duplicados de zonas territoriales disponibles
+     * combinando el catálogo oficial base con las zonas asignadas actualmente a usuarios.
+     */
+    @GetMapping("/zones")
+    public ResponseEntity<List<String>> getAvailableZones() {
+        java.util.Set<String> zones = new java.util.TreeSet<>(DEFAULT_ZONES);
+        for (User u : userRepository.findAll()) {
+            if (u.getZone() != null && !u.getZone().isBlank()) {
+                for (String z : u.getZone().split(",")) {
+                    String clean = z.trim().toUpperCase();
+                    if (!clean.isEmpty()) {
+                        zones.add(clean);
+                    }
+                }
+            }
+        }
+        return ResponseEntity.ok(new java.util.ArrayList<>(zones));
+    }
+
     @GetMapping
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<List<User>> getAllUsers() {
@@ -96,12 +126,22 @@ public class UserController {
             String zone = (String) request.get("zone");
             String dni = (String) request.get("dni");
             List<Number> tipoResolucionIds = (List<Number>) request.get("tipoResolucionIds");
+            boolean sendWelcomeEmail = Boolean.TRUE.equals(request.get("sendWelcomeEmail"));
 
             if (email == null || password == null) {
                 return ResponseEntity.badRequest().body("Email and password are required");
             }
 
             User user = userService.createUser(email, password, role, firstName, lastName, phone, zone, dni, tipoResolucionIds);
+            if (sendWelcomeEmail) {
+                emailService.sendUserCredentialsEmail(
+                        user.getName(),
+                        user.getEmail(),
+                        password,
+                        user.getRole(),
+                        user.getZone()
+                );
+            }
             user.setPassword(null); // Don't return password
             return ResponseEntity.ok(user);
         } catch (IllegalArgumentException e) {

@@ -124,6 +124,7 @@ export default function ProjectDetailsPage() {
     const [isAsociarModalOpen, setIsAsociarModalOpen] = useState(false);
     const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
     const [soloMisPendientes, setSoloMisPendientes] = useState(false);
+    const [importPreviewModal, setImportPreviewModal] = useState({ open: false, items: [], ids: null, warning: null });
 
     // Apertura automática de solicitud si viene referenciada por URL (?id=...)
     useEffect(() => {
@@ -165,7 +166,8 @@ export default function ProjectDetailsPage() {
     });
 
     const SPREADSHEET_ID = config?.spreadsheetId || "1jPw9ni4BW_bRfw_M9ajA7jO5RGX5IFq8w43T3WOXz6g";
-    const isResolutorSubsidio = user?.role === 'RESOLUTOR' && user?.tiposResolucion?.some(t => t.tipo.toUpperCase().includes('SUBSIDIO'));
+    const isResolutorSubsidio = user?.role === 'RESOLUTOR' && user?.tiposResolucion?.some(t => t.tipo?.toUpperCase().includes('SUBSIDIO'));
+    const isResolutorSubsidioDinero = user?.role === 'RESOLUTOR' && user?.tiposResolucion?.some(t => t.tipo?.toUpperCase().includes('SUBSIDIO') && t.tipo?.toUpperCase().includes('DINERO'));
 
     // Extrae el detalle JSON de la asignación de subsidio y resuelve el Tipo de Pedido con fallback
     const extractSubsidioData = (s) => {
@@ -189,6 +191,94 @@ export default function ProjectDetailsPage() {
         return { assignmentSubsidio, subsidioMap, tipoPedido: tipoPedido || '-' };
     };
 
+    // Previsualiza las solicitudes a importar desde la planilla externa antes de confirmar
+    const handleRequestImportPreview = async (ids = null) => {
+        setLoading(true);
+        try {
+            const payload = ids && ids.length > 0
+                ? { spreadsheetId: SPREADSHEET_ID, ids }
+                : { spreadsheetId: SPREADSHEET_ID };
+            const res = await api.post('/api/planilla-salida/import/preview', payload);
+            setImportPreviewModal({
+                open: true,
+                items: res.data?.items || [],
+                ids: ids && ids.length > 0 ? ids : null,
+                warning: res.data?.warning || null
+            });
+        } catch (err) {
+            console.error("Error al previsualizar importación desde planilla:", err);
+            toast.error(err.response?.data?.error || "Error al leer la planilla externa para previsualizar.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleConfirmImport = async () => {
+        const idsToImport = importPreviewModal.ids;
+        setImportPreviewModal({ open: false, items: [], ids: null, warning: null });
+        setLoading(true);
+        try {
+            const payload = idsToImport && idsToImport.length > 0
+                ? { spreadsheetId: SPREADSHEET_ID, ids: idsToImport }
+                : { spreadsheetId: SPREADSHEET_ID };
+            const res = await api.post('/api/planilla-salida/import', payload);
+            toast.success(res.data.message || "Importación desde planilla de salida finalizada con éxito.");
+            if (idsToImport && idsToImport.length > 0) {
+                setSelectedRows([]);
+            }
+            fetchData();
+        } catch (err) {
+            console.error("Error al importar desde planilla:", err);
+            toast.error(err.response?.data?.error || "Error al importar desde la planilla externa.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Exporta a planilla externa SIN cambiar el estado de las solicitudes indicadas
+    const handleSoloExportarIds = async (idsToExport, clearSelection = false) => {
+        if (!idsToExport || idsToExport.length === 0) {
+            toast.error("No hay solicitudes listadas para exportar.");
+            return;
+        }
+        setLoading(true);
+        try {
+            const res = await api.post('/api/planilla-salida/export', {
+                spreadsheetId: SPREADSHEET_ID,
+                ids: idsToExport
+            });
+            toast.success(res.data.message || `Se exportaron ${idsToExport.length} solicitudes a la planilla sin cambiar su estado.`);
+            if (clearSelection) setSelectedRows([]);
+            fetchData();
+        } catch (err) {
+            console.error("Error al exportar solicitudes sin cambio de estado:", err);
+            toast.error(err.response?.data?.error || "Error al exportar a la planilla externa.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Pone en consideración y exporta a la planilla externa las solicitudes indicadas
+    const handleConsideracionYExportarIds = async (idsToProcess, clearSelection = false) => {
+        if (!idsToProcess || idsToProcess.length === 0) {
+            toast.error("No hay solicitudes listadas para poner en consideración y exportar.");
+            return;
+        }
+        if (!window.confirm(`¿Deseas poner en consideración y exportar a la planilla externa ${idsToProcess.length} solicitud(es)?`)) return;
+        setLoading(true);
+        try {
+            await api.post('/api/solicitudes/consideracion/batch', { ids: idsToProcess });
+            toast.success(`Se pusieron en consideración y exportaron ${idsToProcess.length} solicitud(es).`);
+            if (clearSelection) setSelectedRows([]);
+            fetchData();
+        } catch (err) {
+            console.error("Error al poner en consideración y exportar:", err);
+            toast.error(err.response?.data?.error || "Error al poner en consideración y exportar.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleExportPlanilla = async () => {
         setLoading(true);
         try {
@@ -203,74 +293,16 @@ export default function ProjectDetailsPage() {
         }
     };
 
-    const handleImportPlanilla = async () => {
-        setLoading(true);
-        try {
-            const res = await api.post('/api/planilla-salida/import', { spreadsheetId: SPREADSHEET_ID });
-            toast.success(res.data.message || "Importación desde planilla de salida finalizada con éxito.");
-            fetchData();
-        } catch (err) {
-            console.error("Error al importar desde planilla:", err);
-            toast.error(err.response?.data?.error || "Error al importar desde la planilla externa.");
-        } finally {
-            setLoading(false);
-        }
+    const handleImportPlanilla = () => handleRequestImportPreview(null);
+
+    const handleBulkExport = () => handleSoloExportarIds(selectedRows, true);
+
+    const handleBulkImport = () => {
+        if (selectedRows.length === 0) return;
+        handleRequestImportPreview(selectedRows);
     };
 
-    const handleBulkExport = async () => {
-        if (selectedRows.length === 0) return;
-        setLoading(true);
-        try {
-            const res = await api.post('/api/planilla-salida/export', { 
-                spreadsheetId: SPREADSHEET_ID, 
-                ids: selectedRows 
-            });
-            toast.success(res.data.message || `Exportación selectiva de ${selectedRows.length} solicitudes finalizada con éxito.`);
-            setSelectedRows([]);
-            fetchData();
-        } catch (err) {
-            console.error("Error al exportar solicitudes seleccionadas:", err);
-            toast.error(err.response?.data?.error || "Error al realizar la exportación selectiva.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleBulkImport = async () => {
-        if (selectedRows.length === 0) return;
-        setLoading(true);
-        try {
-            const res = await api.post('/api/planilla-salida/import', { 
-                spreadsheetId: SPREADSHEET_ID, 
-                ids: selectedRows 
-            });
-            toast.success(res.data.message || `Importación selectiva de ${selectedRows.length} solicitudes finalizada con éxito.`);
-            setSelectedRows([]);
-            fetchData();
-        } catch (err) {
-            console.error("Error al importar solicitudes seleccionadas:", err);
-            toast.error(err.response?.data?.error || "Error al realizar la importación selectiva.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleBulkConsideracion = async () => {
-        if (selectedRows.length === 0) return;
-        if (!window.confirm(`¿Seguro que deseas poner en consideración las ${selectedRows.length} solicitudes seleccionadas?`)) return;
-        setLoading(true);
-        try {
-            await api.post('/api/solicitudes/consideracion/batch', { ids: selectedRows });
-            toast.success(`Se han puesto en consideración ${selectedRows.length} solicitudes.`);
-            setSelectedRows([]);
-            fetchData();
-        } catch (err) {
-            console.error("Error al poner en consideración por lotes:", err);
-            toast.error(err.response?.data?.error || "Error al poner en consideración por lotes.");
-        } finally {
-            setLoading(false);
-        }
-    };
+    const handleBulkConsideracion = () => handleConsideracionYExportarIds(selectedRows, true);
 
     const handleConsideracion = async (id) => {
         if (!window.confirm("¿Deseas poner esta solicitud en consideración para la planilla externa?")) return;
@@ -728,12 +760,13 @@ export default function ProjectDetailsPage() {
                         <ArrowLeft className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform" />
                         Inicio
                     </Link>
-                    <div className="flex gap-3 text-xs md:text-sm">
+                    <div className="flex flex-wrap gap-2.5 text-xs md:text-sm">
                             {isResolutorSubsidio && (
                                 <button
+                                    data-testid="btn-importar-planilla"
                                     onClick={handleImportPlanilla}
                                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 border border-indigo-500 rounded-xl text-white font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-900/20 active:scale-95"
-                                    title="Importar cambios y POR DONDE? desde planilla de salida"
+                                    title="Lee la planilla externa, muestra las solicitudes coincidentes del sistema y permite confirmar su importación (aprobar/desaprobar)"
                                 >
                                     <Database className="h-4 w-4" /> Importar Planilla
                                 </button>
@@ -742,44 +775,74 @@ export default function ProjectDetailsPage() {
                                 <button
                                     onClick={() => setIsAsociarModalOpen(true)}
                                     className="px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-white font-bold flex items-center gap-2 transition-all shadow-lg shadow-gray-900/20 active:scale-95"
-                                    title="Asociar planilla de cálculo externa de Google Sheets"
+                                    title="Configurar o cambiar la planilla externa de Google Sheets asociada"
                                 >
                                     <Settings className="h-4 w-4" /> Asociar Planilla
                                 </button>
                             )}
-                            <div className="relative">
-                                <button
-                                    onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
-                                    className="px-4 py-2 bg-green-600 hover:bg-green-500 border border-green-500 rounded-xl text-white font-bold flex items-center gap-2 transition-all shadow-lg shadow-green-900/20 active:scale-95 animate-in fade-in"
-                                    title="Exportar solicitudes"
-                                >
-                                    <Download className="h-4 w-4" /> Exportar...
-                                </button>
-                                {isExportDropdownOpen && (
-                                    <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden py-1">
-                                        <button
-                                            onClick={() => {
-                                                handleExportCSV();
-                                                setIsExportDropdownOpen(false);
-                                            }}
-                                            className="w-full text-left px-4 py-2.5 text-xs text-gray-200 hover:bg-gray-700 font-bold transition-all flex items-center gap-2"
-                                        >
-                                            <Download className="h-3.5 w-3.5 text-green-500" /> Descargar CSV
-                                        </button>
-                                        {isResolutorSubsidio && (
+                            {isResolutorSubsidioDinero ? (
+                                <>
+                                    <button
+                                        data-testid="btn-consideracion-exportar-todos"
+                                        onClick={() => handleConsideracionYExportarIds(currentRows.map(s => s.id), false)}
+                                        className="px-4 py-2 bg-green-600 hover:bg-green-500 border border-green-500 rounded-xl text-white font-bold flex items-center gap-2 transition-all shadow-lg shadow-green-900/20 active:scale-95"
+                                        title="Pone en estado 'Consideración' y exporta a la planilla externa todas las solicitudes listadas en la tabla inferior"
+                                    >
+                                        <Download className="h-4 w-4" /> Consideración
+                                    </button>
+                                    <button
+                                        data-testid="btn-solo-exportar-todos"
+                                        onClick={() => handleSoloExportarIds(currentRows.map(s => s.id), false)}
+                                        className="px-4 py-2 bg-teal-700 hover:bg-teal-600 border border-teal-500 rounded-xl text-white font-bold flex items-center gap-2 transition-all shadow-lg shadow-teal-900/20 active:scale-95"
+                                        title="Exporta a la planilla externa todas las solicitudes listadas en la tabla SIN modificar su estado actual"
+                                    >
+                                        <Database className="h-4 w-4" /> Exportar
+                                    </button>
+                                    <button
+                                        onClick={handleExportCSV}
+                                        className="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-gray-200 font-bold flex items-center gap-1.5 transition-all"
+                                        title="Descargar las solicitudes actuales en un archivo CSV local"
+                                    >
+                                        <Download className="h-4 w-4 text-green-400" /> CSV
+                                    </button>
+                                </>
+                            ) : (
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+                                        className="px-4 py-2 bg-green-600 hover:bg-green-500 border border-green-500 rounded-xl text-white font-bold flex items-center gap-2 transition-all shadow-lg shadow-green-900/20 active:scale-95 animate-in fade-in"
+                                        title="Desplegar opciones de exportación de solicitudes (CSV o Google Sheets)"
+                                    >
+                                        <Download className="h-4 w-4" /> Exportar...
+                                    </button>
+                                    {isExportDropdownOpen && (
+                                        <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden py-1">
                                             <button
                                                 onClick={() => {
-                                                    handleExportPlanilla();
+                                                    handleExportCSV();
                                                     setIsExportDropdownOpen(false);
                                                 }}
-                                                className="w-full text-left px-4 py-2.5 text-xs text-gray-200 hover:bg-gray-700 font-bold transition-all flex items-center gap-2 border-t border-gray-700"
+                                                title="Descargar listado en formato CSV"
+                                                className="w-full text-left px-4 py-2.5 text-xs text-gray-200 hover:bg-gray-700 font-bold transition-all flex items-center gap-2"
                                             >
-                                                <Database className="h-3.5 w-3.5 text-orange-500" /> Google Sheets
+                                                <Download className="h-3.5 w-3.5 text-green-500" /> Descargar CSV
                                             </button>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
+                                            {isResolutorSubsidio && (
+                                                <button
+                                                    onClick={() => {
+                                                        handleExportPlanilla();
+                                                        setIsExportDropdownOpen(false);
+                                                    }}
+                                                    title="Exportar solicitudes en consideración a Google Sheets"
+                                                    className="w-full text-left px-4 py-2.5 text-xs text-gray-200 hover:bg-gray-700 font-bold transition-all flex items-center gap-2 border-t border-gray-700"
+                                                >
+                                                    <Database className="h-3.5 w-3.5 text-orange-500" /> Google Sheets
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                             {user?.role === 'RESOLUTOR' && (
                                 <button
                                     type="button"
@@ -789,7 +852,7 @@ export default function ProjectDetailsPage() {
                                             ? 'bg-amber-600/90 border-amber-400 text-white shadow-lg shadow-amber-900/30'
                                             : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
                                     }`}
-                                    title="Mostrar únicamente solicitudes donde tu resolución aún está pendiente"
+                                    title="Filtra el listado para mostrar únicamente solicitudes donde tu resolución propia (tomada o en pool) todavía está pendiente de aprobar"
                                 >
                                     <Check className="h-3.5 w-3.5" />
                                     Solo mis pendientes
@@ -797,13 +860,15 @@ export default function ProjectDetailsPage() {
                             )}
                             <button
                                 onClick={() => setShowFilters(!showFilters)}
-                            className={`p-2 rounded-xl border transition-all ${showFilters ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'}`}
-                        >
-                            <Filter className="h-5 w-5" />
-                        </button>
+                                title="Mostrar u ocultar el panel de filtros avanzados"
+                                className={`p-2 rounded-xl border transition-all ${showFilters ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'}`}
+                            >
+                                <Filter className="h-5 w-5" />
+                            </button>
                         {(user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN' || user?.role === 'OPERADOR' || user?.role === 'RESPONSABLE') && (
                             <button
                                 onClick={() => handleOpenABM()}
+                                title="Crear una nueva solicitud en el sistema"
                                 className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
                             >
                                 <Plus className="h-5 w-5" />
@@ -1084,17 +1149,41 @@ export default function ProjectDetailsPage() {
                                 </select>
                             )}
                             {(user?.role === 'ADMINISTRADOR' || isResolutorSubsidio || user?.role === 'RESPONSABLE') && (
-                                <button onClick={handleBulkConsideracion} className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded-full text-xs font-bold transition-colors shadow-sm">
+                                <button
+                                    data-testid="btn-bulk-consideracion-exportar"
+                                    onClick={handleBulkConsideracion}
+                                    title="Pone en estado 'Consideración' y exporta a la planilla externa únicamente las solicitudes seleccionadas"
+                                    className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded-full text-xs font-bold transition-colors shadow-sm"
+                                >
                                     Consideración
                                 </button>
                             )}
                             {(user?.role === 'ADMINISTRADOR' || isResolutorSubsidio) && (
-                                <button onClick={handleBulkImport} className="bg-indigo-800 hover:bg-indigo-900 text-white px-3 py-1 rounded-full text-xs font-bold transition-colors shadow-sm">
+                                <button
+                                    data-testid="btn-bulk-solo-exportar"
+                                    onClick={handleBulkExport}
+                                    title="Exporta a la planilla externa únicamente las solicitudes seleccionadas SIN cambiar su estado"
+                                    className="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1 rounded-full text-xs font-bold transition-colors shadow-sm"
+                                >
+                                    Exportar
+                                </button>
+                            )}
+                            {(user?.role === 'ADMINISTRADOR' || isResolutorSubsidio) && (
+                                <button
+                                    data-testid="btn-bulk-importar"
+                                    onClick={handleBulkImport}
+                                    title="Previsualiza e importa desde la planilla externa únicamente las solicitudes seleccionadas que coincidan en el sistema"
+                                    className="bg-indigo-800 hover:bg-indigo-900 text-white px-3 py-1 rounded-full text-xs font-bold transition-colors shadow-sm"
+                                >
                                     Importar
                                 </button>
                             )}
                             {user?.role === 'ADMINISTRADOR' && (
-                                <button onClick={handleBulkDelete} className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold transition-colors shadow-sm">
+                                <button
+                                    onClick={handleBulkDelete}
+                                    title="Eliminar permanentemente las solicitudes seleccionadas"
+                                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold transition-colors shadow-sm"
+                                >
                                     Eliminar
                                 </button>
                             )}
@@ -1424,7 +1513,7 @@ export default function ProjectDetailsPage() {
                                                             </button>
                                                         )}
                                                         {/* Botón Poner en Consideración: se muestra únicamente si el usuario es Administrador (ADMINISTRADOR o ADMIN), Responsable (RESPONSABLE) o Resolutor de Subsidio (isResolutorSubsidio === true) */}
-                                                        {s.type === 'SUBSIDIO' && (user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN' || user?.role === 'RESPONSABLE' || isResolutorSubsidio === true) && s.status !== 'completadas' && s.status !== 'rechazada' && (
+                                                        {(s.type?.toUpperCase().includes('SUBSIDIO') || (s.resolutorAssignments || []).some(a => a.tipoResolucion?.toUpperCase().includes('SUBSIDIO'))) && (user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN' || user?.role === 'RESPONSABLE' || isResolutorSubsidio === true) && s.status !== 'completadas' && s.status !== 'rechazada' && (
                                                             <button onClick={() => handleConsideracion(s.id)} title="Poner en Consideración" className="p-1.5 hover:bg-orange-600 bg-orange-900/30 rounded text-orange-400 hover:text-white transition-colors">
                                                                 <ArrowUpDown className="h-4 w-4" />
                                                             </button>
@@ -1530,7 +1619,7 @@ export default function ProjectDetailsPage() {
                                                             </button>
                                                         )}
                                                         {/* Botón Poner en Consideración: se muestra únicamente si el usuario es Administrador (ADMINISTRADOR o ADMIN), Responsable (RESPONSABLE) o Resolutor de Subsidio (isResolutorSubsidio === true) */}
-                                                        {s.type === 'SUBSIDIO' && (user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN' || user?.role === 'RESPONSABLE' || isResolutorSubsidio === true) && s.status !== 'completadas' && s.status !== 'rechazada' && (
+                                                        {(s.type?.toUpperCase().includes('SUBSIDIO') || (s.resolutorAssignments || []).some(a => a.tipoResolucion?.toUpperCase().includes('SUBSIDIO'))) && (user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN' || user?.role === 'RESPONSABLE' || isResolutorSubsidio === true) && s.status !== 'completadas' && s.status !== 'rechazada' && (
                                                             <button onClick={() => handleConsideracion(s.id)} title="Poner en Consideración" className="p-1.5 hover:bg-orange-600 bg-orange-900/30 rounded text-orange-400 hover:text-white transition-colors">
                                                                 <ArrowUpDown className="h-4 w-4" />
                                                             </button>
@@ -1602,6 +1691,104 @@ export default function ProjectDetailsPage() {
                 }}
                 config={config}
             />
+
+            {/* Modal de previsualización y confirmación antes de importar desde la planilla externa */}
+            {importPreviewModal.open && (
+                <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div
+                        data-testid="import-preview-modal"
+                        className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]"
+                    >
+                        <div className="px-6 py-4 bg-gray-900/80 border-b border-gray-700 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-bold text-white">Confirmar Importación desde Planilla</h3>
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                    {importPreviewModal.ids
+                                        ? `Importación selectiva sobre ${importPreviewModal.ids.length} solicitud(es) seleccionada(s)`
+                                        : 'Importación global de todas las solicitudes de la planilla coincidentes en el sistema'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto space-y-4">
+                            {importPreviewModal.warning && (
+                                <div className="p-3 rounded-xl bg-amber-900/30 border border-amber-500/40 text-amber-300 text-xs">
+                                    {importPreviewModal.warning}
+                                </div>
+                            )}
+
+                            {importPreviewModal.items.length === 0 ? (
+                                <div className="text-center py-8 text-sm text-gray-400">
+                                    No se encontraron solicitudes en estado <strong>Consideración</strong> en la planilla externa que coincidan con el sistema para importar.
+                                </div>
+                            ) : (
+                                <>
+                                    <p className="text-sm text-gray-300">
+                                        Se encontraron <strong className="text-indigo-400">{importPreviewModal.items.length}</strong> solicitud(es) listas para importar (IDs:{' '}
+                                        <span className="font-mono text-white">
+                                            {importPreviewModal.items.map(i => `#${i.id}`).join(', ')}
+                                        </span>):
+                                    </p>
+                                    <div className="border border-gray-700 rounded-xl overflow-hidden">
+                                        <table className="w-full text-left text-xs">
+                                            <thead className="bg-gray-900/80 text-gray-400 uppercase">
+                                                <tr>
+                                                    <th className="p-2.5">ID</th>
+                                                    <th className="p-2.5">Solicitante</th>
+                                                    <th className="p-2.5">Monto Planilla</th>
+                                                    <th className="p-2.5">Acción</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-700/60">
+                                                {importPreviewModal.items.map(item => (
+                                                    <tr key={item.id} className="hover:bg-gray-700/30">
+                                                        <td className="p-2.5 font-mono font-bold text-indigo-300">#{item.id}</td>
+                                                        <td className="p-2.5 text-gray-200">{item.solicitante}</td>
+                                                        <td className="p-2.5 font-mono text-gray-200">{item.montoPlanilla || '(vacío)'}</td>
+                                                        <td className="p-2.5">
+                                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                                item.accion === 'APROBAR'
+                                                                    ? 'bg-emerald-500/20 text-emerald-300'
+                                                                    : item.accion === 'DESAPROBAR'
+                                                                        ? 'bg-red-500/20 text-red-300'
+                                                                        : 'bg-amber-500/20 text-amber-300'
+                                                            }`}>
+                                                                {item.accion}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        <div className="px-6 py-4 bg-gray-900/60 border-t border-gray-700 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                data-testid="btn-cancel-import"
+                                onClick={() => setImportPreviewModal({ open: false, items: [], ids: null, warning: null })}
+                                title="Cancelar la importación sin aplicar cambios"
+                                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-xl text-xs font-bold transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                data-testid="btn-confirm-import"
+                                disabled={importPreviewModal.items.length === 0}
+                                onClick={handleConfirmImport}
+                                title="Confirmar e importar los cambios de la planilla al sistema"
+                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition-colors"
+                            >
+                                Confirmar Importación ({importPreviewModal.items.length})
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

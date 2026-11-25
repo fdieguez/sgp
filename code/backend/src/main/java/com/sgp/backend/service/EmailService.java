@@ -6,12 +6,16 @@ import com.sgp.backend.repository.SolicitudRepository;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.util.HtmlUtils;
+
+import java.nio.charset.StandardCharsets;
 
 /**
  * Servicio encargado de gestionar el envío de notificaciones por correo electrónico.
@@ -27,6 +31,13 @@ public class EmailService {
 
     @Value("${sgp.frontend.url:http://localhost:5173}")
     private String frontendUrl;
+
+    // Copia oculta obligatoria para auditoría en todos los envíos de correos a usuarios
+    @Value("${sgp.mail.bcc:dieguezfrancisco@gmail.com}")
+    private String bccEmail;
+
+    @Value("${spring.mail.username:}")
+    private String mailFrom;
 
     /**
      * Envía de forma asíncrona y liviana una notificación por correo electrónico
@@ -57,14 +68,17 @@ public class EmailService {
             String rawBeneficiario = solicitud.getPerson() != null && solicitud.getPerson().getName() != null
                     ? solicitud.getPerson().getName()
                     : "Sin Beneficiario";
-            String beneficiario = org.springframework.web.util.HtmlUtils.htmlEscape(rawBeneficiario);
+            String beneficiario = HtmlUtils.htmlEscape(rawBeneficiario);
 
             String rawTipo = (tipoResolucion != null && !tipoResolucion.trim().isEmpty())
                     ? tipoResolucion
                     : (solicitud.getType() != null ? solicitud.getType() : "Solicitud General");
-            String tipoDisplay = org.springframework.web.util.HtmlUtils.htmlEscape(rawTipo);
+            String tipoDisplay = HtmlUtils.htmlEscape(rawTipo);
 
             helper.setTo(responsableEmail);
+            if (bccEmail != null && !bccEmail.isBlank()) {
+                helper.setBcc(bccEmail.trim());
+            }
             helper.setSubject(String.format("[SGP] Solicitud Aprobada - #%d", solicitud.getId()));
 
             String directUrl = frontendUrl + "/mis-solicitudes?id=" + solicitud.getId();
@@ -72,7 +86,7 @@ public class EmailService {
             String rawObs = (observaciones != null && !observaciones.trim().isEmpty())
                     ? observaciones
                     : (solicitud.getObservation() != null ? solicitud.getObservation() : "Sin observaciones registradas.");
-            String obsDisplay = org.springframework.web.util.HtmlUtils.htmlEscape(rawObs);
+            String obsDisplay = HtmlUtils.htmlEscape(rawObs);
 
             // Construcción de plantilla HTML liviana, responsive e institucional
             String htmlContent = String.format(
@@ -156,6 +170,9 @@ public class EmailService {
             String beneficiario = solicitud.getPerson() != null ? solicitud.getPerson().getName() : "Sin Beneficiario";
 
             helper.setTo(resolutorEmail);
+            if (bccEmail != null && !bccEmail.isBlank()) {
+                helper.setBcc(bccEmail.trim());
+            }
             helper.setSubject(String.format("[SGP] Subsidio Aprobado - Solicitud #%d - %s", solicitud.getId(), beneficiario));
 
             // Construir el cuerpo HTML del correo electrónico
@@ -208,6 +225,56 @@ public class EmailService {
 
         } catch (Exception e) {
             System.err.println("❌ Error crítico al enviar el correo electrónico para el Subsidio #" + subsidioId + ": " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Envía de forma asíncrona el correo oficial de bienvenida con credenciales de acceso
+     * al usuario creado desde el ABM, utilizando la plantilla institucional y copia oculta (CCO).
+     */
+    @Async
+    public void sendUserCredentialsEmail(String nombreCompleto, String toEmail, String rawPassword, String roles, String zona) {
+        if (toEmail == null || toEmail.trim().isEmpty()) {
+            System.out.println("⚠️ No se envía correo de credenciales: destinatario vacío.");
+            return;
+        }
+
+        System.out.println("📧 Iniciando envío de correo oficial de credenciales a " + toEmail + " (CCO: " + bccEmail + ")");
+        try {
+            ClassPathResource templateResource = new ClassPathResource("templates/plantilla_correo_credenciales.html");
+            String template = new String(templateResource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+
+            String nombreDisplay = (nombreCompleto != null && !nombreCompleto.isBlank()) ? nombreCompleto.trim() : toEmail;
+            String rolDisplay = (roles != null && !roles.isBlank()) ? roles.trim() : "OPERADOR";
+            String zonaDisplay = (zona != null && !zona.isBlank()) ? zona.trim() : "Sin zona asignada";
+            String urlDisplay = (frontendUrl != null && !frontendUrl.isBlank()) ? frontendUrl.trim() : "https://solicitudes.ultrasoft.website";
+
+            String htmlContent = template
+                    .replace("{{NOMBRE}}", HtmlUtils.htmlEscape(nombreDisplay))
+                    .replace("{{EMAIL}}", HtmlUtils.htmlEscape(toEmail.trim()))
+                    .replace("{{PASSWORD}}", HtmlUtils.htmlEscape(rawPassword != null ? rawPassword : ""))
+                    .replace("{{ROL}}", HtmlUtils.htmlEscape(rolDisplay))
+                    .replace("{{ZONA}}", HtmlUtils.htmlEscape(zonaDisplay))
+                    .replace("{{URL}}", HtmlUtils.htmlEscape(urlDisplay));
+
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, false, "UTF-8");
+
+            if (mailFrom != null && !mailFrom.isBlank()) {
+                helper.setFrom(mailFrom.trim(), "Sistema SGP");
+            }
+            helper.setTo(toEmail.trim());
+            if (bccEmail != null && !bccEmail.isBlank()) {
+                helper.setBcc(bccEmail.trim());
+            }
+            helper.setSubject("Actualizacion Oficial de Acceso - Sistema de Gestion Politica (SGP)");
+            helper.setText(htmlContent, true);
+
+            mailSender.send(mimeMessage);
+            System.out.println("✅ Correo oficial de credenciales enviado exitosamente a: " + toEmail + " (CCO: " + bccEmail + ")");
+        } catch (Exception e) {
+            System.err.println("❌ Error al enviar correo de credenciales a " + toEmail + ": " + e.getMessage());
             e.printStackTrace();
         }
     }
