@@ -665,6 +665,117 @@ public class SyncService {
     }
 
     /**
+     * Previsualiza las solicitudes presentes en la planilla externa de salida que coinciden con el sistema
+     * antes de confirmar la importación definitiva.
+     * Solo incluye solicitudes existentes en el sistema (y en el subconjunto de IDs si se indicó).
+     */
+    @Transactional(readOnly = true)
+    public java.util.List<java.util.Map<String, Object>> previsualizarImportacionPlanilla(String spreadsheetId, List<Long> ids) throws Exception {
+        String sheetName = resolveSheetName(spreadsheetId);
+        java.util.List<java.util.Map<String, Object>> previewItems = new java.util.ArrayList<>();
+
+        // Simulación para planillas ficticias en pruebas locales
+        if (spreadsheetId != null && (
+            spreadsheetId.contains("sheet-test-") ||
+            spreadsheetId.contains("default-id") ||
+            spreadsheetId.contains("test-id") ||
+            spreadsheetId.startsWith("spreadsheet-")
+        )) {
+            List<Solicitud> candidatas = solicitudRepository.findAll().stream()
+                    .filter(s -> (ids != null && !ids.isEmpty()) ? ids.contains(s.getId()) : "consideracion".equalsIgnoreCase(s.getStatus()))
+                    .toList();
+            for (Solicitud s : candidatas) {
+                java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+                item.put("id", s.getId());
+                item.put("solicitante", s.getPerson() != null ? s.getPerson().getName() : "Sin solicitante");
+                item.put("estadoActual", s.getStatus());
+                item.put("montoActual", s.getAmount() != null ? s.getAmount().toString() : "0");
+                item.put("montoPlanilla", s.getAmount() != null ? s.getAmount().toString() : "0");
+                item.put("porDonde", s.getPorDonde() != null ? s.getPorDonde() : "");
+                item.put("accion", (s.getAmount() != null && s.getAmount().compareTo(java.math.BigDecimal.ZERO) > 0) ? "APROBAR" : "MANTENER");
+                previewItems.add(item);
+            }
+            return previewItems;
+        }
+
+        String range = "'" + sheetName + "'!A:AD";
+        List<List<Object>> rawData = null;
+        try {
+            rawData = googleSheetsService.readSheet(spreadsheetId, range);
+        } catch (Exception e) {
+            List<String> titles = googleSheetsService.getSheetTitles(spreadsheetId);
+            if (titles != null && !titles.isEmpty()) {
+                sheetName = titles.get(0);
+                rawData = googleSheetsService.readSheet(spreadsheetId, "'" + sheetName + "'!A:AD");
+            }
+        }
+
+        if (rawData == null || rawData.size() <= 2) {
+            return previewItems;
+        }
+
+        java.util.Map<String, Integer> columnMapping = getColumnMapping(rawData.get(0), rawData.get(1));
+        if (!columnMapping.containsKey("id")) {
+            throw new IllegalArgumentException("La planilla no contiene la columna obligatoria 'IDENTIFICACIÓN' o 'IDENTIFICADOR'.");
+        }
+
+        int idColIndex = columnMapping.get("id");
+        for (int i = 2; i < rawData.size(); i++) {
+            List<Object> row = rawData.get(i);
+            if (row.isEmpty()) continue;
+
+            String idStr = getValue(row, idColIndex);
+            if (idStr.isEmpty()) continue;
+
+            Long id;
+            try {
+                id = Long.parseLong(idStr);
+            } catch (NumberFormatException e) {
+                continue;
+            }
+
+            if (ids != null && !ids.isEmpty() && !ids.contains(id)) {
+                continue;
+            }
+
+            Optional<Solicitud> optSolicitud = solicitudRepository.findById(id);
+            if (optSolicitud.isEmpty()) {
+                continue;
+            }
+
+            Solicitud solicitud = optSolicitud.get();
+            if (!"consideracion".equalsIgnoreCase(solicitud.getStatus())) {
+                continue;
+            }
+
+            String montoStr = columnMapping.containsKey("monto_solicitado") ? getValue(row, columnMapping.get("monto_solicitado")) : "";
+            java.math.BigDecimal amountFromSheet = parseAmount(montoStr);
+            String porDondeVal = columnMapping.containsKey("por_donde") ? getValue(row, columnMapping.get("por_donde")) : "";
+
+            String accion = "MANTENER EN CONSIDERACION";
+            if (amountFromSheet != null) {
+                if (amountFromSheet.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                    accion = "APROBAR";
+                } else if (amountFromSheet.compareTo(java.math.BigDecimal.ZERO) == 0) {
+                    accion = "DESAPROBAR";
+                }
+            }
+
+            java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("id", solicitud.getId());
+            item.put("solicitante", solicitud.getPerson() != null ? solicitud.getPerson().getName() : "Sin solicitante");
+            item.put("estadoActual", solicitud.getStatus());
+            item.put("montoActual", solicitud.getAmount() != null ? solicitud.getAmount().toString() : "0");
+            item.put("montoPlanilla", montoStr);
+            item.put("porDonde", porDondeVal);
+            item.put("accion", accion);
+            previewItems.add(item);
+        }
+
+        return previewItems;
+    }
+
+    /**
      * Importa las respuestas desde la planilla de salida, actualiza el campo 'porDonde'
      * y sincroniza las diferencias detectadas en montos, fechas y atributos de Subsidio.
      * Si se pasa una lista de IDs no vacía, solo procesa las filas cuyos IDs estén en la lista.
@@ -778,10 +889,10 @@ public class SyncService {
                 }
             }
 
-            // 2. Si es de tipo Subsidio, sincronizar diferencias e importar estado por importe
-            boolean hasSubsidioAssignment = solicitud.getResolutorAssignments() != null &&
-                    solicitud.getResolutorAssignments().stream().anyMatch(a -> "SUBSIDIO".equalsIgnoreCase(a.getTipoResolucion()));
-            if ("SUBSIDIO".equalsIgnoreCase(solicitud.getType()) || hasSubsidioAssignment) {
+            // 2. Si es de tipo Subsidio (Dinero o Especie), sincronizar diferencias e importar estado por importe
+            SolicitudResolutorAssignment subsidioAssignment = findSubsidioAssignment(solicitud);
+            boolean hasSubsidioAssignment = subsidioAssignment != null;
+            if ((solicitud.getType() != null && solicitud.getType().toUpperCase().contains("SUBSIDIO")) || hasSubsidioAssignment) {
                 // Sincronizar Monto
                 if (columnMapping.containsKey("monto_solicitado")) {
                     String montoStr = getValue(row, columnMapping.get("monto_solicitado"));
@@ -793,12 +904,8 @@ public class SyncService {
                             solicitud.setStatus("consideracion");
                             isModified = true;
                         }
-                        SolicitudResolutorAssignment assignment = solicitud.getResolutorAssignments().stream()
-                                .filter(a -> "SUBSIDIO".equalsIgnoreCase(a.getTipoResolucion()))
-                                .findFirst()
-                                .orElse(null);
-                        if (assignment != null && (assignment.getApproved() == null || assignment.getApproved())) {
-                            assignment.setApproved(false);
+                        if (subsidioAssignment != null && (subsidioAssignment.getApproved() == null || subsidioAssignment.getApproved())) {
+                            subsidioAssignment.setApproved(false);
                             isModified = true;
                             logAssignmentChange(solicitud, null, "Resolución revertida a PENDIENTE por importación de planilla (Importe vacío)");
                         }
@@ -811,26 +918,21 @@ public class SyncService {
                             isModified = true;
                         }
 
-                        SolicitudResolutorAssignment assignment = solicitud.getResolutorAssignments().stream()
-                                .filter(a -> "SUBSIDIO".equalsIgnoreCase(a.getTipoResolucion()))
-                                .findFirst()
-                                .orElse(null);
-
                         if (amountFromSheet.compareTo(java.math.BigDecimal.ZERO) > 0) {
                             // APROBADA (importe > 0)
                             if (!"completadas".equalsIgnoreCase(solicitud.getStatus())) {
                                 solicitud.setStatus("completadas");
                                 solicitud.setResolutionApproved(true);
                                 isModified = true;
-                                if (assignment != null) {
-                                    assignment.setApproved(true);
-                                    assignment.setObservaciones("Aprobado automáticamente por importación de planilla (Importe > 0)");
+                                if (subsidioAssignment != null) {
+                                    subsidioAssignment.setApproved(true);
+                                    subsidioAssignment.setObservaciones("Aprobado automáticamente por importación de planilla (Importe > 0)");
                                 }
                                 logAssignmentChange(solicitud, null, "Solicitud APROBADA por importación de planilla con monto: " + amountFromSheet);
                                 // Disparar envío de correo
                                 try {
-                                    String resolutorEmail = (assignment != null && assignment.getResolutor() != null) 
-                                            ? assignment.getResolutor().getEmail() 
+                                    String resolutorEmail = (subsidioAssignment != null && subsidioAssignment.getResolutor() != null) 
+                                            ? subsidioAssignment.getResolutor().getEmail() 
                                             : "martinnocioni@gmail.com";
                                     emailService.sendSubsidioApprovedEmail(resolutorEmail, solicitud.getId());
                                 } catch (Exception ex) {
@@ -843,9 +945,9 @@ public class SyncService {
                                 solicitud.setStatus("rechazada");
                                 solicitud.setResolutionApproved(false);
                                 isModified = true;
-                                if (assignment != null) {
-                                    assignment.setApproved(true);
-                                    assignment.setObservaciones("Desaprobado automáticamente por importación de planilla (Importe = 0)");
+                                if (subsidioAssignment != null) {
+                                    subsidioAssignment.setApproved(false);
+                                    subsidioAssignment.setObservaciones("Desaprobado automáticamente por importación de planilla (Importe = 0)");
                                 }
                                 logAssignmentChange(solicitud, null, "Solicitud DESAPROBADA por importación de planilla (Importe = 0)");
                             }
@@ -855,8 +957,8 @@ public class SyncService {
                                 solicitud.setStatus("consideracion");
                                 isModified = true;
                             }
-                            if (assignment != null && (assignment.getApproved() == null || assignment.getApproved())) {
-                                assignment.setApproved(false);
+                            if (subsidioAssignment != null && (subsidioAssignment.getApproved() == null || subsidioAssignment.getApproved())) {
+                                subsidioAssignment.setApproved(false);
                                 isModified = true;
                                 logAssignmentChange(solicitud, null, "Resolución revertida a PENDIENTE por importación de planilla (Importe < 0)");
                             }
@@ -877,17 +979,15 @@ public class SyncService {
                     }
                 }
 
-                // Sincronizar atributos dinámicos
-                SolicitudResolutorAssignment assignment = solicitud.getResolutorAssignments().stream()
-                        .filter(a -> "SUBSIDIO".equalsIgnoreCase(a.getTipoResolucion()))
-                        .findFirst()
-                        .orElse(null);
+                // Sincronizar atributos dinámicos sobre la asignación de Subsidio existente (Dinero o Especie)
+                SolicitudResolutorAssignment assignment = subsidioAssignment;
 
                 // Si no existe la asignación de resolutor de SUBSIDIO, la creamos en caliente con un resolutor válido
                 if (assignment == null) {
                     com.sgp.backend.entity.User resolutorSubsidio = null;
                     try {
-                        var tipoOpt = tipoResolucionRepository.findByTipoIgnoreCase("SUBSIDIO");
+                        var tipoOpt = tipoResolucionRepository.findByTipoIgnoreCase("SUBSIDIO EN DINERO")
+                                .or(() -> tipoResolucionRepository.findByTipoIgnoreCase("SUBSIDIO"));
                         if (tipoOpt.isPresent() && tipoOpt.get().getResolutor() != null) {
                             resolutorSubsidio = tipoOpt.get().getResolutor();
                         } else if (solicitud.getResponsable() != null) {
@@ -1121,18 +1221,28 @@ public class SyncService {
         return false;
     }
 
+    /**
+     * Busca la primera asignación de resolución de tipo Subsidio (Dinero o Especie).
+     */
+    private SolicitudResolutorAssignment findSubsidioAssignment(Solicitud solicitud) {
+        if (solicitud == null || solicitud.getResolutorAssignments() == null) {
+            return null;
+        }
+        return solicitud.getResolutorAssignments().stream()
+                .filter(a -> a.getTipoResolucion() != null && a.getTipoResolucion().toUpperCase().contains("SUBSIDIO"))
+                .findFirst()
+                .orElse(null);
+    }
+
     private java.util.Map<String, Object> getSubsidioDetalle(Solicitud solicitud) {
-        if (solicitud.getResolutorAssignments() != null) {
-            for (SolicitudResolutorAssignment assignment : solicitud.getResolutorAssignments()) {
-                if ("SUBSIDIO".equalsIgnoreCase(assignment.getTipoResolucion())) {
-                    String detalleJson = assignment.getDetalle();
-                    if (detalleJson != null && !detalleJson.trim().isEmpty()) {
-                        try {
-                            return objectMapper.readValue(detalleJson, new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, Object>>() {});
-                        } catch (Exception e) {
-                            log.error("Error al parsear detalle de resolución SUBSIDIO de la solicitud #{}", solicitud.getId(), e);
-                        }
-                    }
+        SolicitudResolutorAssignment assignment = findSubsidioAssignment(solicitud);
+        if (assignment != null) {
+            String detalleJson = assignment.getDetalle();
+            if (detalleJson != null && !detalleJson.trim().isEmpty()) {
+                try {
+                    return objectMapper.readValue(detalleJson, new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, Object>>() {});
+                } catch (Exception e) {
+                    log.error("Error al parsear detalle de resolución SUBSIDIO de la solicitud #{}", solicitud.getId(), e);
                 }
             }
         }

@@ -30,7 +30,7 @@ export default function ResolutorSettingsPage() {
     // Identificar las especialidades del resolutor o permitir al administrador configurar todas
     const esAdmin = user?.role === 'ADMINISTRADOR' || user?.roles?.includes('ADMINISTRADOR');
     const tieneAgenda = esAdmin || user?.tiposResolucion?.some(t => t.tipo?.toUpperCase() === 'AGENDA') || false;
-    const tieneSubsidio = esAdmin || user?.tiposResolucion?.some(t => t.tipo?.toUpperCase() === 'SUBSIDIO') || false;
+    const tieneSubsidio = esAdmin || user?.tiposResolucion?.some(t => t.tipo?.toUpperCase().includes('SUBSIDIO')) || false;
 
     useEffect(() => {
         fetchProjects();

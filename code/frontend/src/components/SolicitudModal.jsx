@@ -1650,7 +1650,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     )}
 
                     {/* Campos específicos de Subsidio */}
-                    {formData.type === 'SUBSIDIO' && (
+                    {(formData.type?.toUpperCase().includes('SUBSIDIO')) && (
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top-2 p-4 bg-emerald-900/20 rounded-xl border border-emerald-800/50">
                             <div>
                                 <label className="block text-sm font-medium text-emerald-400 mb-1 flex items-center gap-1">

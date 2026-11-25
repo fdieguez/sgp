@@ -497,7 +497,13 @@ public class SolicitudService {
         boolean isAssignedResponsable = currentUser != null && existing.getResponsable() != null &&
                 existing.getResponsable().getId().equals(currentUser.getId());
 
-        boolean canEditStatus = isOperadorOrAdmin || isDistribuidor || isAssignedResponsable;
+        boolean isResolutorSubsidio = currentUser != null && "RESOLUTOR".equalsIgnoreCase(activeRoleUpdater)
+                && currentUser.getTiposResolucion() != null
+                && currentUser.getTiposResolucion().stream()
+                        .anyMatch(tr -> tr.getTipo() != null && tr.getTipo().toUpperCase().contains("SUBSIDIO"));
+
+        boolean canEditStatus = isOperadorOrAdmin || isDistribuidor || isAssignedResponsable
+                || (isResolutorSubsidio && dto.getStatus() != null && "consideracion".equalsIgnoreCase(dto.getStatus().trim()));
 
         boolean canEditInitialData = isOperadorOrAdmin || isCreator;
 
@@ -1188,9 +1194,9 @@ public class SolicitudService {
                 String activeRole = com.sgp.backend.security.SecurityUtils.getActiveRole(currentUser);
                 // Verificar si el usuario tiene rol RESOLUTOR
                 if ("RESOLUTOR".equalsIgnoreCase(activeRole)) {
-                    // Verificar si la colección de tipos de resolución del resolutor contiene la competencia 'SUBSIDIO'
+                    // Verificar si la colección de tipos de resolución del resolutor contiene alguna competencia de SUBSIDIO (Dinero o Especie)
                     boolean tieneSubsidio = currentUser.getTiposResolucion() != null && currentUser.getTiposResolucion().stream()
-                            .anyMatch(tr -> tr.getTipo() != null && "SUBSIDIO".equalsIgnoreCase(tr.getTipo()));
+                            .anyMatch(tr -> tr.getTipo() != null && tr.getTipo().toUpperCase().contains("SUBSIDIO"));
                     if (!tieneSubsidio) {
                         // Lanzar HTTP 403 Forbidden si el resolutor no tiene la competencia SUBSIDIO
                         throw new org.springframework.web.server.ResponseStatusException(

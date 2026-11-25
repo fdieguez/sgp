@@ -76,6 +76,58 @@ public class PlanillaSalidaSyncController {
     }
 
     /**
+     * Previsualiza los registros que coinciden entre la planilla externa y el SGP
+     * antes de confirmar la importación definitiva.
+     */
+    @PostMapping("/import/preview")
+    public ResponseEntity<Map<String, Object>> previsualizarImportacion(@RequestBody Map<String, Object> payload) {
+        String spreadsheetId = (String) payload.get("spreadsheetId");
+        if (spreadsheetId == null || spreadsheetId.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "El parámetro 'spreadsheetId' es requerido."));
+        }
+
+        List<Long> ids = null;
+        if (payload.containsKey("ids") && payload.get("ids") instanceof List) {
+            List<?> rawList = (List<?>) payload.get("ids");
+            ids = new java.util.ArrayList<>();
+            for (Object obj : rawList) {
+                if (obj instanceof Number) {
+                    ids.add(((Number) obj).longValue());
+                } else if (obj instanceof String) {
+                    try {
+                        ids.add(Long.parseLong((String) obj));
+                    } catch (NumberFormatException e) {
+                        // Ignorar valores de ID inválidos
+                    }
+                }
+            }
+        }
+
+        try {
+            List<Map<String, Object>> items = syncService.previsualizarImportacionPlanilla(spreadsheetId, ids);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "items", items,
+                    "total", items.size()
+            ));
+        } catch (com.google.api.client.googleapis.json.GoogleJsonResponseException e) {
+            System.err.println("⚠️ Google Sheets API response en preview de importación (" + e.getStatusCode() + "): " + e.getMessage());
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "items", List.of(),
+                    "total", 0,
+                    "warning", "Planilla externa no accesible en Google Sheets (" + e.getStatusCode() + ")."
+            ));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "success", false,
+                    "error", "Fallo al previsualizar importación: " + e.getMessage()
+            ));
+        }
+    }
+
+    /**
      * Importa las respuestas desde la planilla externa de Google Sheets a la base de datos del SGP.
      * Admite una lista de 'ids' en el payload para importación selectiva.
      *
