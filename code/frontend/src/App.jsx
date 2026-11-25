@@ -14,11 +14,12 @@ import ProjectSettingsPage from './pages/ProjectSettingsPage';
 import HelpPage from './pages/HelpPage';
 import DescargarAdjunto from './pages/DescargarAdjunto';
 import ResolutorSettingsPage from './pages/ResolutorSettingsPage';
+import UserPreferencesPage from './pages/UserPreferencesPage';
 import SelectRolPage from './pages/SelectRolPage';
 import { Toaster } from 'react-hot-toast';
 
 function ProtectedRoute({ children, adminOnly = false }) {
-  const { isAuthenticated, loading, user, activeRole, allRoles } = useAuth();
+  const { isAuthenticated, loading, user, activeRole, activeTipoResolucion, allRoles } = useAuth();
 
   if (loading) {
     return (
@@ -32,8 +33,12 @@ function ProtectedRoute({ children, adminOnly = false }) {
     return <Navigate to="/login" replace />;
   }
 
-  // Redirigir a selección de rol si tiene múltiples y no seleccionó ninguno
+  // Redirigir a selección de rol si tiene múltiples roles sin elegir,
+  // o si actúa como RESOLUTOR con más de un tipo de resolución y aún no eligió especialidad
   if (allRoles && allRoles.length > 1 && !activeRole) {
+    return <Navigate to="/select-rol" replace />;
+  }
+  if (activeRole?.toUpperCase() === 'RESOLUTOR' && (user?.tiposResolucion?.length || 0) > 1 && !activeTipoResolucion) {
     return <Navigate to="/select-rol" replace />;
   }
 
@@ -136,6 +141,12 @@ function App() {
             <Route path="/resolutor-settings" element={
               <ProtectedRoute>
                 <ResolutorSettingsPage />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/preferencias" element={
+              <ProtectedRoute>
+                <UserPreferencesPage />
               </ProtectedRoute>
             } />
 

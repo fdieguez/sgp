@@ -23,6 +23,10 @@ api.interceptors.request.use(
         if (activeRole) {
             config.headers['X-Active-Role'] = activeRole;
         }
+        const activeTipoResolucion = localStorage.getItem('activeTipoResolucion');
+        if (activeTipoResolucion) {
+            config.headers['X-Active-Tipo-Resolucion'] = activeTipoResolucion;
+        }
         return config;
     },
     (error) => {
@@ -52,6 +56,7 @@ api.interceptors.response.use(
                 localStorage.removeItem('token');
                 localStorage.removeItem('user');
                 localStorage.removeItem('activeRole');
+                localStorage.removeItem('activeTipoResolucion');
 
                 // Notificación amigable al usuario con ID único para evitar toasts duplicados
                 toast.error('Su sesión ha expirado. Por favor inicie sesión nuevamente', {

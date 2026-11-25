@@ -1,18 +1,22 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
-import { Briefcase, Settings, HelpCircle, LogOut, Sun, Moon, Users } from 'lucide-react';
+import { Briefcase, Settings, HelpCircle, LogOut, Users } from 'lucide-react';
 import { APP_VERSION_LABEL } from '../config/version';
 import NotificationBell from './NotificationBell';
 
 export default function Navbar() {
-    const { user, logout, allRoles } = useAuth();
+    const { user, logout, allRoles, activeTipoResolucion } = useAuth();
     const navigate = useNavigate();
-    const { theme, setTheme } = useTheme();
 
     const handleLogout = () => {
         logout();
         navigate('/login');
+    };
+
+    const getSettingsPath = () => {
+        if (user?.role === 'ADMINISTRADOR') return '/settings';
+        if (user?.role === 'RESOLUTOR') return '/resolutor-settings';
+        return '/preferencias';
     };
 
     return (
@@ -36,9 +40,11 @@ export default function Navbar() {
                                     {user.role === 'RESPONSABLE' 
                                         ? `RESPONSABLE - ZONA ${user.zone ? user.zone.toUpperCase() : 'SIN ZONA'}` 
                                         : user.role === 'RESOLUTOR' 
-                                            ? `RESOLUTOR - ${user.tiposResolucion && user.tiposResolucion.length > 0 
-                                                ? user.tiposResolucion.map(t => t.tipo.toUpperCase()).join(', ') 
-                                                : 'SIN ESPECIFICIDAD'}` 
+                                            ? `RESOLUTOR - ${activeTipoResolucion
+                                                ? activeTipoResolucion.toUpperCase()
+                                                : (user.tiposResolucion && user.tiposResolucion.length > 0 
+                                                    ? user.tiposResolucion.map(t => t.tipo.toUpperCase()).join(', ') 
+                                                    : 'SIN ESPECIFICIDAD')}` 
                                             : user.role === 'AUDITOR'
                                                 ? 'AUDITORÍA Y SEGUIMIENTO'
                                                 : user.role}
@@ -46,28 +52,22 @@ export default function Navbar() {
                             </div>
                         )}
                         {user && <NotificationBell />}
-                        <button
-                            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                            className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
-                            title="Alternar Tema"
-                        >
-                            {theme === 'dark' ? <Sun className="h-5 w-5 text-yellow-400" /> : <Moon className="h-5 w-5 text-indigo-600" />}
-                            <span className="hidden sm:inline">{theme === 'dark' ? 'Claro' : 'Oscuro'}</span>
-                        </button>
-                        {allRoles && allRoles.length > 1 && (
+                        {((allRoles && allRoles.length > 1) || (user?.role === 'RESOLUTOR' && (user?.tiposResolucion?.length || 0) > 1)) && (
                             <button
                                 onClick={() => navigate('/select-rol')}
                                 className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
-                                title="Cambiar perfil activo"
+                                title="Cambiar perfil o especialidad activa"
                             >
                                 <Users className="h-5 w-5 text-indigo-400" />
                                 <span className="hidden sm:inline">Cambiar Rol</span>
                             </button>
                         )}
-                        {(user?.role === 'ADMINISTRADOR' || user?.role === 'RESOLUTOR') && (
+                        {user && (
                             <button
-                                onClick={() => navigate(user?.role === 'RESOLUTOR' ? '/resolutor-settings' : '/settings')}
+                                data-testid="navbar-settings-btn"
+                                onClick={() => navigate(getSettingsPath())}
                                 className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
+                                title="Configuración y apariencia"
                             >
                                 <Settings className="h-5 w-5" />
                                 <span className="hidden sm:inline">Configuración</span>

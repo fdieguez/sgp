@@ -110,7 +110,7 @@ const StatusBadge = ({ status }) => {
 export default function ProjectDetailsPage() {
     const { configId } = useParams();
     const [searchParams] = useSearchParams();
-    const { user } = useAuth();
+    const { user, activeTipoResolucion } = useAuth();
     const [solicitudes, setSolicitudes] = useState([]);
     const [config, setConfig] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -166,8 +166,17 @@ export default function ProjectDetailsPage() {
     });
 
     const SPREADSHEET_ID = config?.spreadsheetId || "1jPw9ni4BW_bRfw_M9ajA7jO5RGX5IFq8w43T3WOXz6g";
-    const isResolutorSubsidio = user?.role === 'RESOLUTOR' && user?.tiposResolucion?.some(t => t.tipo?.toUpperCase().includes('SUBSIDIO'));
-    const isResolutorSubsidioDinero = user?.role === 'RESOLUTOR' && user?.tiposResolucion?.some(t => t.tipo?.toUpperCase().includes('SUBSIDIO') && t.tipo?.toUpperCase().includes('DINERO'));
+    const activeTipoUpper = activeTipoResolucion ? activeTipoResolucion.trim().toUpperCase() : null;
+    const isResolutorSubsidio = user?.role === 'RESOLUTOR' && (
+        activeTipoUpper
+            ? activeTipoUpper.includes('SUBSIDIO')
+            : user?.tiposResolucion?.some(t => t.tipo?.toUpperCase().includes('SUBSIDIO'))
+    );
+    const isResolutorSubsidioDinero = user?.role === 'RESOLUTOR' && (
+        activeTipoUpper
+            ? (activeTipoUpper.includes('SUBSIDIO') && activeTipoUpper.includes('DINERO'))
+            : user?.tiposResolucion?.some(t => t.tipo?.toUpperCase().includes('SUBSIDIO') && t.tipo?.toUpperCase().includes('DINERO'))
+    );
 
     // Extrae el detalle JSON de la asignación de subsidio y resuelve el Tipo de Pedido con fallback
     const extractSubsidioData = (s) => {
@@ -633,7 +642,9 @@ export default function ProjectDetailsPage() {
         // Filtro rápido para el rol Resolutor: mostrar solo pedidos donde SU resolución (tomada o en pool de su tipo) aún está pendiente
         if (soloMisPendientes && user?.role === 'RESOLUTOR' && user?.email) {
             const myEmail = user.email.toLowerCase();
-            const myTipos = (user?.tiposResolucion || []).map(t => (t?.tipo || '').trim().toUpperCase()).filter(Boolean);
+            const myTipos = activeTipoUpper
+                ? [activeTipoUpper]
+                : (user?.tiposResolucion || []).map(t => (t?.tipo || '').trim().toUpperCase()).filter(Boolean);
             result = result.filter(s =>
                 (s.resolutorAssignments || []).some(a =>
                     !a.approved && (

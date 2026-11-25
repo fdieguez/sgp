@@ -38,4 +38,35 @@ public class SecurityUtils {
         
         return user.getRole();
     }
+
+    /**
+     * Obtiene la especialidad (tipo de resolución) activa seleccionada por un Resolutor
+     * a partir de la cabecera HTTP 'X-Active-Tipo-Resolucion', validando que efectivamente
+     * pertenezca a los tipos asignados al usuario.
+     * Si no viene informada o no corresponde al usuario, retorna null (compatibilidad con vista combinada).
+     */
+    public static String getActiveTipoResolucion(User user) {
+        if (user == null || user.getTiposResolucion() == null || user.getTiposResolucion().isEmpty()) {
+            return null;
+        }
+        try {
+            ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+            if (attributes != null) {
+                HttpServletRequest request = attributes.getRequest();
+                String headerVal = request.getHeader("X-Active-Tipo-Resolucion");
+                if (headerVal != null && !headerVal.trim().isEmpty()) {
+                    String cleanTarget = headerVal.trim();
+                    return user.getTiposResolucion().stream()
+                            .map(com.sgp.backend.entity.TipoResolucion::getTipo)
+                            .filter(t -> t != null && t.trim().equalsIgnoreCase(cleanTarget))
+                            .map(t -> t.trim().toUpperCase())
+                            .findFirst()
+                            .orElse(null);
+                }
+            }
+        } catch (Exception e) {
+            // Fuera de contexto HTTP o error
+        }
+        return null;
+    }
 }

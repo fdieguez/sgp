@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import api from '../config/axios';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import AparienciaPanel from '../components/AparienciaPanel';
 import {
     ArrowLeft,
     Save,
@@ -367,6 +368,10 @@ export default function ResolutorSettingsPage() {
                         )}
                     </div>
                 )}
+
+                <div className="mt-8">
+                    <AparienciaPanel />
+                </div>
             </div>
         </div>
     );
