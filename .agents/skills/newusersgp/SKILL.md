@@ -63,9 +63,9 @@ Confirmar o recopilar del usuario:
    - Crear el CSV temporal/del día con el encabezado `nombre,email,password,rol,zona,url` y la fila del nuevo usuario (o los nuevos usuarios del lote).
 
 ### Paso 4: Insertar en Bases de Datos (Producción y Local)
-1. **Producción (`sgp_prod_v1_2` en VPS DonWeb `149.50.128.168:5287`):**
+1. **Producción (`sgp_prod_v1_3` en VPS DonWeb `149.50.128.168:5287`):**
    ```powershell
-   Get-Content "scripts\insert_<nombre>_<apellido>_2026.sql" -Encoding UTF8 | plink -ssh -P 5287 -pw 1.2.3.Fnd.2026 -batch root@149.50.128.168 "mysql --default-character-set=utf8mb4 -u sgp_admin -pP10xmK2vL9qRnW5z sgp_prod_v1_2"
+   Get-Content "scripts\insert_<nombre>_<apellido>_2026.sql" -Encoding UTF8 | plink -ssh -P 5287 -pw 1.2.3.Fnd.2026 -batch root@149.50.128.168 "mysql --default-character-set=utf8mb4 -u sgp_admin -pP10xmK2vL9qRnW5z sgp_prod_v1_3"
    ```
 2. **Local (`sgp_dev_v1_2`):**
    ```powershell

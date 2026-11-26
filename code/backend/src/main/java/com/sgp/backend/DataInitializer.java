@@ -199,7 +199,7 @@ public class DataInitializer implements CommandLineRunner {
 
             // Sembrar Usuarios de Nómina Oficial y Sistema (29 usuarios)
             User resMartin = createUserIfNotFound("martinnocioni@gmail.com", "Martin_SGP_2026*", "RESPONSABLE,RESOLUTOR", "Martin", "Nocioni", LocalDate.of(1990, 1, 1), "3426144703", null, "31111251");
-            createUserIfNotFound("fy.vildoza@gmail.com", "Florencia$2026#Uw", "RESPONSABLE,DISTRIBUIDOR", "FLORENCIA", "VILDOZA", LocalDate.of(1990, 1, 1), "3425008539", null, "35448744");
+            createUserIfNotFound("fy.vildoza@gmail.com", "Florencia$Cnnj#Uw", "RESPONSABLE,DISTRIBUIDOR,RESOLUTOR", "Florencia", "Vildoza", LocalDate.of(1990, 1, 1), "3425008539", "GENERAL", "35448744");
             createUserIfNotFound("adflucha@gmail.com", "Alejandro#2026!Dt", "RESPONSABLE", "Alejandro", "Fluchá", LocalDate.of(1990, 1, 1), "3424766314", null, "37451391");
             createUserIfNotFound("carinacdevard@gmail.com", "Carina!2026!Qg", "RESPONSABLE", "Carina", "Devard", LocalDate.of(1990, 1, 1), "3425346032", null, "22861416");
             createUserIfNotFound("diegopiedrabuena74@gmail.com", "Diego#2026&Mn", "RESPONSABLE", "Diego", "Piedrabuena", LocalDate.of(1990, 1, 1), "3424460555", null, "23738440");
