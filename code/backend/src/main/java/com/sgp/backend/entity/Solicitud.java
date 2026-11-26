@@ -103,6 +103,13 @@ public class Solicitud {
     @com.fasterxml.jackson.annotation.JsonProperty("barrio")
     private String barrio;
 
+    // Dirección exacta y fecha del evento (opcionales; recomendadas para eventos/agenda)
+    @Column(name = "direccion", length = 255)
+    private String direccion;
+
+    @Column(name = "fecha_evento")
+    private LocalDate fechaEvento;
+
     @ManyToOne(optional = false)
     @JoinColumn(name = "person_id")
     private Person person; // The beneficiary

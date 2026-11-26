@@ -25,8 +25,8 @@ public class SolicitudController {
     public ResponseEntity<org.springframework.data.domain.Page<Solicitud>> getAllSolicitudes(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) Long responsableId,
-            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) String responsableId,
+            @RequestParam(required = false) String locationId,
             @RequestParam(required = false) String origin,
             @RequestParam(required = false) String tipoPedido,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
@@ -49,8 +49,8 @@ public class SolicitudController {
             @PathVariable Long configId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) Long responsableId,
-            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) String responsableId,
+            @RequestParam(required = false) String locationId,
             @RequestParam(required = false) String origin,
             @RequestParam(required = false) String tipoPedido,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
@@ -185,8 +185,8 @@ public class SolicitudController {
     @GetMapping("/stats")
     public ResponseEntity<java.util.Map<String, Object>> getSolicitudStats(
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) Long responsableId,
-            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) String responsableId,
+            @RequestParam(required = false) String locationId,
             @RequestParam(required = false) String origin,
             @RequestParam(required = false) String tipoPedido,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
@@ -198,8 +198,8 @@ public class SolicitudController {
     public ResponseEntity<java.util.Map<String, Object>> getSolicitudStatsByConfig(
             @PathVariable Long configId,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) Long responsableId,
-            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) String responsableId,
+            @RequestParam(required = false) String locationId,
             @RequestParam(required = false) String origin,
             @RequestParam(required = false) String tipoPedido,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
