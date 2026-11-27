@@ -71,6 +71,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         person: { name: '', phone: '', dni: '', type: '', subType: '', socialMedia: '' },
         locationName: 'Santa Fe',
         barrio: '',
+        direccion: '',
+        fechaEvento: '',
         responsableId: '',
         amount: '',
         grantDate: '',
@@ -141,6 +143,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const [loading, setLoading] = useState(false);
     const [showApproveConfirm, setShowApproveConfirm] = useState(false);
     const [approveObservations, setApproveObservations] = useState('');
+    const [showRejectConfirm, setShowRejectConfirm] = useState(false);
+    const [rejectObservations, setRejectObservations] = useState('');
     const [asistencia, setAsistencia] = useState('');
     
     // Estados para eventos de calendario
@@ -192,14 +196,15 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         .map(t => (t?.tipo || '').trim().toUpperCase())
         .filter(Boolean);
 
-    // Verificar si el usuario actual tiene una asignación tomada, en pool de su tipo o aprobada
-    const myAssignment = formData.assignments?.find(a => a.resolutorEmail?.toLowerCase() === user?.email?.toLowerCase() && !a.approved);
+    // Verificar si el usuario actual tiene una asignación tomada, en pool de su tipo, aprobada o rechazada
+    const myAssignment = formData.assignments?.find(a => a.resolutorEmail?.toLowerCase() === user?.email?.toLowerCase() && !a.approved && !a.rejected);
     const myPoolAssignment = formData.assignments?.find(
-        a => !a.resolutorEmail && !a.approved && userTiposResolucion.includes((a.tipoResolucion || '').trim().toUpperCase())
+        a => !a.resolutorEmail && !a.approved && !a.rejected && userTiposResolucion.includes((a.tipoResolucion || '').trim().toUpperCase())
     );
     const activeResolutorAssignment = myAssignment || myPoolAssignment;
     const myApprovedAssignment = formData.assignments?.find(a => a.resolutorEmail?.toLowerCase() === user?.email?.toLowerCase() && a.approved);
-    const isPendingResolutor = isResolutor && Boolean(activeResolutorAssignment && !activeResolutorAssignment.approved);
+    const myRejectedAssignment = formData.assignments?.find(a => a.resolutorEmail?.toLowerCase() === user?.email?.toLowerCase() && a.rejected);
+    const isPendingResolutor = isResolutor && Boolean(activeResolutorAssignment && !activeResolutorAssignment.approved && !activeResolutorAssignment.rejected);
     const isApproveDisabled = loading || (activeResolutorAssignment?.tipoResolucion === 'AGENDA' && !asistencia);
 
     // Abrir automáticamente el sub-modal de aprobación si el usuario ingresó desde el botón rápido de una AGENDA
@@ -595,6 +600,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         tema: initialData.tema || '',
                         locationName: resolvedLocationName,
                         barrio: resolvedBarrio,
+                        direccion: initialData.direccion || '',
+                        fechaEvento: formatDateISO(initialData.fechaEvento),
                         responsableId: initialData.responsable?.id || '',
                         amount: initialData.amount || '',
                         grantDate: formatDateISO(initialData.grantDate),
@@ -627,6 +634,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 tipoResolucion: a.tipoResolucion || '',
                                 detalle: parsedDetalle,
                                 approved: a.approved || false,
+                                rejected: a.rejected || false,
                                 observaciones: a.observaciones || ''
                             };
                         }) || []
@@ -658,6 +666,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     person: { name: '', phone: '', dni: '', type: '', subType: '', socialMedia: '' },
                     locationName: 'Santa Fe',
                     barrio: '',
+                    direccion: '',
+                    fechaEvento: '',
                     responsableId: myRespId,
                     amount: '',
                     grantDate: '',
@@ -696,6 +706,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                 person: { name: '', phone: '', dni: '', type: '', subType: '', socialMedia: '' },
                 locationName: 'Santa Fe',
                 barrio: '',
+                direccion: '',
+                fechaEvento: '',
                 responsableId: '',
                 amount: '',
                 grantDate: '',
@@ -979,6 +991,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     person: formData.person,
                     locationName: formData.locationName,
                     barrio: formData.barrio,
+                    direccion: formData.direccion || null,
+                    fechaEvento: formData.fechaEvento || null,
                     zone: formData.zone || selectedZone || null,
                     contactDate: formData.contactDate || null,
                     resolutionDate: formData.resolutionDate || null,
@@ -1078,6 +1092,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             person: formData.person,
                             locationName: formData.locationName,
                             barrio: formData.barrio,
+                            direccion: formData.direccion || null,
+                            fechaEvento: formData.fechaEvento || null,
                             zone: formData.zone || selectedZone || null,
                             responsableId: formData.responsableId ? Number(formData.responsableId) : 0,
                             amount: formData.amount ? Number(formData.amount) : null,
@@ -1105,6 +1121,59 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
             const errMsg = err.response?.data?.message || err.response?.data?.error || (typeof err.response?.data === 'string' ? err.response?.data : "Error al guardar la solicitud");
             toast.error(errMsg);
             return false;
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    /**
+     * Rechaza la resolución pendiente del resolutor actual registrando el motivo obligatorio.
+     */
+    const handleRechazar = async () => {
+        const motivo = rejectObservations ? rejectObservations.trim() : '';
+        if (!motivo) {
+            toast.error("Debe ingresar el motivo del rechazo.");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            await api.post(`/api/solicitudes/${formData.id}/rechazar`, {
+                assignmentId: activeResolutorAssignment?.id || undefined,
+                observaciones: motivo
+            });
+
+            const otrasPendientes = (formData.assignments || [])
+                .filter(a => {
+                    if (activeResolutorAssignment?.id && a.id) {
+                        return a.id !== activeResolutorAssignment.id && !a.approved && !a.rejected;
+                    }
+                    return !(a.tipoResolucion === activeResolutorAssignment?.tipoResolucion) && !a.approved && !a.rejected;
+                })
+                .map(a => a.tipoResolucion)
+                .filter(Boolean);
+
+            if (otrasPendientes.length > 0) {
+                toast.success(
+                    `Tu resolución (${activeResolutorAssignment?.tipoResolucion || 'asignada'}) fue rechazada. El pedido #${formData.id} sigue En Resolución pendiente de: ${otrasPendientes.join(', ')}.`,
+                    { duration: 6000 }
+                );
+            } else {
+                const hayAprobadas = (formData.assignments || []).some(a => a.approved);
+                toast.success(
+                    hayAprobadas
+                        ? `Resolución rechazada. Todas las áreas cerraron el pedido #${formData.id}.`
+                        : `Resolución rechazada. La solicitud #${formData.id} pasó a Rechazado.`
+                );
+            }
+            setShowRejectConfirm(false);
+            setRejectObservations('');
+            onSuccess();
+            onClose();
+        } catch (err) {
+            console.error("Error al rechazar asignación", err);
+            const errMsg = err.response?.data?.message || err.response?.data?.error || "Error al rechazar la resolución";
+            toast.error(errMsg);
         } finally {
             setLoading(false);
         }
@@ -1204,19 +1273,39 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         if (showApproveConfirm && (myAssignment?.tipoResolucion === 'AGENDA' || formData.type === 'AGENDA')) {
             const beneficiario = formData.person?.name || "Sin Beneficiario";
             setCalendarTitle(`SGP Agenda #${formData.id} - ${beneficiario}`);
-            setCalendarDate(formData.resolutionDate || new Date().toISOString().split('T')[0]);
-            setCalendarTime('');
-            
-            let loc = formData.locationName || '';
-            if (formData.barrio) {
-                loc += (loc ? ', ' : '') + `Barrio: ${formData.barrio}`;
+
+            // Precargar fecha, hora y ubicación desde los atributos cargados en la resolución de Agenda
+            const agendaAsgn = (myAssignment?.tipoResolucion === 'AGENDA' ? myAssignment : null)
+                || (formData.assignments || []).find(a => (a.tipoResolucion || '').toUpperCase() === 'AGENDA');
+            let agendaDet = {};
+            if (agendaAsgn?.detalle) {
+                if (typeof agendaAsgn.detalle === 'object') {
+                    agendaDet = agendaAsgn.detalle;
+                } else if (typeof agendaAsgn.detalle === 'string' && agendaAsgn.detalle.trim().startsWith('{')) {
+                    try { agendaDet = JSON.parse(agendaAsgn.detalle); } catch (e) {}
+                }
             }
-            setCalendarLocation(loc);
-            
+
+            const rawAgendaDate = agendaDet['Día'] || agendaDet['Dia'] || agendaDet['Fecha'] || formData.fechaEvento || formData.resolutionDate;
+            setCalendarDate(formatDateISO(rawAgendaDate) || new Date().toISOString().split('T')[0]);
+
+            const rawAgendaTime = (agendaDet['Hora'] || '').toString().trim();
+            setCalendarTime(rawAgendaTime.length >= 5 ? rawAgendaTime.slice(0, 5) : rawAgendaTime);
+
+            const locCity = agendaDet['Lugar - Localidad'] || formData.locationName || '';
+            const locBarrio = agendaDet['Lugar - Barrio'] || formData.barrio || '';
+            const locDir = agendaDet['Dirección'] || formData.direccion || '';
+            const locParts = [
+                locDir,
+                locBarrio ? `Barrio: ${locBarrio}` : '',
+                locCity
+            ].filter(Boolean);
+            setCalendarLocation(locParts.join(', '));
+
             const desc = `Detalle del Caso: ${formData.description || 'Sin descripción'}\nObservaciones de la Resolución: ${approveObservations || 'Sin observaciones'}\nAsistencia Registrada: ${asistencia || 'No especificada'}`;
             setCalendarDescription(desc);
         }
-    }, [showApproveConfirm, myAssignment?.tipoResolucion, formData.type, formData.id, formData.person, formData.resolutionDate, formData.locationName, formData.barrio, formData.description, approveObservations, asistencia]);
+    }, [showApproveConfirm, myAssignment, formData.assignments, formData.type, formData.id, formData.person, formData.fechaEvento, formData.resolutionDate, formData.locationName, formData.barrio, formData.direccion, formData.description, approveObservations, asistencia]);
 
     // Computar zonas únicas de responsables (soportando múltiples zonas separadas por coma)
     const uniqueZones = [...new Set(responsables.flatMap(r => (r.zone || '').split(',').map(z => z.trim()).filter(Boolean)))].sort();
@@ -1232,7 +1321,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-6xl overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="flex items-center justify-between p-6 border-b border-gray-700 bg-gray-800/50">
                     <h2 className="text-xl font-bold flex items-center gap-2">
                         <Clipboard className="text-indigo-500" />
@@ -1293,54 +1382,10 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                     </button>
                 </div>
 
-                <div className="max-h-[70vh] overflow-y-auto custom-scrollbar">
+                <div className="max-h-[76vh] overflow-y-auto custom-scrollbar">
                     {activeTab === 'detalles' && (
                         <form onSubmit={handleSubmit} className="p-6">
-                            <fieldset disabled={isReadOnly} className="space-y-6">
-
-                            {/* Tipo y Estado */}
-                            <div className="grid grid-cols-2 gap-4">
-                                {!!formData.id && user?.role !== 'DISTRIBUIDOR' && (
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-400 mb-1">Tipo</label>
-                                        <select
-                                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
-                                            value={formData.type}
-                                            disabled={true}
-                                            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                                        >
-                                            <option value="PEDIDO">Pedido</option>
-                                            <option value="SUBSIDIO">Subsidio</option>
-                                            <option value="AGENDA">Agenda</option>
-                                        </select>
-                                    </div>
-                                )}
-                        {!!formData.id && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">
-                                    Estado {!canEditStatus && <span className="text-xs text-gray-500 font-normal">(Solo lectura)</span>}
-                                </label>
-                                <select
-                                    disabled={!canEditStatus || isReadOnly}
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                                    value={formData.status}
-                                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                                >
-                                    <option value="pendiente" disabled={Boolean(formData.responsableId)}>
-                                        Pendiente {formData.responsableId ? '(Desasignar responsable para volver a pendiente)' : ''}
-                                    </option>
-                                    <option value="en proceso">Asignadas</option>
-                                    <option value="en resolucion">En Resolución</option>
-                                    <option value="completadas">Resueltas</option>
-                                    <option value="rechazada">Rechazado</option>
-                                    {/* Renderizar la opción 'Consideración' solo para usuarios autorizados (Administrador, Responsable o Resolutor de Subsidio) o si el estado actual ya es 'consideracion' */}
-                                    {canPonerConsideracion && (
-                                        <option value="consideracion">Consideración</option>
-                                    )}
-                                </select>
-                            </div>
-                        )}
-                    </div>
+                            <fieldset disabled={isReadOnly} className="space-y-5">
 
                     {/* Banner de restricción de edición de carga original (Punto 6) */}
                     {!canEditInitialData && !isReadOnly && (
@@ -1349,6 +1394,32 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             <span>Los datos de la carga inicial solo pueden ser modificados por el Operador o el Responsable que cargó este pedido.</span>
                         </div>
                     )}
+
+                    {/* Cartel destacado de resoluciones rechazadas (visible para todos los roles) */}
+                    {(formData.assignments || []).some(a => a.rejected) && (
+                        <div
+                            data-testid="banner-resoluciones-rechazadas"
+                            className="p-3.5 bg-red-950/50 border border-red-500/60 rounded-xl space-y-1.5 text-xs text-red-100"
+                        >
+                            <div className="font-bold text-red-300 flex items-center gap-2 uppercase tracking-wider text-[11px]">
+                                <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" />
+                                Resolución Rechazada
+                            </div>
+                            {(formData.assignments || []).filter(a => a.rejected).map((rej, idx) => (
+                                <div key={rej.id || idx} className="pl-6 leading-snug">
+                                    <span className="font-bold text-red-200">{rej.tipoResolucion}</span>
+                                    {' — Rechazado por '}
+                                    <span className="font-bold text-white">{rej.resolutorName || rej.resolutorEmail || 'Resolutor'}</span>
+                                    {rej.observaciones ? `: "${rej.observaciones}"` : ''}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Layout responsivo de dos columnas en escritorio (Opción A) */}
+                    <div data-testid="solicitud-modal-two-col" className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                        {/* COLUMNA IZQUIERDA: Datos de la Solicitud */}
+                        <div className="lg:col-span-6 space-y-5">
 
                     {/* Datos de la Persona */}
                     <div className="space-y-4 p-4 bg-gray-900/40 rounded-xl border border-gray-700">
@@ -1567,6 +1638,35 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 </div>
                             )}
                         </div>
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="md:col-span-2">
+                                <label className="block text-sm text-gray-500 mb-1">
+                                    Dirección <span className="text-xs text-indigo-400 font-normal">(Opcional — indicar dirección exacta si es un evento)</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    data-testid="solicitud-direccion-input"
+                                    disabled={!canEditInitialData || isReadOnly}
+                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                                    value={formData.direccion || ''}
+                                    onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+                                    placeholder="Ej: Bv. Gálvez 1540 / Club Unión..."
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-gray-500 mb-1">
+                                    Fecha del Evento <span className="text-xs text-indigo-400 font-normal">(Opcional)</span>
+                                </label>
+                                <input
+                                    type="date"
+                                    data-testid="solicitud-fecha-evento-input"
+                                    disabled={!canEditInitialData || isReadOnly}
+                                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                                    value={formData.fechaEvento || ''}
+                                    onChange={(e) => setFormData({ ...formData, fechaEvento: e.target.value })}
+                                />
+                            </div>
+                        </div>
                     </div>
 
                     {/* Descripción de la Solicitud */}
@@ -1593,8 +1693,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         />
                     </div>
 
-                    {/* Tema Solicitud y Origen */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Tema Solicitud, Origen y Fecha de Ingreso */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-400 mb-1">Tema Solicitud</label>
                             <select
@@ -1636,7 +1736,123 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 <option value="Derivado">Derivado</option>
                             </select>
                         </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Ingreso</label>
+                            <input
+                                type="date"
+                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
+                                value={formData.entryDate}
+                                onChange={(e) => setFormData({ ...formData, entryDate: e.target.value })}
+                            />
+                        </div>
                     </div>
+                        </div>{/* Fin Columna Izquierda */}
+
+                        {/* COLUMNA DERECHA: Gestión, Asignaciones y Resoluciones */}
+                        <div className="lg:col-span-6 space-y-5">
+                    {/* Bloque de Gestión: Tipo, Estado, Zona y Responsable */}
+                    {(!!formData.id || user?.role !== 'OPERADOR') && (
+                        <div className="p-4 bg-gray-900/40 rounded-xl border border-gray-700 space-y-4">
+                            <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                                <LayoutDashboard className="h-4 w-4 text-indigo-400" /> Gestión y Asignación
+                            </h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {!!formData.id && user?.role !== 'DISTRIBUIDOR' && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-400 mb-1">Tipo</label>
+                                        <select
+                                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50"
+                                            value={formData.type}
+                                            disabled={true}
+                                            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                                        >
+                                            <option value="PEDIDO">Pedido</option>
+                                            <option value="SUBSIDIO">Subsidio</option>
+                                            <option value="AGENDA">Agenda</option>
+                                        </select>
+                                    </div>
+                                )}
+                                {!!formData.id && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-400 mb-1">
+                                            Estado {!canEditStatus && <span className="text-xs text-gray-500 font-normal">(Solo lectura)</span>}
+                                        </label>
+                                        <select
+                                            disabled={!canEditStatus || isReadOnly}
+                                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                            value={formData.status}
+                                            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                        >
+                                            <option value="pendiente" disabled={Boolean(formData.responsableId)}>
+                                                Pendiente {formData.responsableId ? '(Desasignar responsable para volver a pendiente)' : ''}
+                                            </option>
+                                            <option value="en proceso">Asignadas</option>
+                                            <option value="en resolucion">En Resolución</option>
+                                            <option value="completadas">Resueltas</option>
+                                            <option value="rechazada">Rechazado</option>
+                                            {/* Renderizar la opción 'Consideración' solo para usuarios autorizados (Administrador, Responsable o Resolutor de Subsidio) o si el estado actual ya es 'consideracion' */}
+                                            {canPonerConsideracion && (
+                                                <option value="consideracion">Consideración</option>
+                                            )}
+                                        </select>
+                                    </div>
+                                )}
+                                {user?.role !== 'OPERADOR' && (
+                                    <>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-400 mb-1">Zona Territorial</label>
+                                            <select
+                                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                                                value={selectedZone}
+                                                disabled={isResponsable && (!isNewSolicitud || !hasMultipleUserZones)}
+                                                onChange={(e) => {
+                                                    const z = e.target.value;
+                                                    setSelectedZone(z);
+                                                    // Si es un responsable eligiendo entre sus propias zonas, conserva su asignación propia
+                                                    setFormData(prev => ({ 
+                                                        ...prev, 
+                                                        responsableId: isResponsable ? prev.responsableId : '',
+                                                        zone: z
+                                                    }));
+                                                }}
+                                            >
+                                                <option value="">Seleccionar Zona...</option>
+                                                {(isResponsable && hasMultipleUserZones ? userZones : uniqueZones).map(z => (
+                                                    <option key={z} value={z}>{z}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-400 mb-1">Responsable</label>
+                                            <select
+                                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                                                value={formData.responsableId}
+                                                disabled={isResponsable || !selectedZone}
+                                                onChange={(e) => {
+                                                    const respId = e.target.value;
+                                                    const selectedResp = responsables.find(r => r.id.toString() === respId.toString());
+                                                    const nextStatus = (respId && formData.status === 'pendiente')
+                                                        ? 'en proceso'
+                                                        : (!respId && formData.status === 'en proceso' ? 'pendiente' : formData.status);
+                                                    setFormData({ 
+                                                        ...formData, 
+                                                        responsableId: respId,
+                                                        status: nextStatus,
+                                                        zone: selectedZone || (selectedResp ? selectedResp.zone : '')
+                                                    });
+                                                }}
+                                            >
+                                                <option value="">-- Sin Asignar (Pool de Zona) --</option>
+                                                {filteredResponsables.map(r => (
+                                                    <option key={r.id} value={r.id}>{r.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Campos específicos de Agenda para visualización de solo lectura */}
                     {formData.type === 'AGENDA' && formData.asistencia && (
@@ -1651,7 +1867,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
 
                     {/* Campos específicos de Subsidio */}
                     {(formData.type?.toUpperCase().includes('SUBSIDIO')) && (
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top-2 p-4 bg-emerald-900/20 rounded-xl border border-emerald-800/50">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in slide-in-from-top-2 p-4 bg-emerald-900/20 rounded-xl border border-emerald-800/50">
                             <div>
                                 <label className="block text-sm font-medium text-emerald-400 mb-1 flex items-center gap-1">
                                     <UserIcon className="h-3 w-3" /> DNI Beneficiario {requiresPersonDni ? <span className="text-red-400 font-bold">*</span> : <span className="text-xs text-gray-400 font-normal">(Opcional)</span>}
@@ -1711,86 +1927,21 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         </div>
                     )}
 
-                    {/* Fechas y Seguimiento */}
-                    <div className={`grid gap-4 ${user?.role !== 'OPERADOR' ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Ingreso</label>
-                            <input
-                                type="date"
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white"
-                                value={formData.entryDate}
-                                onChange={(e) => setFormData({ ...formData, entryDate: e.target.value })}
-                            />
-                        </div>
-                        {user?.role !== 'OPERADOR' && (
-                            <>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-1">Zona Territorial</label>
-                                    <select
-                                        className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-                                        value={selectedZone}
-                                        disabled={isResponsable && (!isNewSolicitud || !hasMultipleUserZones)}
-                                        onChange={(e) => {
-                                            const z = e.target.value;
-                                            setSelectedZone(z);
-                                            // Si es un responsable eligiendo entre sus propias zonas, conserva su asignación propia
-                                            setFormData(prev => ({ 
-                                                ...prev, 
-                                                responsableId: isResponsable ? prev.responsableId : '',
-                                                zone: z
-                                            }));
-                                        }}
-                                    >
-                                        <option value="">Seleccionar Zona...</option>
-                                        {(isResponsable && hasMultipleUserZones ? userZones : uniqueZones).map(z => (
-                                            <option key={z} value={z}>{z}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-1">Responsable</label>
-                                    <select
-                                        className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-                                        value={formData.responsableId}
-                                        disabled={isResponsable || !selectedZone}
-                                        onChange={(e) => {
-                                            const respId = e.target.value;
-                                            const selectedResp = responsables.find(r => r.id.toString() === respId.toString());
-                                            const nextStatus = (respId && formData.status === 'pendiente')
-                                                ? 'en proceso'
-                                                : (!respId && formData.status === 'en proceso' ? 'pendiente' : formData.status);
-                                            setFormData({ 
-                                                ...formData, 
-                                                responsableId: respId,
-                                                status: nextStatus,
-                                                zone: selectedZone || (selectedResp ? selectedResp.zone : '')
-                                            });
-                                        }}
-                                    >
-                                        <option value="">-- Sin Asignar (Pool de Zona) --</option>
-                                        {filteredResponsables.map(r => (
-                                            <option key={r.id} value={r.id}>{r.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </>
-                        )}
-                    </div>
-
-                    {user?.role !== 'OPERADOR' && user?.role !== 'DISTRIBUIDOR' && (
-                        <div className="p-4 bg-gray-900/40 rounded-xl border border-gray-700 space-y-4">
-                            <h3 className="text-sm font-semibold text-gray-300">Seguimiento</h3>
-
-                            {myApprovedAssignment && (
-                                <div className="bg-emerald-900/40 p-4 rounded-xl border border-emerald-700/50 flex flex-col gap-1">
-                                    <span className="text-sm font-bold text-emerald-400">✅ Resolución Finalizada</span>
-                                    {myApprovedAssignment.observaciones && (
-                                        <p className="text-xs text-emerald-200 italic">"{myApprovedAssignment.observaciones}"</p>
-                                    )}
-                                </div>
+                    {user?.role !== 'OPERADOR' && user?.role !== 'DISTRIBUIDOR' && myApprovedAssignment && (
+                        <div className="bg-emerald-900/40 p-4 rounded-xl border border-emerald-700/50 flex flex-col gap-1">
+                            <span className="text-sm font-bold text-emerald-400">✅ Resolución Finalizada</span>
+                            {myApprovedAssignment.observaciones && (
+                                <p className="text-xs text-emerald-200 italic">"{myApprovedAssignment.observaciones}"</p>
                             )}
+                        </div>
+                    )}
 
-
+                    {user?.role !== 'OPERADOR' && user?.role !== 'DISTRIBUIDOR' && myRejectedAssignment && (
+                        <div className="bg-red-900/30 p-4 rounded-xl border border-red-700/50 flex flex-col gap-1">
+                            <span className="text-sm font-bold text-red-400">❌ Resolución Rechazada</span>
+                            {myRejectedAssignment.observaciones && (
+                                <p className="text-xs text-red-200 italic">"{myRejectedAssignment.observaciones}"</p>
+                            )}
                         </div>
                     )}
 
@@ -1833,40 +1984,66 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                     const config = tiposResolucion.find(c => c.tipo === type);
                                                     const newAssignments = [...formData.assignments];
                                                     let currentDet = typeof assignment.detalle === 'object' && assignment.detalle !== null ? { ...assignment.detalle } : {};
-                                                    if (type === 'AGENDA') {
-                                                        if (!currentDet['Lugar - Localidad'] && formData.locationName) {
-                                                            currentDet['Lugar - Localidad'] = formData.locationName;
+                                                    // Autocompletado inteligente: prellena atributos vacíos con los datos ya cargados en la solicitud
+                                                    const fillIfEmpty = (key, val) => {
+                                                        if ((currentDet[key] === undefined || currentDet[key] === null || String(currentDet[key]).trim() === '') && val !== undefined && val !== null && String(val).trim() !== '') {
+                                                            currentDet[key] = String(val).trim();
                                                         }
-                                                        if (!currentDet['Lugar - Barrio'] && formData.barrio) {
-                                                            currentDet['Lugar - Barrio'] = formData.barrio;
+                                                    };
+                                                    const upperType = (type || '').toUpperCase();
+                                                    const assignedRespObj = responsables.find(r => String(r.id) === String(formData.responsableId));
+                                                    const respNombre = assignedRespObj?.name || '';
+
+                                                    if (upperType === 'AGENDA') {
+                                                        fillIfEmpty('Lugar - Localidad', formData.locationName);
+                                                        fillIfEmpty('Lugar - Barrio', formData.barrio);
+                                                        fillIfEmpty('Dirección', formData.direccion);
+                                                        fillIfEmpty('Día', formData.fechaEvento);
+                                                        fillIfEmpty('Descripción/temario', formData.description);
+                                                        fillIfEmpty('Descripción/monto', formData.amount);
+                                                        fillIfEmpty('Responsable', respNombre);
+                                                        const obsConDir = [formData.observation, formData.direccion ? `Dirección: ${formData.direccion}` : ''].filter(Boolean).join(' | ');
+                                                        fillIfEmpty('Observación', obsConDir);
+                                                    } else if (upperType.includes('DECLARACION') || upperType.includes('DECLARACIÓN')) {
+                                                        fillIfEmpty('Localidad', formData.locationName);
+                                                        fillIfEmpty('Dirección', formData.direccion);
+                                                        fillIfEmpty('Fecha', formData.fechaEvento);
+                                                        fillIfEmpty('Descripción', formData.description);
+                                                        fillIfEmpty('Observaciones', formData.observation);
+                                                        fillIfEmpty('Responsable', respNombre);
+                                                        if (formData.person?.type !== 'Personal') {
+                                                            fillIfEmpty('Institución a declarar', formData.person?.name);
                                                         }
-                                                    }
-                                                    if (type === 'DECLARACION DE INTERES' || type === 'DECLARACIÓN DE INTERÉS' || (type || '').includes('SUBSIDIO')) {
-                                                        if (!currentDet['Localidad'] && formData.locationName) {
-                                                            currentDet['Localidad'] = formData.locationName;
-                                                        }
-                                                        const defaultTipoPedido = formData.person?.type === 'Personal' ? 'Personal' : (type.toUpperCase() === 'SUBSIDIO EN ESPECIE' ? 'Institucional en especie' : 'Institucional en dinero');
-                                                        if ((type || '').toUpperCase().includes('SUBSIDIO')) {
-                                                            // Actualizar Tipo de pedido al cambiar entre Subsidio en Especie y Subsidio en Dinero
-                                                            if (type.toUpperCase() === 'SUBSIDIO EN ESPECIE') {
-                                                                currentDet['Tipo de pedido'] = 'Institucional en especie';
-                                                            } else if (!currentDet['Tipo de pedido'] || currentDet['Tipo de pedido'] === 'Institucional en especie') {
-                                                                currentDet['Tipo de pedido'] = formData.person?.type === 'Personal' ? 'Personal' : 'Institucional en dinero';
+                                                    } else if (upperType.includes('SUBSIDIO')) {
+                                                        fillIfEmpty('Localidad', formData.locationName);
+                                                        fillIfEmpty('Fecha del evento', formData.fechaEvento);
+                                                        fillIfEmpty('Observaciones', formData.observation);
+                                                        const defaultTipoPedido = formData.person?.type === 'Personal'
+                                                            ? 'Personal'
+                                                            : (upperType === 'SUBSIDIO EN ESPECIE' ? 'Institucional en especie' : 'Institucional en dinero');
+                                                        if (upperType === 'SUBSIDIO EN ESPECIE') {
+                                                            currentDet['Tipo de pedido'] = 'Institucional en especie';
+                                                            fillIfEmpty('Monto solicitado', formData.amount);
+                                                            fillIfEmpty('Descripción de bienes solicitados', formData.description);
+                                                        } else {
+                                                            if (!currentDet['Tipo de pedido'] || currentDet['Tipo de pedido'] === 'Institucional en especie') {
+                                                                currentDet['Tipo de pedido'] = defaultTipoPedido;
                                                             }
-                                                        } else if (!currentDet['Tipo de pedido']) {
-                                                            currentDet['Tipo de pedido'] = defaultTipoPedido;
+                                                            fillIfEmpty('Monto', formData.amount);
                                                         }
-                                                        if ((type || '').includes('SUBSIDIO') && (currentDet['Tipo de pedido'] === 'Personal' || defaultTipoPedido === 'Personal')) {
-                                                            if (!currentDet['Nombre y apellido'] && formData.person?.name) {
-                                                                currentDet['Nombre y apellido'] = formData.person.name;
-                                                            }
-                                                            if (!currentDet['DNI'] && formData.person?.dni) {
-                                                                currentDet['DNI'] = formData.person.dni;
-                                                            }
-                                                            if (!currentDet['Teléfono'] && formData.person?.phone) {
-                                                                currentDet['Teléfono'] = formData.person.phone;
-                                                            }
+                                                        const effectiveTipoPedido = currentDet['Tipo de pedido'] || defaultTipoPedido;
+                                                        if (effectiveTipoPedido === 'Personal') {
+                                                            fillIfEmpty('Nombre y apellido', formData.person?.name);
+                                                            fillIfEmpty('DNI', formData.person?.dni);
+                                                            fillIfEmpty('Teléfono', formData.person?.phone);
+                                                            fillIfEmpty('Dirección de DNI', formData.direccion);
+                                                        } else {
+                                                            fillIfEmpty('Nombre de institución', formData.person?.name);
+                                                            fillIfEmpty('Dirección de institución', formData.direccion);
                                                         }
+                                                    } else if (upperType === 'OTRO' || upperType === 'OTRA') {
+                                                        fillIfEmpty('Descripción corta', formData.tema || (formData.description || '').slice(0, 100));
+                                                        fillIfEmpty('Detalle de resolución', formData.description);
                                                     }
                                                     newAssignments[index] = { 
                                                         ...assignment, 
@@ -2331,7 +2508,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
 
                                             {assignment.resolutorEmail ? (
                                                 <span className="text-[10px] text-gray-400 mt-2 ml-1">
-                                                    {assignment.approved ? 'Resuelto por:' : 'Asignado a:'}{' '}
+                                                    {assignment.approved ? 'Resuelto por:' : (assignment.rejected ? 'Rechazado por:' : 'Asignado a:')}{' '}
                                                     <span className="font-semibold text-gray-300">
                                                         {assignment.resolutorName || assignment.resolutorEmail}
                                                     </span>
@@ -2344,10 +2521,20 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                             {assignment.approved && (
                                                 <div className="mt-2 p-2.5 bg-emerald-950/30 rounded-lg border border-emerald-800/40 text-xs text-emerald-200">
                                                     <span className="font-bold text-emerald-400 flex items-center gap-1.5 mb-1">
-                                                        ✔️ Aprobado y Agendado
+                                                        ✔️ Aprobado
                                                     </span>
                                                     {assignment.observaciones && (
                                                         <p className="text-[11px] text-emerald-100 italic">"{assignment.observaciones}"</p>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {assignment.rejected && (
+                                                <div className="mt-2 p-2.5 bg-red-950/30 rounded-lg border border-red-800/40 text-xs text-red-200">
+                                                    <span className="font-bold text-red-400 flex items-center gap-1.5 mb-1">
+                                                        ❌ Rechazado
+                                                    </span>
+                                                    {assignment.observaciones && (
+                                                        <p className="text-[11px] text-red-100 italic">"{assignment.observaciones}"</p>
                                                     )}
                                                 </div>
                                             )}
@@ -2456,6 +2643,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             )}
                         </div>
                     </div>
+                        </div>{/* Fin Columna Derecha */}
+                    </div>{/* Fin Grid Dos Columnas */}
                             </fieldset>
                         </form>
                     )}
@@ -2481,6 +2670,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                 record.actionType === 'CREATED' ? 'bg-amber-500/10 text-amber-400' :
                                                 record.actionType === 'ASSIGNED' ? 'bg-emerald-500/10 text-emerald-400' :
                                                 record.actionType === 'REASSIGNED' ? 'bg-indigo-500/10 text-indigo-400' :
+                                                record.actionType.includes('RECHAZADA') ? 'bg-red-500/10 text-red-400' :
                                                 record.actionType.startsWith('RESOLUCIÓN') ? 'bg-blue-500/10 text-blue-400' :
                                                 'bg-red-500/10 text-red-400'
                                             }`}>
@@ -2492,12 +2682,15 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                         record.actionType === 'CREATED' ? 'bg-amber-900/30 text-amber-400 border-amber-800' :
                                                         record.actionType === 'ASSIGNED' ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' :
                                                         record.actionType === 'REASSIGNED' ? 'bg-indigo-900/30 text-indigo-400 border-indigo-800' :
+                                                        record.actionType.includes('RECHAZADA') ? 'bg-red-900/30 text-red-400 border-red-800' :
                                                         record.actionType.startsWith('RESOLUCIÓN') ? 'bg-blue-900/30 text-blue-400 border-blue-800' :
                                                         'bg-red-900/30 text-red-400 border-red-800'
                                                     }`}>
                                                         {record.actionType === 'CREATED' ? 'Cargado/Creado' :
                                                          record.actionType === 'ASSIGNED' ? 'Asignado' :
-                                                         record.actionType === 'REASSIGNED' ? 'Re-asignado' : 
+                                                         record.actionType === 'REASSIGNED' ? 'Re-asignado' :
+                                                         record.actionType.includes('RECHAZADA') ? 'Resolución Rechazada' :
+                                                         record.actionType.includes('TOMADA') ? 'Resolución Tomada' :
                                                          record.actionType.startsWith('RESOLUCIÓN') ? 'Resolución Aprobada' : 'Desasignado'}
                                                     </span>
                                                     <span className="text-xs text-gray-400">
@@ -2523,7 +2716,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                         </span>
                                                     ) : (
                                                         <span className="text-gray-300">
-                                                            <span className="font-bold text-white">{record.responsable ? record.responsable.name : 'Usuario'}</span> {record.actionType.toLowerCase().includes('aprobada') ? 'aprobó la resolución.' : ''}
+                                                            <span className="font-bold text-white">{record.responsable ? record.responsable.name : 'Usuario'}</span> — {record.actionType}
                                                         </span>
                                                     )}
                                                 </div>
@@ -2648,15 +2841,32 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             </button>
                         )}
                         {!isReadOnly && isPendingResolutor && (
-                            <button
-                                type="button"
-                                onClick={() => setShowApproveConfirm(true)}
-                                disabled={loading}
-                                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold transition-all shadow-lg flex items-center gap-2 disabled:opacity-50"
-                            >
-                                <Save className="h-4 w-4" />
-                                Aprobar Resolución
-                            </button>
+                            <>
+                                <button
+                                    type="button"
+                                    data-testid="btn-aprobar-resolucion"
+                                    onClick={() => setShowApproveConfirm(true)}
+                                    disabled={loading}
+                                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold transition-all shadow-lg flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    <Save className="h-4 w-4" />
+                                    Aprobar Resolución
+                                </button>
+                                <button
+                                    type="button"
+                                    data-testid="btn-rechazar-resolucion"
+                                    onClick={() => {
+                                        setRejectObservations('');
+                                        setShowRejectConfirm(true);
+                                    }}
+                                    disabled={loading}
+                                    className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg font-bold transition-all shadow-lg flex items-center gap-2 disabled:opacity-50"
+                                    title={`Rechazar la resolución (${activeResolutorAssignment?.tipoResolucion || ''}) indicando el motivo`}
+                                >
+                                    <X className="h-4 w-4" />
+                                    Rechazar Resolución
+                                </button>
+                            </>
                         )}
                         {!isReadOnly && canTomar && (
                             <button
@@ -2694,8 +2904,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
 
                 {/* Sub-modal de confirmación de aprobación */}
                 {showApproveConfirm && (
-                    <div className="absolute inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
-                        <div className="bg-gray-800 border border-emerald-500/50 rounded-2xl shadow-2xl p-6 w-full max-w-md space-y-4">
+                    <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-300">
+                        <div className="bg-gray-800 border border-emerald-500/50 rounded-2xl shadow-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto custom-scrollbar space-y-4 my-auto">
                             <h3 className="text-lg font-bold text-emerald-400 flex items-center gap-2">
                                 <Save className="h-5 w-5" /> ¿Aprobar Resolución?
                             </h3>
@@ -2882,6 +3092,54 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {loading ? 'Confirmando...' : 'Confirmar y Finalizar'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Sub-modal de confirmación de rechazo de resolución */}
+                {showRejectConfirm && (
+                    <div
+                        data-testid="modal-confirmar-rechazo"
+                        className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-300"
+                    >
+                        <div className="bg-gray-800 border border-red-500/50 rounded-2xl shadow-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto custom-scrollbar space-y-4 my-auto">
+                            <h3 className="text-lg font-bold text-red-400 flex items-center gap-2">
+                                <X className="h-5 w-5" /> ¿Rechazar Resolución ({activeResolutorAssignment?.tipoResolucion || 'Asignada'})?
+                            </h3>
+                            <p className="text-sm text-gray-300">
+                                Esta acción marcará tu resolución como <strong>Rechazada</strong> y dejará registrado el motivo en el historial de la solicitud.
+                            </p>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-400 uppercase mb-2">
+                                    Motivo del rechazo <span className="text-red-400">*</span>
+                                </label>
+                                <textarea
+                                    data-testid="reject-observaciones-input"
+                                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white text-sm outline-none focus:ring-2 focus:ring-red-500"
+                                    rows="4"
+                                    placeholder="Explique brevemente el motivo por el cual se rechaza esta resolución..."
+                                    value={rejectObservations}
+                                    onChange={(e) => setRejectObservations(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowRejectConfirm(false)}
+                                    className="px-4 py-2 text-gray-400 hover:text-white"
+                                >
+                                    Volver
+                                </button>
+                                <button
+                                    type="button"
+                                    data-testid="btn-confirmar-rechazo"
+                                    onClick={handleRechazar}
+                                    disabled={loading || !rejectObservations.trim()}
+                                    className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {loading ? 'Rechazando...' : 'Confirmar Rechazo'}
                                 </button>
                             </div>
                         </div>

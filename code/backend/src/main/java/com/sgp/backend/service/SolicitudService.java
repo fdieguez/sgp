@@ -49,31 +49,31 @@ public class SolicitudService {
     private final SyncService syncService;
     private final ObjectMapper objectMapper;
 
-    public org.springframework.data.domain.Page<Solicitud> getAllSolicitudes(String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, org.springframework.data.domain.Pageable pageable) {
+    public org.springframework.data.domain.Page<Solicitud> getAllSolicitudes(String status, String search, String responsableId, String locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, org.springframework.data.domain.Pageable pageable) {
         return getAllSolicitudes(status, search, responsableId, locationId, origin, dateFrom, dateTo, null, pageable);
     }
 
-    public org.springframework.data.domain.Page<Solicitud> getAllSolicitudes(String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, String tipoPedido, org.springframework.data.domain.Pageable pageable) {
+    public org.springframework.data.domain.Page<Solicitud> getAllSolicitudes(String status, String search, String responsableId, String locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, String tipoPedido, org.springframework.data.domain.Pageable pageable) {
         org.springframework.data.jpa.domain.Specification<Solicitud> spec = buildSpecification(status, search, responsableId, locationId, origin, dateFrom, dateTo, tipoPedido);
         return solicitudRepository.findAll(spec, pageable);
     }
 
-    public org.springframework.data.domain.Page<Solicitud> getSolicitudesByConfig(Long configId, String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, org.springframework.data.domain.Pageable pageable) {
+    public org.springframework.data.domain.Page<Solicitud> getSolicitudesByConfig(Long configId, String status, String search, String responsableId, String locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, org.springframework.data.domain.Pageable pageable) {
         return getSolicitudesByConfig(configId, status, search, responsableId, locationId, origin, dateFrom, dateTo, null, pageable);
     }
 
-    public org.springframework.data.domain.Page<Solicitud> getSolicitudesByConfig(Long configId, String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, String tipoPedido, org.springframework.data.domain.Pageable pageable) {
+    public org.springframework.data.domain.Page<Solicitud> getSolicitudesByConfig(Long configId, String status, String search, String responsableId, String locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, String tipoPedido, org.springframework.data.domain.Pageable pageable) {
         org.springframework.data.jpa.domain.Specification<Solicitud> baseSpec = org.springframework.data.jpa.domain.Specification
                 .where((root, query, cb) -> cb.equal(root.get("sheetsConfig").get("id"), configId));
         org.springframework.data.jpa.domain.Specification<Solicitud> spec = baseSpec.and(buildSpecification(status, search, responsableId, locationId, origin, dateFrom, dateTo, tipoPedido));
         return solicitudRepository.findAll(spec, pageable);
     }
 
-    public java.util.Map<String, Object> getSolicitudStats(Long configId, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo) {
+    public java.util.Map<String, Object> getSolicitudStats(Long configId, String search, String responsableId, String locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo) {
         return getSolicitudStats(configId, search, responsableId, locationId, origin, dateFrom, dateTo, null);
     }
 
-    public java.util.Map<String, Object> getSolicitudStats(Long configId, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, String tipoPedido) {
+    public java.util.Map<String, Object> getSolicitudStats(Long configId, String search, String responsableId, String locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, String tipoPedido) {
         org.springframework.data.jpa.domain.Specification<Solicitud> spec = org.springframework.data.jpa.domain.Specification.where(null);
         if (configId != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("sheetsConfig").get("id"), configId));
@@ -107,11 +107,32 @@ public class SolicitudService {
         return stats;
     }
 
-    private org.springframework.data.jpa.domain.Specification<Solicitud> buildSpecification(String status, String search, Long responsableId, Long locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, String tipoPedido) {
+    private List<String> splitCsv(String raw) {
+        if (raw == null || raw.isBlank()) return java.util.Collections.emptyList();
+        return java.util.Arrays.stream(raw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+    }
+
+    private List<Long> splitCsvLongs(String raw) {
+        List<Long> ids = new java.util.ArrayList<>();
+        for (String token : splitCsv(raw)) {
+            try {
+                ids.add(Long.parseLong(token));
+            } catch (NumberFormatException ignored) {
+                // Ignorar IDs no numéricos
+            }
+        }
+        return ids;
+    }
+
+    private org.springframework.data.jpa.domain.Specification<Solicitud> buildSpecification(String status, String search, String responsableId, String locationId, String origin, java.time.LocalDate dateFrom, java.time.LocalDate dateTo, String tipoPedido) {
         org.springframework.data.jpa.domain.Specification<Solicitud> spec = org.springframework.data.jpa.domain.Specification.where(null);
 
-        if (status != null && !status.isEmpty()) {
-            spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), status));
+        List<String> statusList = splitCsv(status);
+        if (!statusList.isEmpty()) {
+            spec = spec.and((root, query, cb) -> root.get("status").in(statusList));
         }
 
         if (search != null && !search.isEmpty()) {
@@ -122,20 +143,34 @@ public class SolicitudService {
                     cb.like(cb.lower(root.get("id").as(String.class)), likePattern)));
         }
 
-        if (responsableId != null) {
-            if (responsableId == 0) {
-                spec = spec.and((root, query, cb) -> cb.isNull(root.get("responsable")));
-            } else {
-                spec = spec.and((root, query, cb) -> cb.equal(root.get("responsable").get("id"), responsableId));
-            }
+        List<Long> respIds = splitCsvLongs(responsableId);
+        if (!respIds.isEmpty()) {
+            boolean includeUnassigned = respIds.contains(0L);
+            List<Long> assignedIds = respIds.stream().filter(id -> id != 0L).toList();
+            spec = spec.and((root, query, cb) -> {
+                if (includeUnassigned && !assignedIds.isEmpty()) {
+                    return cb.or(cb.isNull(root.get("responsable")), root.get("responsable").get("id").in(assignedIds));
+                } else if (includeUnassigned) {
+                    return cb.isNull(root.get("responsable"));
+                } else {
+                    return root.get("responsable").get("id").in(assignedIds);
+                }
+            });
         }
 
-        if (locationId != null) {
-            spec = spec.and((root, query, cb) -> cb.equal(root.get("location").get("id"), locationId));
+        List<Long> locIds = splitCsvLongs(locationId);
+        if (!locIds.isEmpty()) {
+            // Contempla tanto la localidad directa como barrios cuyo padre sea alguna localidad seleccionada
+            spec = spec.and((root, query, cb) -> {
+                jakarta.persistence.criteria.Join<Object, Object> locJoin = root.join("location", jakarta.persistence.criteria.JoinType.LEFT);
+                jakarta.persistence.criteria.Join<Object, Object> parentJoin = locJoin.join("parent", jakarta.persistence.criteria.JoinType.LEFT);
+                return cb.or(locJoin.get("id").in(locIds), parentJoin.get("id").in(locIds));
+            });
         }
 
-        if (origin != null && !origin.isEmpty()) {
-            spec = spec.and((root, query, cb) -> cb.equal(root.get("origin"), origin));
+        List<String> originList = splitCsv(origin);
+        if (!originList.isEmpty()) {
+            spec = spec.and((root, query, cb) -> root.get("origin").in(originList));
         }
 
         if (dateFrom != null) {
@@ -146,42 +181,46 @@ public class SolicitudService {
             spec = spec.and((root, query, cb) -> cb.lessThanOrEqualTo(root.get("entryDate"), dateTo));
         }
 
-        // Filtro por tipo de pedido de subsidio (Personal, Institucional en dinero, Institucional en especie)
-        if (tipoPedido != null && !tipoPedido.trim().isEmpty()) {
-            final String tpLower = tipoPedido.trim().toLowerCase();
+        // Filtro por uno o múltiples tipos de pedido de subsidio
+        List<String> tipoPedidoList = splitCsv(tipoPedido);
+        if (!tipoPedidoList.isEmpty()) {
             spec = spec.and((root, query, cb) -> {
-                jakarta.persistence.criteria.Subquery<Long> sub = query.subquery(Long.class);
-                jakarta.persistence.criteria.Root<SolicitudResolutorAssignment> aRoot = sub.from(SolicitudResolutorAssignment.class);
-                sub.select(aRoot.get("solicitud").get("id"));
+                List<jakarta.persistence.criteria.Predicate> orTipos = new java.util.ArrayList<>();
+                for (String tpRaw : tipoPedidoList) {
+                    final String tpLower = tpRaw.toLowerCase();
+                    jakarta.persistence.criteria.Subquery<Long> sub = query.subquery(Long.class);
+                    jakarta.persistence.criteria.Root<SolicitudResolutorAssignment> aRoot = sub.from(SolicitudResolutorAssignment.class);
+                    sub.select(aRoot.get("solicitud").get("id"));
 
-                jakarta.persistence.criteria.Predicate isSubsidioAsgn = cb.like(cb.upper(aRoot.get("tipoResolucion")), "%SUBSIDIO%");
-                jakarta.persistence.criteria.Predicate matchTipo;
-                if ("personal".equals(tpLower)) {
-                    matchTipo = cb.or(
-                            cb.like(cb.lower(aRoot.get("detalle")), "%\"tipo de pedido\":\"personal\"%"),
-                            cb.like(cb.lower(aRoot.get("detalle")), "%\"tipo de pedido\": \"personal\"%"),
-                            cb.equal(cb.lower(root.get("person").get("type")), "personal")
-                    );
-                } else if (tpLower.contains("especie")) {
-                    matchTipo = cb.or(
-                            cb.like(cb.lower(aRoot.get("detalle")), "%institucional en especie%"),
-                            cb.equal(cb.upper(aRoot.get("tipoResolucion")), "SUBSIDIO EN ESPECIE")
-                    );
-                } else {
-                    // Institucional en dinero
-                    matchTipo = cb.or(
-                            cb.like(cb.lower(aRoot.get("detalle")), "%institucional en dinero%"),
-                            cb.and(
-                                    cb.notEqual(cb.upper(aRoot.get("tipoResolucion")), "SUBSIDIO EN ESPECIE"),
-                                    cb.notEqual(cb.lower(cb.coalesce(root.get("person").get("type"), "")), "personal"),
-                                    cb.notLike(cb.lower(cb.coalesce(aRoot.get("detalle"), "")), "%\"tipo de pedido\":\"personal\"%"),
-                                    cb.notLike(cb.lower(cb.coalesce(aRoot.get("detalle"), "")), "%\"tipo de pedido\": \"personal\"%"),
-                                    cb.notLike(cb.lower(cb.coalesce(aRoot.get("detalle"), "")), "%institucional en especie%")
-                            )
-                    );
+                    jakarta.persistence.criteria.Predicate isSubsidioAsgn = cb.like(cb.upper(aRoot.get("tipoResolucion")), "%SUBSIDIO%");
+                    jakarta.persistence.criteria.Predicate matchTipo;
+                    if ("personal".equals(tpLower)) {
+                        matchTipo = cb.or(
+                                cb.like(cb.lower(aRoot.get("detalle")), "%\"tipo de pedido\":\"personal\"%"),
+                                cb.like(cb.lower(aRoot.get("detalle")), "%\"tipo de pedido\": \"personal\"%"),
+                                cb.equal(cb.lower(root.get("person").get("type")), "personal")
+                        );
+                    } else if (tpLower.contains("especie")) {
+                        matchTipo = cb.or(
+                                cb.like(cb.lower(aRoot.get("detalle")), "%institucional en especie%"),
+                                cb.equal(cb.upper(aRoot.get("tipoResolucion")), "SUBSIDIO EN ESPECIE")
+                        );
+                    } else {
+                        matchTipo = cb.or(
+                                cb.like(cb.lower(aRoot.get("detalle")), "%institucional en dinero%"),
+                                cb.and(
+                                        cb.notEqual(cb.upper(aRoot.get("tipoResolucion")), "SUBSIDIO EN ESPECIE"),
+                                        cb.notEqual(cb.lower(cb.coalesce(root.get("person").get("type"), "")), "personal"),
+                                        cb.notLike(cb.lower(cb.coalesce(aRoot.get("detalle"), "")), "%\"tipo de pedido\":\"personal\"%"),
+                                        cb.notLike(cb.lower(cb.coalesce(aRoot.get("detalle"), "")), "%\"tipo de pedido\": \"personal\"%"),
+                                        cb.notLike(cb.lower(cb.coalesce(aRoot.get("detalle"), "")), "%institucional en especie%")
+                                )
+                        );
+                    }
+                    sub.where(cb.and(isSubsidioAsgn, matchTipo));
+                    orTipos.add(cb.in(root.get("id")).value(sub));
                 }
-                sub.where(cb.and(isSubsidioAsgn, matchTipo));
-                return cb.in(root.get("id")).value(sub);
+                return cb.or(orTipos.toArray(new jakarta.persistence.criteria.Predicate[0]));
             });
         }
 
@@ -614,6 +653,10 @@ public class SolicitudService {
             existing.setStatus(dto.getStatus());
         }
         existing.setZone(dto.getZone());
+        if (dto.getDireccion() != null) {
+            existing.setDireccion(dto.getDireccion().trim().isEmpty() ? null : dto.getDireccion().trim());
+        }
+        existing.setFechaEvento(dto.getFechaEvento());
         existing.setContactDate(dto.getContactDate());
         existing.setResolutionDate(dto.getResolutionDate());
         existing.setObservation(dto.getObservation());
@@ -1051,6 +1094,7 @@ public class SolicitudService {
         // 1. Buscar asignación pendiente ya tomada por este resolutor (priorizando assignmentId si se indicó)
         SolicitudResolutorAssignment assignment = solicitud.getResolutorAssignments().stream()
                 .filter(a -> !Boolean.TRUE.equals(a.getApproved())
+                        && !Boolean.TRUE.equals(a.getRejected())
                         && a.getResolutor() != null
                         && a.getResolutor().getId().equals(resolutor.getId())
                         && (targetAssignmentId == null || targetAssignmentId.equals(a.getId())))
@@ -1058,6 +1102,7 @@ public class SolicitudService {
                 // 2. Respaldo: si la resolución aún está en el pool compartido del tipo que atiende este resolutor, se la auto-asigna y aprueba
                 .orElseGet(() -> solicitud.getResolutorAssignments().stream()
                         .filter(a -> !Boolean.TRUE.equals(a.getApproved())
+                                && !Boolean.TRUE.equals(a.getRejected())
                                 && a.getResolutor() == null
                                 && tieneTipoResolucion(resolutor, a.getTipoResolucion())
                                 && (targetAssignmentId == null || targetAssignmentId.equals(a.getId())))
@@ -1321,25 +1366,84 @@ public class SolicitudService {
         return saved;
     }
 
+    /**
+     * Permite a cualquier resolutor rechazar una asignación pendiente (tomada o en pool de su competencia)
+     * dejando registrado el motivo obligatorio y recalculando el estado global de la solicitud.
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public void rechazarAsignacion(Long solicitudId, String emailResolutor, String observaciones, Long requestedAssignmentId) {
+        String motivo = observaciones != null ? observaciones.trim() : "";
+        if (motivo.isEmpty()) {
+            throw new IllegalArgumentException("Debe ingresar el motivo del rechazo.");
+        }
+
+        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
+
+        User resolutor = userRepository.findByEmail(emailResolutor)
+                .orElseThrow(() -> new RuntimeException("Resolutor no encontrado"));
+
+        final Long targetAssignmentId = requestedAssignmentId;
+        SolicitudResolutorAssignment assignment = solicitud.getResolutorAssignments().stream()
+                .filter(a -> !Boolean.TRUE.equals(a.getApproved())
+                        && !Boolean.TRUE.equals(a.getRejected())
+                        && a.getResolutor() != null
+                        && a.getResolutor().getId().equals(resolutor.getId())
+                        && (targetAssignmentId == null || targetAssignmentId.equals(a.getId())))
+                .findFirst()
+                .orElseGet(() -> solicitud.getResolutorAssignments().stream()
+                        .filter(a -> !Boolean.TRUE.equals(a.getApproved())
+                                && !Boolean.TRUE.equals(a.getRejected())
+                                && a.getResolutor() == null
+                                && tieneTipoResolucion(resolutor, a.getTipoResolucion())
+                                && (targetAssignmentId == null || targetAssignmentId.equals(a.getId())))
+                        .findFirst()
+                        .orElseThrow(() -> new RuntimeException("Asignación pendiente no encontrada para este resolutor")));
+
+        if (assignment.getResolutor() == null) {
+            assignment.setResolutor(resolutor);
+        }
+
+        assignment.setApproved(false);
+        assignment.setRejected(true);
+        assignment.setObservaciones(motivo);
+
+        // Registrar también el autor y motivo del rechazo en la observación general de la solicitud
+        String nombreResolutor = (resolutor.getName() != null && !resolutor.getName().trim().isEmpty())
+                ? resolutor.getName().trim()
+                : resolutor.getEmail();
+        String notaRechazo = "[Rechazado por " + nombreResolutor + " (" + assignment.getTipoResolucion() + "): " + motivo + "]";
+        String obsActual = solicitud.getObservation() != null ? solicitud.getObservation().trim() : "";
+        solicitud.setObservation(obsActual.isEmpty() ? notaRechazo : obsActual + "\n" + notaRechazo);
+
+        String detalleHistorial = "RESOLUCIÓN RECHAZADA (" + assignment.getTipoResolucion() + "): " + motivo;
+        logAssignmentChange(solicitud, resolutor, detalleHistorial);
+
+        updateSolicitudStatus(solicitud);
+        solicitudRepository.save(solicitud);
+    }
+
     private void updateSolicitudStatus(Solicitud solicitud) {
-        String currentStatus = solicitud.getStatus();
-        
-        // Si la solicitud no tiene responsable, vuelve a estado pendiente.
-        
+        List<SolicitudResolutorAssignment> assignments = solicitud.getResolutorAssignments();
+        if (assignments != null && !assignments.isEmpty()) {
+            long approvedCount = assignments.stream().filter(a -> Boolean.TRUE.equals(a.getApproved())).count();
+            long rejectedCount = assignments.stream().filter(a -> Boolean.TRUE.equals(a.getRejected())).count();
+            long closedCount = approvedCount + rejectedCount;
+            if (closedCount < assignments.size()) {
+                solicitud.setStatus("en resolucion");
+            } else if (rejectedCount == assignments.size()) {
+                solicitud.setStatus("rechazada");
+            } else {
+                solicitud.setStatus("completadas");
+            }
+            return;
+        }
+
+        // Si no tiene asignaciones de resolutor, depende de si tiene responsable asignado.
         if (solicitud.getResponsable() == null) {
             solicitud.setStatus("pendiente");
         } else {
-            List<SolicitudResolutorAssignment> assignments = solicitud.getResolutorAssignments();
-            if (assignments.isEmpty()) {
-                solicitud.setStatus("en proceso");
-            } else {
-                long approvedCount = assignments.stream().filter(SolicitudResolutorAssignment::getApproved).count();
-                if (approvedCount == assignments.size()) {
-                    solicitud.setStatus("completadas");
-                } else {
-                    solicitud.setStatus("en resolucion");
-                }
-            }
+            solicitud.setStatus("en proceso");
         }
     }
 }

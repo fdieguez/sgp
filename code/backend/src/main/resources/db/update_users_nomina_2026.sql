@@ -19,9 +19,9 @@ INSERT INTO users (email, password, role, first_name, last_name, birth_date, pho
 VALUES ('martinnocioni@gmail.com', '$2a$10$wS2Wb1F.s3c3qH7l3.Zkfe78Uj.YwW6b3t87i7kP1nK3Qy3Bq.w8y', 'RESPONSABLE,RESOLUTOR', 'Martin', 'Nocioni', '1990-01-01', '3426144703', NULL, '31111251', 1)
 ON DUPLICATE KEY UPDATE role = VALUES(role), first_name = VALUES(first_name), last_name = VALUES(last_name), phone = VALUES(phone), zone = VALUES(zone), dni = VALUES(dni), activo = 1;
 
--- 2. Florencia Vildoza (RESPONSABLE,DISTRIBUIDOR)
+-- 2. Florencia Vildoza (RESPONSABLE,DISTRIBUIDOR,RESOLUTOR - General)
 INSERT INTO users (email, password, role, first_name, last_name, birth_date, phone, zone, dni, activo)
-VALUES ('fy.vildoza@gmail.com', '$2a$10$W2j2H1rUe0K8F.Zk2M7dOuFp6q7vN9tB1d7kP1nK3Qy3Bq.w8y21a', 'RESPONSABLE,DISTRIBUIDOR', 'FLORENCIA', 'VILDOZA', '1990-01-01', '3425008539', NULL, '35448744', 1)
+VALUES ('fy.vildoza@gmail.com', '$2a$10$WLL.aL39XRUi36mTpfPbyua9JdslyWHKTE27CZK1armTm8uM23jUe', 'RESPONSABLE,DISTRIBUIDOR,RESOLUTOR', 'Florencia', 'Vildoza', '1990-01-01', '3425008539', 'GENERAL', '35448744', 1)
 ON DUPLICATE KEY UPDATE role = VALUES(role), first_name = VALUES(first_name), last_name = VALUES(last_name), phone = VALUES(phone), zone = VALUES(zone), dni = VALUES(dni), activo = 1;
 
 -- 3. Alejandro Fluchá (RESPONSABLE)

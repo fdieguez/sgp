@@ -25,8 +25,8 @@ public class SolicitudController {
     public ResponseEntity<org.springframework.data.domain.Page<Solicitud>> getAllSolicitudes(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) Long responsableId,
-            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) String responsableId,
+            @RequestParam(required = false) String locationId,
             @RequestParam(required = false) String origin,
             @RequestParam(required = false) String tipoPedido,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
@@ -49,8 +49,8 @@ public class SolicitudController {
             @PathVariable Long configId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) Long responsableId,
-            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) String responsableId,
+            @RequestParam(required = false) String locationId,
             @RequestParam(required = false) String origin,
             @RequestParam(required = false) String tipoPedido,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
@@ -127,6 +127,25 @@ public class SolicitudController {
         return ResponseEntity.ok().build();
     }
 
+    /**
+     * Permite a cualquier resolutor rechazar su asignación pendiente registrando el motivo obligatorio.
+     */
+    @PostMapping("/{id}/rechazar")
+    public ResponseEntity<Void> rechazarSolicitud(@PathVariable Long id, @RequestBody java.util.Map<String, Object> body) {
+        String observaciones = body.get("observaciones") != null ? body.get("observaciones").toString() : "";
+        Long assignmentId = null;
+        if (body.get("assignmentId") != null) {
+            try {
+                assignmentId = Long.valueOf(body.get("assignmentId").toString());
+            } catch (NumberFormatException ignored) {
+                assignmentId = null;
+            }
+        }
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        solicitudService.rechazarAsignacion(id, auth.getName(), observaciones, assignmentId);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/{id}/tomar")
     public ResponseEntity<Solicitud> tomarSolicitud(@PathVariable Long id) {
         return ResponseEntity.ok(solicitudService.tomarSolicitud(id));
@@ -185,8 +204,8 @@ public class SolicitudController {
     @GetMapping("/stats")
     public ResponseEntity<java.util.Map<String, Object>> getSolicitudStats(
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) Long responsableId,
-            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) String responsableId,
+            @RequestParam(required = false) String locationId,
             @RequestParam(required = false) String origin,
             @RequestParam(required = false) String tipoPedido,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,
@@ -198,8 +217,8 @@ public class SolicitudController {
     public ResponseEntity<java.util.Map<String, Object>> getSolicitudStatsByConfig(
             @PathVariable Long configId,
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) Long responsableId,
-            @RequestParam(required = false) Long locationId,
+            @RequestParam(required = false) String responsableId,
+            @RequestParam(required = false) String locationId,
             @RequestParam(required = false) String origin,
             @RequestParam(required = false) String tipoPedido,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate dateFrom,

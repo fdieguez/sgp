@@ -1,4 +1,5 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import api from '../config/axios';
 import { useAuth } from '../context/AuthContext';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
@@ -9,6 +10,7 @@ import {
     Search,
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
     ArrowUpDown,
     ArrowUp,
     ArrowDown,
@@ -25,6 +27,8 @@ import {
     Check,
     Settings,
     Download,
+    FileSpreadsheet,
+    FileText,
     UserCheck
 } from 'lucide-react';
 import {
@@ -40,6 +44,7 @@ import {
 
 import SolicitudModal from '../components/SolicitudModal';
 import AsociarPlanillaModal from '../components/AsociarPlanillaModal';
+import MultiSelectDropdown from '../components/MultiSelectDropdown';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 
@@ -147,12 +152,16 @@ export default function ProjectDetailsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [totalElements, setTotalElements] = useState(0);
     const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'desc' });
     const [localSortConfig, setLocalSortConfig] = useState({ key: null, direction: 'asc' });
     const [visColumn, setVisColumn] = useState('status'); // Gráfico por defecto por estado
     const [filters, setFilters] = useState({});
     const [showFilters, setShowFilters] = useState(false);
-    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [rowsPerPage, setRowsPerPage] = useState(() => {
+        const saved = Number(localStorage.getItem('sgp-rows-per-page'));
+        return [10, 50, 100, 500].includes(saved) ? saved : 10;
+    });
     const [responsablesList, setResponsablesList] = useState([]);
     const [locationsList, setLocationsList] = useState([]);
     const [stats, setStats] = useState({
@@ -459,6 +468,7 @@ export default function ProjectDetailsPage() {
 
             setSolicitudes(response.data.content);
             setTotalPages(response.data.totalPages);
+            setTotalElements(response.data.totalElements ?? 0);
             setStats(statsResponse.data);
         } catch (err) {
             console.error(err);
@@ -576,62 +586,155 @@ export default function ProjectDetailsPage() {
         }
     };
 
-    const handleExportCSV = async () => {
-        try {
-            const params = {
-                status: filters.status || null,
-                search: searchTerm || null,
-                origin: filters.origin || null,
-                tipoPedido: filters.tipoPedido || null,
-                responsableId: filters.responsableId || null,
-                locationId: filters.locationId || null,
-                page: 0,
-                size: 10000,
-                sort: `${sortConfig.key},${sortConfig.direction}`
-            };
+    const exportDropdownRef = useRef(null);
 
-            const endpoint = configId ? `/api/solicitudes/config/${configId}` : `/api/solicitudes`;
-            const response = await api.get(endpoint, { params });
-            const dataToExport = response.data.content;
-            
+    useEffect(() => {
+        if (!isExportDropdownOpen) return;
+        const handleClickOutside = (event) => {
+            if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target)) {
+                setIsExportDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isExportDropdownOpen]);
+
+    /**
+     * Devuelve el subconjunto de solicitudes a exportar según la regla unificada:
+     * si hay filas chequeadas en la tabla exporta solo las seleccionadas;
+     * en caso contrario, exporta todas las solicitudes actualmente listadas.
+     */
+    const getSolicitudesToExport = () => {
+        if (selectedRows.length > 0) {
+            return processedData.rows.filter(s => selectedRows.includes(s.id));
+        }
+        return processedData.rows;
+    };
+
+    /**
+     * Construye los objetos planos normalizados para exportación en Excel y CSV.
+     */
+    const buildExportRows = (dataToExport) => {
+        return dataToExport.map(s => {
+            const localidad = s.location?.type === 'NEIGHBORHOOD'
+                ? (s.location?.parent?.name || '')
+                : (s.location?.name || '');
+            const barrio = s.location?.type === 'NEIGHBORHOOD' ? (s.location?.name || '') : '';
+            const statusNorm = s.status?.trim().toLowerCase();
+            const estadoLegible = STATUS_MAP[statusNorm] || s.status || '';
+            const resolucionesTexto = (s.resolutorAssignments || []).map(a => {
+                let det = '';
+                try {
+                    const parsed = typeof a.detalle === 'string' ? JSON.parse(a.detalle) : a.detalle;
+                    if (parsed && typeof parsed === 'object') {
+                        det = Object.entries(parsed)
+                            .filter(([k, v]) => !k.endsWith('_id') && !k.endsWith('_filename') && v !== '' && v != null)
+                            .map(([k, v]) => `${k}: ${v}`)
+                            .join(' | ');
+                    }
+                } catch {
+                    det = a.detalle || '';
+                }
+                const est = a.approved ? 'Aprobada' : (a.rejected ? 'Rechazada' : 'Pendiente');
+                return `[${a.tipoResolucion || 'Resolución'} - ${est}]${det ? ' ' + det : ''}`;
+            }).join(' // ');
+
+            return {
+                'N° Orden': s.id,
+                'Fecha Ingreso': s.entryDate || '',
+                'Origen': s.origin || '',
+                'Beneficiario': s.person?.name || '',
+                'DNI': s.person?.dni || '',
+                'Teléfono': s.person?.phone || '',
+                'Localidad': localidad,
+                'Barrio': barrio,
+                'Dirección': s.direccion || '',
+                'Fecha Evento': s.fechaEvento || '',
+                'Descripción': s.description || '',
+                'Estado': estadoLegible,
+                'Responsable': s.responsable?.name || (s.zone ? `Pool: ${s.zone}` : 'Sin Asignar'),
+                'Monto': s.amount || 0,
+                'Resoluciones': resolucionesTexto
+            };
+        });
+    };
+
+    const handleExportCSV = () => {
+        try {
+            const dataToExport = getSolicitudesToExport();
             if (!dataToExport.length) {
                 toast.error("No hay datos para exportar");
                 return;
             }
 
-            const headers = ["ID", "Fecha", "Origen", "Beneficiario", "Localidad", "Barrio", "Estado", "Responsable", "Monto"];
-            const csvRows = [headers.join(",")];
+            const rowsObj = buildExportRows(dataToExport);
+            const headers = Object.keys(rowsObj[0]);
+            const escapeCsv = (val) => {
+                const str = String(val ?? '').replace(/"/g, '""');
+                return `"${str}"`;
+            };
+            const csvRows = [
+                headers.map(escapeCsv).join(","),
+                ...rowsObj.map(r => headers.map(h => escapeCsv(r[h])).join(","))
+            ];
 
-            dataToExport.forEach(s => {
-                const localidad = s.location?.type === 'NEIGHBORHOOD' ? (s.location?.parent?.name || '') : (s.location?.name || '');
-                const barrio = s.location?.type === 'NEIGHBORHOOD' ? s.location?.name : '';
-                const row = [
-                    s.id,
-                    s.entryDate,
-                    s.origin,
-                    `"${s.person?.name || ''}"`,
-                    `"${localidad}"`,
-                    `"${barrio}"`,
-                    s.status,
-                    `"${s.responsable?.name || ''}"`,
-                    s.amount || 0
-                ];
-                csvRows.push(row.join(","));
-            });
-
-            const csvString = csvRows.join("\n");
+            // Agregar BOM UTF-8 para compatibilidad con acentos al abrir en Excel
+            const csvString = "\uFEFF" + csvRows.join("\n");
             const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
+            const today = new Date().toISOString().slice(0, 10);
             link.href = url;
-            link.setAttribute("download", `exportacion_solicitudes_${new Date().getTime()}.csv`);
+            link.setAttribute("download", `solicitudes_sgp_${today}.csv`);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            toast.success("Exportación exitosa");
+            URL.revokeObjectURL(url);
+            const scopeMsg = selectedRows.length > 0 ? `${dataToExport.length} seleccionadas` : `${dataToExport.length} listadas`;
+            toast.success(`CSV exportado correctamente (${scopeMsg})`);
         } catch (err) {
-            console.error("Error exporting", err);
-            toast.error("Error al exportar los datos");
+            console.error("Error al exportar CSV", err);
+            toast.error("Error al exportar el archivo CSV");
+        }
+    };
+
+    const handleExportExcel = () => {
+        try {
+            const dataToExport = getSolicitudesToExport();
+            if (!dataToExport.length) {
+                toast.error("No hay datos para exportar");
+                return;
+            }
+
+            const rowsObj = buildExportRows(dataToExport);
+            const worksheet = XLSX.utils.json_to_sheet(rowsObj);
+            worksheet['!cols'] = [
+                { wch: 10 }, // N° Orden
+                { wch: 14 }, // Fecha Ingreso
+                { wch: 16 }, // Origen
+                { wch: 28 }, // Beneficiario
+                { wch: 13 }, // DNI
+                { wch: 16 }, // Teléfono
+                { wch: 20 }, // Localidad
+                { wch: 20 }, // Barrio
+                { wch: 26 }, // Dirección
+                { wch: 14 }, // Fecha Evento
+                { wch: 42 }, // Descripción
+                { wch: 16 }, // Estado
+                { wch: 22 }, // Responsable
+                { wch: 14 }, // Monto
+                { wch: 48 }  // Resoluciones
+            ];
+
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Solicitudes');
+            const today = new Date().toISOString().slice(0, 10);
+            XLSX.writeFile(workbook, `solicitudes_sgp_${today}.xlsx`);
+            const scopeMsg = selectedRows.length > 0 ? `${dataToExport.length} seleccionadas` : `${dataToExport.length} listadas`;
+            toast.success(`Excel (.xlsx) exportado correctamente (${scopeMsg})`);
+        } catch (err) {
+            console.error("Error al exportar Excel", err);
+            toast.error("Error al exportar el archivo Excel");
         }
     };
 
@@ -647,7 +750,7 @@ export default function ProjectDetailsPage() {
                 : (user?.tiposResolucion || []).map(t => (t?.tipo || '').trim().toUpperCase()).filter(Boolean);
             result = result.filter(s =>
                 (s.resolutorAssignments || []).some(a =>
-                    !a.approved && (
+                    !a.approved && !a.rejected && (
                         a.resolutor?.email?.toLowerCase() === myEmail ||
                         (!a.resolutor && myTipos.includes((a.tipoResolucion || '').trim().toUpperCase()))
                     )
@@ -772,7 +875,7 @@ export default function ProjectDetailsPage() {
                         Inicio
                     </Link>
                     <div className="flex flex-wrap gap-2.5 text-xs md:text-sm">
-                            {isResolutorSubsidio && (
+                            {isResolutorSubsidioDinero && (
                                 <button
                                     data-testid="btn-importar-planilla"
                                     onClick={handleImportPlanilla}
@@ -782,7 +885,7 @@ export default function ProjectDetailsPage() {
                                     <Database className="h-4 w-4" /> Importar Planilla
                                 </button>
                             )}
-                            {(config && (user?.role === 'RESOLUTOR' || user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN')) && (
+                            {(config && (isResolutorSubsidioDinero || user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN')) && (
                                 <button
                                     onClick={() => setIsAsociarModalOpen(true)}
                                     className="px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-white font-bold flex items-center gap-2 transition-all shadow-lg shadow-gray-900/20 active:scale-95"
@@ -791,69 +894,108 @@ export default function ProjectDetailsPage() {
                                     <Settings className="h-4 w-4" /> Asociar Planilla
                                 </button>
                             )}
-                            {isResolutorSubsidioDinero ? (
-                                <>
-                                    <button
-                                        data-testid="btn-consideracion-exportar-todos"
-                                        onClick={() => handleConsideracionYExportarIds(currentRows.map(s => s.id), false)}
-                                        className="px-4 py-2 bg-green-600 hover:bg-green-500 border border-green-500 rounded-xl text-white font-bold flex items-center gap-2 transition-all shadow-lg shadow-green-900/20 active:scale-95"
-                                        title="Pone en estado 'Consideración' y exporta a la planilla externa todas las solicitudes listadas en la tabla inferior"
-                                    >
-                                        <Download className="h-4 w-4" /> Consideración
-                                    </button>
-                                    <button
-                                        data-testid="btn-solo-exportar-todos"
-                                        onClick={() => handleSoloExportarIds(currentRows.map(s => s.id), false)}
-                                        className="px-4 py-2 bg-teal-700 hover:bg-teal-600 border border-teal-500 rounded-xl text-white font-bold flex items-center gap-2 transition-all shadow-lg shadow-teal-900/20 active:scale-95"
-                                        title="Exporta a la planilla externa todas las solicitudes listadas en la tabla SIN modificar su estado actual"
-                                    >
-                                        <Database className="h-4 w-4" /> Exportar
-                                    </button>
-                                    <button
-                                        onClick={handleExportCSV}
-                                        className="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-gray-200 font-bold flex items-center gap-1.5 transition-all"
-                                        title="Descargar las solicitudes actuales en un archivo CSV local"
-                                    >
-                                        <Download className="h-4 w-4 text-green-400" /> CSV
-                                    </button>
-                                </>
-                            ) : (
-                                <div className="relative">
-                                    <button
-                                        onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
-                                        className="px-4 py-2 bg-green-600 hover:bg-green-500 border border-green-500 rounded-xl text-white font-bold flex items-center gap-2 transition-all shadow-lg shadow-green-900/20 active:scale-95 animate-in fade-in"
-                                        title="Desplegar opciones de exportación de solicitudes (CSV o Google Sheets)"
-                                    >
-                                        <Download className="h-4 w-4" /> Exportar...
-                                    </button>
-                                    {isExportDropdownOpen && (
-                                        <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-xl shadow-xl z-50 overflow-hidden py-1">
-                                            <button
-                                                onClick={() => {
-                                                    handleExportCSV();
-                                                    setIsExportDropdownOpen(false);
-                                                }}
-                                                title="Descargar listado en formato CSV"
-                                                className="w-full text-left px-4 py-2.5 text-xs text-gray-200 hover:bg-gray-700 font-bold transition-all flex items-center gap-2"
-                                            >
-                                                <Download className="h-3.5 w-3.5 text-green-500" /> Descargar CSV
-                                            </button>
-                                            {isResolutorSubsidio && (
-                                                <button
-                                                    onClick={() => {
-                                                        handleExportPlanilla();
-                                                        setIsExportDropdownOpen(false);
-                                                    }}
-                                                    title="Exportar solicitudes en consideración a Google Sheets"
-                                                    className="w-full text-left px-4 py-2.5 text-xs text-gray-200 hover:bg-gray-700 font-bold transition-all flex items-center gap-2 border-t border-gray-700"
-                                                >
-                                                    <Database className="h-3.5 w-3.5 text-orange-500" /> Google Sheets
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
+                            {isResolutorSubsidioDinero && (
+                                <button
+                                    data-testid="btn-consideracion-exportar-todos"
+                                    onClick={() => {
+                                        const ids = selectedRows.length > 0 ? selectedRows : currentRows.map(s => s.id);
+                                        handleConsideracionYExportarIds(ids, selectedRows.length > 0);
+                                    }}
+                                    className="px-4 py-2 bg-green-600 hover:bg-green-500 border border-green-500 rounded-xl text-white font-bold flex items-center gap-2 transition-all shadow-lg shadow-green-900/20 active:scale-95"
+                                    title={selectedRows.length > 0
+                                        ? `Pone en estado 'Consideración' y exporta a la planilla externa las ${selectedRows.length} solicitudes seleccionadas`
+                                        : "Pone en estado 'Consideración' y exporta a la planilla externa todas las solicitudes listadas en la tabla inferior"}
+                                >
+                                    <Download className="h-4 w-4" /> Consideración
+                                </button>
                             )}
+                            <div className="relative" ref={exportDropdownRef}>
+                                <button
+                                    type="button"
+                                    data-testid="btn-exportar-menu"
+                                    onClick={() => setIsExportDropdownOpen(prev => !prev)}
+                                    className={`px-4 py-2 rounded-xl text-white font-bold flex items-center gap-2 transition-all shadow-lg active:scale-95 ${
+                                        isResolutorSubsidioDinero
+                                            ? 'bg-teal-700 hover:bg-teal-600 border border-teal-500 shadow-teal-900/20'
+                                            : 'bg-green-600 hover:bg-green-500 border border-green-500 shadow-green-900/20'
+                                    }`}
+                                    title={selectedRows.length > 0
+                                        ? `Exportar las ${selectedRows.length} solicitudes seleccionadas`
+                                        : `Exportar las ${currentRows.length} solicitudes listadas en la tabla`}
+                                >
+                                    <Download className="h-4 w-4" />
+                                    <span>Exportar</span>
+                                    {selectedRows.length > 0 && (
+                                        <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-white/20 font-black">
+                                            {selectedRows.length}
+                                        </span>
+                                    )}
+                                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExportDropdownOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                {isExportDropdownOpen && (
+                                    <div
+                                        data-testid="exportar-dropdown-menu"
+                                        className="absolute right-0 mt-2 w-64 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden py-1"
+                                    >
+                                        <div className="px-4 py-2 text-[10px] font-black uppercase tracking-wider text-gray-400 border-b border-gray-700/80 bg-gray-900/40">
+                                            {selectedRows.length > 0
+                                                ? `Alcance: ${selectedRows.length} seleccionada(s)`
+                                                : `Alcance: ${currentRows.length} listada(s) en tabla`}
+                                        </div>
+                                        {isResolutorSubsidioDinero && (
+                                            <button
+                                                type="button"
+                                                data-testid="export-option-sheets"
+                                                onClick={() => {
+                                                    setIsExportDropdownOpen(false);
+                                                    const ids = selectedRows.length > 0 ? selectedRows : currentRows.map(s => s.id);
+                                                    handleSoloExportarIds(ids, selectedRows.length > 0);
+                                                }}
+                                                title="Exportar a la planilla externa de Google Sheets configurada SIN cambiar el estado"
+                                                className="w-full text-left px-4 py-2.5 text-xs text-gray-100 hover:bg-gray-700 font-bold transition-all flex items-center gap-2.5 border-b border-gray-700/80"
+                                            >
+                                                <Database className="h-4 w-4 text-amber-400 shrink-0" />
+                                                <div>
+                                                    <div>Planilla Externa (Google Sheets)</div>
+                                                    <div className="text-[10px] font-normal text-gray-400">Sin cambiar el estado actual</div>
+                                                </div>
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            data-testid="export-option-xlsx"
+                                            onClick={() => {
+                                                handleExportExcel();
+                                                setIsExportDropdownOpen(false);
+                                            }}
+                                            title="Descargar archivo de hoja de cálculo Excel (.xlsx)"
+                                            className="w-full text-left px-4 py-2.5 text-xs text-gray-100 hover:bg-gray-700 font-bold transition-all flex items-center gap-2.5"
+                                        >
+                                            <FileSpreadsheet className="h-4 w-4 text-emerald-400 shrink-0" />
+                                            <div>
+                                                <div>Descargar Excel (.xlsx)</div>
+                                                <div className="text-[10px] font-normal text-gray-400">Hoja de cálculo con columnas ajustadas</div>
+                                            </div>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            data-testid="export-option-csv"
+                                            onClick={() => {
+                                                handleExportCSV();
+                                                setIsExportDropdownOpen(false);
+                                            }}
+                                            title="Descargar archivo de texto separado por comas (.csv)"
+                                            className="w-full text-left px-4 py-2.5 text-xs text-gray-100 hover:bg-gray-700 font-bold transition-all flex items-center gap-2.5 border-t border-gray-700/60"
+                                        >
+                                            <FileText className="h-4 w-4 text-sky-400 shrink-0" />
+                                            <div>
+                                                <div>Descargar CSV (.csv)</div>
+                                                <div className="text-[10px] font-normal text-gray-400">Compatible con cualquier planilla</div>
+                                            </div>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                             {user?.role === 'RESOLUTOR' && (
                                 <button
                                     type="button"
@@ -942,69 +1084,79 @@ export default function ProjectDetailsPage() {
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Estado</label>
-                                <select
-                                    className="bg-gray-900 text-sm border border-gray-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none w-full"
+                                <MultiSelectDropdown
+                                    testId="filter-status"
+                                    placeholder="Todos los Estados"
                                     value={filters.status || ''}
-                                    onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                                >
-                                    <option value="">Todos los Estados</option>
-                                    <option value="pendiente">Pendiente</option>
-                                    <option value="en proceso">Asignadas</option>
-                                    <option value="en resolucion">En Resolución</option>
-                                    <option value="completadas">Resueltas</option>
-                                    <option value="rechazada">Rechazado</option>
-                                    <option value="consideracion">Consideración</option>
-                                </select>
+                                    onChange={(vals) => { setFilters(prev => ({ ...prev, status: vals.join(',') })); setCurrentPage(1); }}
+                                    options={[
+                                        { value: 'pendiente', label: 'Pendiente' },
+                                        { value: 'en proceso', label: 'Asignadas' },
+                                        { value: 'en resolucion', label: 'En Resolución' },
+                                        { value: 'completadas', label: 'Resueltas' },
+                                        { value: 'rechazada', label: 'Rechazado' },
+                                        { value: 'consideracion', label: 'Consideración' }
+                                    ]}
+                                />
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Localidad</label>
-                                <select
-                                    className="bg-gray-900 text-sm border border-gray-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 outline-none w-full"
+                                <MultiSelectDropdown
+                                    testId="filter-location"
+                                    placeholder="Todas las Localidades"
+                                    searchable={true}
                                     value={filters.locationId || ''}
-                                    onChange={(e) => setFilters(prev => ({ ...prev, locationId: e.target.value }))}
-                                >
-                                    <option value="">Todas las Localidades</option>
-                                    {locationsList.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                                </select>
+                                    onChange={(vals) => { setFilters(prev => ({ ...prev, locationId: vals.join(',') })); setCurrentPage(1); }}
+                                    options={locationsList.map(l => ({ value: String(l.id), label: l.name }))}
+                                />
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Origen</label>
-                                <select
-                                    className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                <MultiSelectDropdown
+                                    testId="filter-origin"
+                                    placeholder="Todos"
                                     value={filters.origin || ''}
-                                    onChange={(e) => setFilters(prev => ({ ...prev, origin: e.target.value }))}
-                                >
-                                    <option value="">Todos</option>
-                                    <option value="MANUAL">MANUAL</option>
-                                    <option value="SINCRO">SINCRO</option>
-                                    <option value="WEB">WEB</option>
-                                </select>
+                                    onChange={(vals) => { setFilters(prev => ({ ...prev, origin: vals.join(',') })); setCurrentPage(1); }}
+                                    options={[
+                                        { value: 'MANUAL', label: 'MANUAL' },
+                                        { value: 'SINCRO', label: 'SINCRO' },
+                                        { value: 'WEB', label: 'WEB' },
+                                        { value: 'Directo de paco', label: 'Directo de paco' },
+                                        { value: 'Territorio', label: 'Territorio' },
+                                        { value: 'Facebook', label: 'Facebook' },
+                                        { value: 'Instagram', label: 'Instagram' },
+                                        { value: 'Whatsapp', label: 'Whatsapp' }
+                                    ]}
+                                />
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Responsable</label>
-                                <select
-                                    className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                <MultiSelectDropdown
+                                    testId="filter-responsable"
+                                    placeholder="Todos"
+                                    searchable={true}
                                     value={filters.responsableId || ''}
-                                    onChange={(e) => setFilters(prev => ({ ...prev, responsableId: e.target.value }))}
-                                >
-                                    <option value="">Todos</option>
-                                    <option value="0">(Sin Asignar)</option>
-                                    {responsablesList.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                                </select>
+                                    onChange={(vals) => { setFilters(prev => ({ ...prev, responsableId: vals.join(',') })); setCurrentPage(1); }}
+                                    options={[
+                                        { value: '0', label: '(Sin Asignar)' },
+                                        ...responsablesList.map(r => ({ value: String(r.id), label: r.name }))
+                                    ]}
+                                />
                             </div>
                             {isResolutorSubsidio && (
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Tipo de Pedido</label>
-                                    <select
-                                        className="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    <MultiSelectDropdown
+                                        testId="filter-tipo-pedido"
+                                        placeholder="Todos los Tipos"
                                         value={filters.tipoPedido || ''}
-                                        onChange={(e) => { setFilters(prev => ({ ...prev, tipoPedido: e.target.value })); setCurrentPage(1); }}
-                                    >
-                                        <option value="">Todos los Tipos</option>
-                                        <option value="Personal">Personal</option>
-                                        <option value="Institucional en dinero">Institucional en dinero</option>
-                                        <option value="Institucional en especie">Institucional en especie</option>
-                                    </select>
+                                        onChange={(vals) => { setFilters(prev => ({ ...prev, tipoPedido: vals.join(',') })); setCurrentPage(1); }}
+                                        options={[
+                                            { value: 'Personal', label: 'Personal' },
+                                            { value: 'Institucional en dinero', label: 'Institucional en dinero' },
+                                            { value: 'Institucional en especie', label: 'Institucional en especie' }
+                                        ]}
+                                    />
                                 </div>
                             )}
                         </div>
@@ -1018,10 +1170,32 @@ export default function ProjectDetailsPage() {
                             <h1 className="text-4xl font-black tracking-tight text-white mb-2">
                                 {configId ? (config?.sheetName || 'Cargando...') : 'Mis Solicitudes'}
                             </h1>
-                            <p className="text-gray-500 flex items-center gap-2 font-medium">
-                                <Database className="h-4 w-4" />
-                                Mostrar {processedData.rows.length} registros
-                            </p>
+                            <div className="text-gray-500 flex flex-wrap items-center gap-3 font-medium text-sm">
+                                <span className="flex items-center gap-2">
+                                    <Database className="h-4 w-4" />
+                                    Mostrando {processedData.rows.length} de {totalElements} registros
+                                </span>
+                                <label className="flex items-center gap-1.5 text-xs text-gray-400">
+                                    <span>Filas por página:</span>
+                                    <select
+                                        data-testid="rows-per-page-select"
+                                        value={rowsPerPage}
+                                        onChange={(e) => {
+                                            const nextSize = Number(e.target.value);
+                                            setRowsPerPage(nextSize);
+                                            localStorage.setItem('sgp-rows-per-page', String(nextSize));
+                                            setCurrentPage(1);
+                                        }}
+                                        title="Seleccionar cantidad de filas a mostrar por página"
+                                        className="bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-xs font-bold text-white outline-none focus:border-indigo-500 cursor-pointer"
+                                    >
+                                        <option value={10}>10</option>
+                                        <option value={50}>50</option>
+                                        <option value={100}>100</option>
+                                        <option value={500}>500</option>
+                                    </select>
+                                </label>
+                            </div>
                         </div>
                         <div className="relative flex-1 max-w-md">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
@@ -1140,9 +1314,12 @@ export default function ProjectDetailsPage() {
 
                 {/* Sección principal de la tabla */}
                 <div className="bg-gray-800/50 rounded-[2rem] border border-gray-700/50 overflow-hidden shadow-2xl backdrop-blur-xl relative">
-                    {/* Barra de acciones flotante */}
-                    {selectedRows.length > 0 && user?.role !== 'AUDITOR' && (
-                        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-indigo-600 border border-indigo-500 p-2 px-4 rounded-full shadow-2xl z-[50] flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300">
+                    {/* Barra de acciones flotante: para Resolutores solo aplica al Resolutor de Subsidio en Dinero */}
+                    {selectedRows.length > 0 && user?.role !== 'AUDITOR' && (user?.role !== 'RESOLUTOR' || isResolutorSubsidioDinero) && (
+                        <div
+                            data-testid="bulk-actions-bar"
+                            className="absolute top-4 left-1/2 -translate-x-1/2 bg-indigo-600 border border-indigo-500 p-2 px-4 rounded-full shadow-2xl z-[50] flex items-center gap-4 animate-in slide-in-from-top-4 fade-in duration-300"
+                        >
                             <span className="text-white font-bold text-xs">{selectedRows.length} seleccionadas</span>
                             <div className="h-4 w-px bg-indigo-400"></div>
                             {user?.role !== 'RESOLUTOR' && (
@@ -1159,7 +1336,7 @@ export default function ProjectDetailsPage() {
                                     {responsablesList.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                 </select>
                             )}
-                            {(user?.role === 'ADMINISTRADOR' || isResolutorSubsidio || user?.role === 'RESPONSABLE') && (
+                            {(user?.role === 'ADMINISTRADOR' || isResolutorSubsidioDinero) && (
                                 <button
                                     data-testid="btn-bulk-consideracion-exportar"
                                     onClick={handleBulkConsideracion}
@@ -1169,7 +1346,7 @@ export default function ProjectDetailsPage() {
                                     Consideración
                                 </button>
                             )}
-                            {(user?.role === 'ADMINISTRADOR' || isResolutorSubsidio) && (
+                            {(user?.role === 'ADMINISTRADOR' || isResolutorSubsidioDinero) && (
                                 <button
                                     data-testid="btn-bulk-solo-exportar"
                                     onClick={handleBulkExport}
@@ -1179,7 +1356,7 @@ export default function ProjectDetailsPage() {
                                     Exportar
                                 </button>
                             )}
-                            {(user?.role === 'ADMINISTRADOR' || isResolutorSubsidio) && (
+                            {(user?.role === 'ADMINISTRADOR' || isResolutorSubsidioDinero) && (
                                 <button
                                     data-testid="btn-bulk-importar"
                                     onClick={handleBulkImport}
@@ -1324,22 +1501,22 @@ export default function ProjectDetailsPage() {
                                         }
                                     }
 
-                                    // Renderizar detalles de resolución con estado individual claro (Aprobada / Pendiente / Pool)
+                                    // Renderizar detalles de resolución con estado individual claro (Aprobada / Rechazada / Pendiente / Pool)
                                     let resolucionContent = '-';
                                     const assignments = s.resolutorAssignments || [];
-                                    const approvedCount = assignments.filter(a => a.approved).length;
+                                    const approvedCount = assignments.filter(a => a.approved || a.rejected).length;
                                     const pendingTypes = assignments
-                                        .filter(a => !a.approved)
+                                        .filter(a => !a.approved && !a.rejected)
                                         .map(a => a.tipoResolucion)
                                         .filter(Boolean);
                                     const userTiposResolucion = (user?.tiposResolucion || [])
                                         .map(t => (t?.tipo || '').trim().toUpperCase())
                                         .filter(Boolean);
                                     const myPendingAssignment = assignments.find(
-                                        a => a.resolutor?.email?.toLowerCase() === user?.email?.toLowerCase() && !a.approved
+                                        a => a.resolutor?.email?.toLowerCase() === user?.email?.toLowerCase() && !a.approved && !a.rejected
                                     );
                                     const myPoolAssignment = assignments.find(
-                                        a => !a.resolutor && !a.approved && userTiposResolucion.includes((a.tipoResolucion || '').trim().toUpperCase())
+                                        a => !a.resolutor && !a.approved && !a.rejected && userTiposResolucion.includes((a.tipoResolucion || '').trim().toUpperCase())
                                     );
                                     const hasPendingApproval = Boolean(myPendingAssignment);
 
@@ -1363,10 +1540,17 @@ export default function ProjectDetailsPage() {
                                                             >
                                                                 <Check className="h-2.5 w-2.5" /> Aprobada
                                                             </span>
+                                                        ) : assignment.rejected ? (
+                                                            <span
+                                                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-red-900/60 text-red-300 border border-red-700/60 text-[9px] font-bold uppercase"
+                                                                title={assignment.observaciones ? `Rechazada: ${assignment.observaciones}` : "Esta resolución fue rechazada"}
+                                                            >
+                                                                <X className="h-2.5 w-2.5" /> Rechazada
+                                                            </span>
                                                         ) : (
                                                             <span
                                                                 className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-900/50 text-amber-300 border border-amber-700/60 text-[9px] font-bold uppercase"
-                                                                title="Resolución pendiente de aprobación"
+                                                                title="Resolución pendiente de aprobación o rechazo"
                                                             >
                                                                 Pendiente
                                                             </span>
@@ -1386,7 +1570,11 @@ export default function ProjectDetailsPage() {
                                                         <span className="font-semibold text-gray-200">{assignment.tipoResolucion}</span>
                                                     </div>
                                                     {detailText && (
-                                                        <div className="text-gray-300">
+                                                        <div
+                                                            data-testid="resolucion-detail-clamped"
+                                                            title={detailText}
+                                                            className="text-gray-300 text-xs leading-snug line-clamp-2 max-w-[340px] cursor-help"
+                                                        >
                                                             {detailText}
                                                         </div>
                                                     )}
@@ -1523,12 +1711,6 @@ export default function ProjectDetailsPage() {
                                                                 <UserCheck className="h-4 w-4" />
                                                             </button>
                                                         )}
-                                                        {/* Botón Poner en Consideración: se muestra únicamente si el usuario es Administrador (ADMINISTRADOR o ADMIN), Responsable (RESPONSABLE) o Resolutor de Subsidio (isResolutorSubsidio === true) */}
-                                                        {(s.type?.toUpperCase().includes('SUBSIDIO') || (s.resolutorAssignments || []).some(a => a.tipoResolucion?.toUpperCase().includes('SUBSIDIO'))) && (user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN' || user?.role === 'RESPONSABLE' || isResolutorSubsidio === true) && s.status !== 'completadas' && s.status !== 'rechazada' && (
-                                                            <button onClick={() => handleConsideracion(s.id)} title="Poner en Consideración" className="p-1.5 hover:bg-orange-600 bg-orange-900/30 rounded text-orange-400 hover:text-white transition-colors">
-                                                                <ArrowUpDown className="h-4 w-4" />
-                                                            </button>
-                                                        )}
                                                         <button onClick={() => handleOpenABM(s)} title="Ver / Editar Detalles" className="p-1.5 hover:bg-indigo-600 bg-gray-800 rounded text-indigo-400 hover:text-white transition-colors">
                                                             <Edit3 className="h-4 w-4" />
                                                         </button>
@@ -1627,12 +1809,6 @@ export default function ProjectDetailsPage() {
                                                         {!s.responsable && (user?.role === 'RESPONSABLE' || user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN') && (!s.zone || !user?.zone || s.zone.toLowerCase() === user?.zone.toLowerCase() || user?.role?.includes('ADMIN')) && (
                                                             <button onClick={() => handleTomarSolicitud(s.id)} title="Tomar Solicitud (Asignármela)" className="p-1.5 hover:bg-emerald-600 bg-emerald-900/40 rounded text-emerald-400 hover:text-white transition-colors">
                                                                 <UserCheck className="h-4 w-4" />
-                                                            </button>
-                                                        )}
-                                                        {/* Botón Poner en Consideración: se muestra únicamente si el usuario es Administrador (ADMINISTRADOR o ADMIN), Responsable (RESPONSABLE) o Resolutor de Subsidio (isResolutorSubsidio === true) */}
-                                                        {(s.type?.toUpperCase().includes('SUBSIDIO') || (s.resolutorAssignments || []).some(a => a.tipoResolucion?.toUpperCase().includes('SUBSIDIO'))) && (user?.role === 'ADMINISTRADOR' || user?.role === 'ADMIN' || user?.role === 'RESPONSABLE' || isResolutorSubsidio === true) && s.status !== 'completadas' && s.status !== 'rechazada' && (
-                                                            <button onClick={() => handleConsideracion(s.id)} title="Poner en Consideración" className="p-1.5 hover:bg-orange-600 bg-orange-900/30 rounded text-orange-400 hover:text-white transition-colors">
-                                                                <ArrowUpDown className="h-4 w-4" />
                                                             </button>
                                                         )}
                                                         <button onClick={() => handleOpenABM(s)} title="Ver / Editar Detalles" className="p-1.5 hover:bg-indigo-600 bg-gray-800 rounded text-indigo-400 hover:text-white transition-colors">

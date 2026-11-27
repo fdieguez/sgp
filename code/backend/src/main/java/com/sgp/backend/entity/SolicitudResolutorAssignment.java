@@ -55,7 +55,13 @@ public class SolicitudResolutorAssignment {
     private Boolean approved = false;
 
     /**
-     * Comentarios u observaciones del resolutor al momento de aprobar.
+     * Indica si el resolutor ha rechazado esta parte de la solicitud.
+     */
+    @Builder.Default
+    private Boolean rejected = false;
+
+    /**
+     * Comentarios u observaciones del resolutor al momento de aprobar o rechazar.
      */
     @Column(columnDefinition = "TEXT")
     private String observaciones;

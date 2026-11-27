@@ -31,6 +31,8 @@ public class SolicitudUpdateDTO {
     /* ── Ubicación ───────────────────────────────────────────────────── */
     private String locationName;
     private String barrio;
+    private String direccion;
+    private LocalDate fechaEvento;
     private String zone;
     private String tema;
 
