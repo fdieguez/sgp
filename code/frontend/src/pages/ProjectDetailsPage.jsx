@@ -635,7 +635,7 @@ export default function ProjectDetailsPage() {
                 } catch {
                     det = a.detalle || '';
                 }
-                const est = a.approved ? 'Aprobada' : 'Pendiente';
+                const est = a.approved ? 'Aprobada' : (a.rejected ? 'Rechazada' : 'Pendiente');
                 return `[${a.tipoResolucion || 'Resolución'} - ${est}]${det ? ' ' + det : ''}`;
             }).join(' // ');
 
@@ -750,7 +750,7 @@ export default function ProjectDetailsPage() {
                 : (user?.tiposResolucion || []).map(t => (t?.tipo || '').trim().toUpperCase()).filter(Boolean);
             result = result.filter(s =>
                 (s.resolutorAssignments || []).some(a =>
-                    !a.approved && (
+                    !a.approved && !a.rejected && (
                         a.resolutor?.email?.toLowerCase() === myEmail ||
                         (!a.resolutor && myTipos.includes((a.tipoResolucion || '').trim().toUpperCase()))
                     )
@@ -1501,22 +1501,22 @@ export default function ProjectDetailsPage() {
                                         }
                                     }
 
-                                    // Renderizar detalles de resolución con estado individual claro (Aprobada / Pendiente / Pool)
+                                    // Renderizar detalles de resolución con estado individual claro (Aprobada / Rechazada / Pendiente / Pool)
                                     let resolucionContent = '-';
                                     const assignments = s.resolutorAssignments || [];
-                                    const approvedCount = assignments.filter(a => a.approved).length;
+                                    const approvedCount = assignments.filter(a => a.approved || a.rejected).length;
                                     const pendingTypes = assignments
-                                        .filter(a => !a.approved)
+                                        .filter(a => !a.approved && !a.rejected)
                                         .map(a => a.tipoResolucion)
                                         .filter(Boolean);
                                     const userTiposResolucion = (user?.tiposResolucion || [])
                                         .map(t => (t?.tipo || '').trim().toUpperCase())
                                         .filter(Boolean);
                                     const myPendingAssignment = assignments.find(
-                                        a => a.resolutor?.email?.toLowerCase() === user?.email?.toLowerCase() && !a.approved
+                                        a => a.resolutor?.email?.toLowerCase() === user?.email?.toLowerCase() && !a.approved && !a.rejected
                                     );
                                     const myPoolAssignment = assignments.find(
-                                        a => !a.resolutor && !a.approved && userTiposResolucion.includes((a.tipoResolucion || '').trim().toUpperCase())
+                                        a => !a.resolutor && !a.approved && !a.rejected && userTiposResolucion.includes((a.tipoResolucion || '').trim().toUpperCase())
                                     );
                                     const hasPendingApproval = Boolean(myPendingAssignment);
 
@@ -1540,10 +1540,17 @@ export default function ProjectDetailsPage() {
                                                             >
                                                                 <Check className="h-2.5 w-2.5" /> Aprobada
                                                             </span>
+                                                        ) : assignment.rejected ? (
+                                                            <span
+                                                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-red-900/60 text-red-300 border border-red-700/60 text-[9px] font-bold uppercase"
+                                                                title={assignment.observaciones ? `Rechazada: ${assignment.observaciones}` : "Esta resolución fue rechazada"}
+                                                            >
+                                                                <X className="h-2.5 w-2.5" /> Rechazada
+                                                            </span>
                                                         ) : (
                                                             <span
                                                                 className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-900/50 text-amber-300 border border-amber-700/60 text-[9px] font-bold uppercase"
-                                                                title="Resolución pendiente de aprobación"
+                                                                title="Resolución pendiente de aprobación o rechazo"
                                                             >
                                                                 Pendiente
                                                             </span>

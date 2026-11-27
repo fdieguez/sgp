@@ -127,6 +127,25 @@ public class SolicitudController {
         return ResponseEntity.ok().build();
     }
 
+    /**
+     * Permite a cualquier resolutor rechazar su asignación pendiente registrando el motivo obligatorio.
+     */
+    @PostMapping("/{id}/rechazar")
+    public ResponseEntity<Void> rechazarSolicitud(@PathVariable Long id, @RequestBody java.util.Map<String, Object> body) {
+        String observaciones = body.get("observaciones") != null ? body.get("observaciones").toString() : "";
+        Long assignmentId = null;
+        if (body.get("assignmentId") != null) {
+            try {
+                assignmentId = Long.valueOf(body.get("assignmentId").toString());
+            } catch (NumberFormatException ignored) {
+                assignmentId = null;
+            }
+        }
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        solicitudService.rechazarAsignacion(id, auth.getName(), observaciones, assignmentId);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/{id}/tomar")
     public ResponseEntity<Solicitud> tomarSolicitud(@PathVariable Long id) {
         return ResponseEntity.ok(solicitudService.tomarSolicitud(id));

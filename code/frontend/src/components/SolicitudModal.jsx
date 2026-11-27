@@ -143,6 +143,8 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
     const [loading, setLoading] = useState(false);
     const [showApproveConfirm, setShowApproveConfirm] = useState(false);
     const [approveObservations, setApproveObservations] = useState('');
+    const [showRejectConfirm, setShowRejectConfirm] = useState(false);
+    const [rejectObservations, setRejectObservations] = useState('');
     const [asistencia, setAsistencia] = useState('');
     
     // Estados para eventos de calendario
@@ -194,14 +196,15 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         .map(t => (t?.tipo || '').trim().toUpperCase())
         .filter(Boolean);
 
-    // Verificar si el usuario actual tiene una asignación tomada, en pool de su tipo o aprobada
-    const myAssignment = formData.assignments?.find(a => a.resolutorEmail?.toLowerCase() === user?.email?.toLowerCase() && !a.approved);
+    // Verificar si el usuario actual tiene una asignación tomada, en pool de su tipo, aprobada o rechazada
+    const myAssignment = formData.assignments?.find(a => a.resolutorEmail?.toLowerCase() === user?.email?.toLowerCase() && !a.approved && !a.rejected);
     const myPoolAssignment = formData.assignments?.find(
-        a => !a.resolutorEmail && !a.approved && userTiposResolucion.includes((a.tipoResolucion || '').trim().toUpperCase())
+        a => !a.resolutorEmail && !a.approved && !a.rejected && userTiposResolucion.includes((a.tipoResolucion || '').trim().toUpperCase())
     );
     const activeResolutorAssignment = myAssignment || myPoolAssignment;
     const myApprovedAssignment = formData.assignments?.find(a => a.resolutorEmail?.toLowerCase() === user?.email?.toLowerCase() && a.approved);
-    const isPendingResolutor = isResolutor && Boolean(activeResolutorAssignment && !activeResolutorAssignment.approved);
+    const myRejectedAssignment = formData.assignments?.find(a => a.resolutorEmail?.toLowerCase() === user?.email?.toLowerCase() && a.rejected);
+    const isPendingResolutor = isResolutor && Boolean(activeResolutorAssignment && !activeResolutorAssignment.approved && !activeResolutorAssignment.rejected);
     const isApproveDisabled = loading || (activeResolutorAssignment?.tipoResolucion === 'AGENDA' && !asistencia);
 
     // Abrir automáticamente el sub-modal de aprobación si el usuario ingresó desde el botón rápido de una AGENDA
@@ -631,6 +634,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                 tipoResolucion: a.tipoResolucion || '',
                                 detalle: parsedDetalle,
                                 approved: a.approved || false,
+                                rejected: a.rejected || false,
                                 observaciones: a.observaciones || ''
                             };
                         }) || []
@@ -1122,6 +1126,59 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
         }
     };
 
+    /**
+     * Rechaza la resolución pendiente del resolutor actual registrando el motivo obligatorio.
+     */
+    const handleRechazar = async () => {
+        const motivo = rejectObservations ? rejectObservations.trim() : '';
+        if (!motivo) {
+            toast.error("Debe ingresar el motivo del rechazo.");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            await api.post(`/api/solicitudes/${formData.id}/rechazar`, {
+                assignmentId: activeResolutorAssignment?.id || undefined,
+                observaciones: motivo
+            });
+
+            const otrasPendientes = (formData.assignments || [])
+                .filter(a => {
+                    if (activeResolutorAssignment?.id && a.id) {
+                        return a.id !== activeResolutorAssignment.id && !a.approved && !a.rejected;
+                    }
+                    return !(a.tipoResolucion === activeResolutorAssignment?.tipoResolucion) && !a.approved && !a.rejected;
+                })
+                .map(a => a.tipoResolucion)
+                .filter(Boolean);
+
+            if (otrasPendientes.length > 0) {
+                toast.success(
+                    `Tu resolución (${activeResolutorAssignment?.tipoResolucion || 'asignada'}) fue rechazada. El pedido #${formData.id} sigue En Resolución pendiente de: ${otrasPendientes.join(', ')}.`,
+                    { duration: 6000 }
+                );
+            } else {
+                const hayAprobadas = (formData.assignments || []).some(a => a.approved);
+                toast.success(
+                    hayAprobadas
+                        ? `Resolución rechazada. Todas las áreas cerraron el pedido #${formData.id}.`
+                        : `Resolución rechazada. La solicitud #${formData.id} pasó a Rechazado.`
+                );
+            }
+            setShowRejectConfirm(false);
+            setRejectObservations('');
+            onSuccess();
+            onClose();
+        } catch (err) {
+            console.error("Error al rechazar asignación", err);
+            const errMsg = err.response?.data?.message || err.response?.data?.error || "Error al rechazar la resolución";
+            toast.error(errMsg);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleAprobar = async () => {
         // Validaciones estrictas de campos nuevos al resolver como AGENDA
         if (activeResolutorAssignment?.tipoResolucion === 'AGENDA') {
@@ -1335,6 +1392,27 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                         <div className="p-3 bg-amber-950/40 border border-amber-500/50 rounded-xl flex items-center gap-2.5 text-xs text-amber-200">
                             <Lock className="h-4 w-4 text-amber-400 shrink-0" />
                             <span>Los datos de la carga inicial solo pueden ser modificados por el Operador o el Responsable que cargó este pedido.</span>
+                        </div>
+                    )}
+
+                    {/* Cartel destacado de resoluciones rechazadas (visible para todos los roles) */}
+                    {(formData.assignments || []).some(a => a.rejected) && (
+                        <div
+                            data-testid="banner-resoluciones-rechazadas"
+                            className="p-3.5 bg-red-950/50 border border-red-500/60 rounded-xl space-y-1.5 text-xs text-red-100"
+                        >
+                            <div className="font-bold text-red-300 flex items-center gap-2 uppercase tracking-wider text-[11px]">
+                                <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" />
+                                Resolución Rechazada
+                            </div>
+                            {(formData.assignments || []).filter(a => a.rejected).map((rej, idx) => (
+                                <div key={rej.id || idx} className="pl-6 leading-snug">
+                                    <span className="font-bold text-red-200">{rej.tipoResolucion}</span>
+                                    {' — Rechazado por '}
+                                    <span className="font-bold text-white">{rej.resolutorName || rej.resolutorEmail || 'Resolutor'}</span>
+                                    {rej.observaciones ? `: "${rej.observaciones}"` : ''}
+                                </div>
+                            ))}
                         </div>
                     )}
 
@@ -1854,6 +1932,15 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             <span className="text-sm font-bold text-emerald-400">✅ Resolución Finalizada</span>
                             {myApprovedAssignment.observaciones && (
                                 <p className="text-xs text-emerald-200 italic">"{myApprovedAssignment.observaciones}"</p>
+                            )}
+                        </div>
+                    )}
+
+                    {user?.role !== 'OPERADOR' && user?.role !== 'DISTRIBUIDOR' && myRejectedAssignment && (
+                        <div className="bg-red-900/30 p-4 rounded-xl border border-red-700/50 flex flex-col gap-1">
+                            <span className="text-sm font-bold text-red-400">❌ Resolución Rechazada</span>
+                            {myRejectedAssignment.observaciones && (
+                                <p className="text-xs text-red-200 italic">"{myRejectedAssignment.observaciones}"</p>
                             )}
                         </div>
                     )}
@@ -2421,7 +2508,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
 
                                             {assignment.resolutorEmail ? (
                                                 <span className="text-[10px] text-gray-400 mt-2 ml-1">
-                                                    {assignment.approved ? 'Resuelto por:' : 'Asignado a:'}{' '}
+                                                    {assignment.approved ? 'Resuelto por:' : (assignment.rejected ? 'Rechazado por:' : 'Asignado a:')}{' '}
                                                     <span className="font-semibold text-gray-300">
                                                         {assignment.resolutorName || assignment.resolutorEmail}
                                                     </span>
@@ -2434,10 +2521,20 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                             {assignment.approved && (
                                                 <div className="mt-2 p-2.5 bg-emerald-950/30 rounded-lg border border-emerald-800/40 text-xs text-emerald-200">
                                                     <span className="font-bold text-emerald-400 flex items-center gap-1.5 mb-1">
-                                                        ✔️ Aprobado y Agendado
+                                                        ✔️ Aprobado
                                                     </span>
                                                     {assignment.observaciones && (
                                                         <p className="text-[11px] text-emerald-100 italic">"{assignment.observaciones}"</p>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {assignment.rejected && (
+                                                <div className="mt-2 p-2.5 bg-red-950/30 rounded-lg border border-red-800/40 text-xs text-red-200">
+                                                    <span className="font-bold text-red-400 flex items-center gap-1.5 mb-1">
+                                                        ❌ Rechazado
+                                                    </span>
+                                                    {assignment.observaciones && (
+                                                        <p className="text-[11px] text-red-100 italic">"{assignment.observaciones}"</p>
                                                     )}
                                                 </div>
                                             )}
@@ -2573,6 +2670,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                 record.actionType === 'CREATED' ? 'bg-amber-500/10 text-amber-400' :
                                                 record.actionType === 'ASSIGNED' ? 'bg-emerald-500/10 text-emerald-400' :
                                                 record.actionType === 'REASSIGNED' ? 'bg-indigo-500/10 text-indigo-400' :
+                                                record.actionType.includes('RECHAZADA') ? 'bg-red-500/10 text-red-400' :
                                                 record.actionType.startsWith('RESOLUCIÓN') ? 'bg-blue-500/10 text-blue-400' :
                                                 'bg-red-500/10 text-red-400'
                                             }`}>
@@ -2584,12 +2682,15 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                         record.actionType === 'CREATED' ? 'bg-amber-900/30 text-amber-400 border-amber-800' :
                                                         record.actionType === 'ASSIGNED' ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' :
                                                         record.actionType === 'REASSIGNED' ? 'bg-indigo-900/30 text-indigo-400 border-indigo-800' :
+                                                        record.actionType.includes('RECHAZADA') ? 'bg-red-900/30 text-red-400 border-red-800' :
                                                         record.actionType.startsWith('RESOLUCIÓN') ? 'bg-blue-900/30 text-blue-400 border-blue-800' :
                                                         'bg-red-900/30 text-red-400 border-red-800'
                                                     }`}>
                                                         {record.actionType === 'CREATED' ? 'Cargado/Creado' :
                                                          record.actionType === 'ASSIGNED' ? 'Asignado' :
-                                                         record.actionType === 'REASSIGNED' ? 'Re-asignado' : 
+                                                         record.actionType === 'REASSIGNED' ? 'Re-asignado' :
+                                                         record.actionType.includes('RECHAZADA') ? 'Resolución Rechazada' :
+                                                         record.actionType.includes('TOMADA') ? 'Resolución Tomada' :
                                                          record.actionType.startsWith('RESOLUCIÓN') ? 'Resolución Aprobada' : 'Desasignado'}
                                                     </span>
                                                     <span className="text-xs text-gray-400">
@@ -2615,7 +2716,7 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                                         </span>
                                                     ) : (
                                                         <span className="text-gray-300">
-                                                            <span className="font-bold text-white">{record.responsable ? record.responsable.name : 'Usuario'}</span> {record.actionType.toLowerCase().includes('aprobada') ? 'aprobó la resolución.' : ''}
+                                                            <span className="font-bold text-white">{record.responsable ? record.responsable.name : 'Usuario'}</span> — {record.actionType}
                                                         </span>
                                                     )}
                                                 </div>
@@ -2740,15 +2841,32 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                             </button>
                         )}
                         {!isReadOnly && isPendingResolutor && (
-                            <button
-                                type="button"
-                                onClick={() => setShowApproveConfirm(true)}
-                                disabled={loading}
-                                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold transition-all shadow-lg flex items-center gap-2 disabled:opacity-50"
-                            >
-                                <Save className="h-4 w-4" />
-                                Aprobar Resolución
-                            </button>
+                            <>
+                                <button
+                                    type="button"
+                                    data-testid="btn-aprobar-resolucion"
+                                    onClick={() => setShowApproveConfirm(true)}
+                                    disabled={loading}
+                                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-bold transition-all shadow-lg flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    <Save className="h-4 w-4" />
+                                    Aprobar Resolución
+                                </button>
+                                <button
+                                    type="button"
+                                    data-testid="btn-rechazar-resolucion"
+                                    onClick={() => {
+                                        setRejectObservations('');
+                                        setShowRejectConfirm(true);
+                                    }}
+                                    disabled={loading}
+                                    className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg font-bold transition-all shadow-lg flex items-center gap-2 disabled:opacity-50"
+                                    title={`Rechazar la resolución (${activeResolutorAssignment?.tipoResolucion || ''}) indicando el motivo`}
+                                >
+                                    <X className="h-4 w-4" />
+                                    Rechazar Resolución
+                                </button>
+                            </>
                         )}
                         {!isReadOnly && canTomar && (
                             <button
@@ -2974,6 +3092,54 @@ export default function SolicitudModal({ isOpen, onClose, onSuccess, initialData
                                     className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {loading ? 'Confirmando...' : 'Confirmar y Finalizar'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Sub-modal de confirmación de rechazo de resolución */}
+                {showRejectConfirm && (
+                    <div
+                        data-testid="modal-confirmar-rechazo"
+                        className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-300"
+                    >
+                        <div className="bg-gray-800 border border-red-500/50 rounded-2xl shadow-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto custom-scrollbar space-y-4 my-auto">
+                            <h3 className="text-lg font-bold text-red-400 flex items-center gap-2">
+                                <X className="h-5 w-5" /> ¿Rechazar Resolución ({activeResolutorAssignment?.tipoResolucion || 'Asignada'})?
+                            </h3>
+                            <p className="text-sm text-gray-300">
+                                Esta acción marcará tu resolución como <strong>Rechazada</strong> y dejará registrado el motivo en el historial de la solicitud.
+                            </p>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-400 uppercase mb-2">
+                                    Motivo del rechazo <span className="text-red-400">*</span>
+                                </label>
+                                <textarea
+                                    data-testid="reject-observaciones-input"
+                                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-white text-sm outline-none focus:ring-2 focus:ring-red-500"
+                                    rows="4"
+                                    placeholder="Explique brevemente el motivo por el cual se rechaza esta resolución..."
+                                    value={rejectObservations}
+                                    onChange={(e) => setRejectObservations(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowRejectConfirm(false)}
+                                    className="px-4 py-2 text-gray-400 hover:text-white"
+                                >
+                                    Volver
+                                </button>
+                                <button
+                                    type="button"
+                                    data-testid="btn-confirmar-rechazo"
+                                    onClick={handleRechazar}
+                                    disabled={loading || !rejectObservations.trim()}
+                                    className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {loading ? 'Rechazando...' : 'Confirmar Rechazo'}
                                 </button>
                             </div>
                         </div>

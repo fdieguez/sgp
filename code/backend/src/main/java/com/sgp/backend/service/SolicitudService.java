@@ -1094,6 +1094,7 @@ public class SolicitudService {
         // 1. Buscar asignación pendiente ya tomada por este resolutor (priorizando assignmentId si se indicó)
         SolicitudResolutorAssignment assignment = solicitud.getResolutorAssignments().stream()
                 .filter(a -> !Boolean.TRUE.equals(a.getApproved())
+                        && !Boolean.TRUE.equals(a.getRejected())
                         && a.getResolutor() != null
                         && a.getResolutor().getId().equals(resolutor.getId())
                         && (targetAssignmentId == null || targetAssignmentId.equals(a.getId())))
@@ -1101,6 +1102,7 @@ public class SolicitudService {
                 // 2. Respaldo: si la resolución aún está en el pool compartido del tipo que atiende este resolutor, se la auto-asigna y aprueba
                 .orElseGet(() -> solicitud.getResolutorAssignments().stream()
                         .filter(a -> !Boolean.TRUE.equals(a.getApproved())
+                                && !Boolean.TRUE.equals(a.getRejected())
                                 && a.getResolutor() == null
                                 && tieneTipoResolucion(resolutor, a.getTipoResolucion())
                                 && (targetAssignmentId == null || targetAssignmentId.equals(a.getId())))
@@ -1364,25 +1366,84 @@ public class SolicitudService {
         return saved;
     }
 
+    /**
+     * Permite a cualquier resolutor rechazar una asignación pendiente (tomada o en pool de su competencia)
+     * dejando registrado el motivo obligatorio y recalculando el estado global de la solicitud.
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public void rechazarAsignacion(Long solicitudId, String emailResolutor, String observaciones, Long requestedAssignmentId) {
+        String motivo = observaciones != null ? observaciones.trim() : "";
+        if (motivo.isEmpty()) {
+            throw new IllegalArgumentException("Debe ingresar el motivo del rechazo.");
+        }
+
+        Solicitud solicitud = solicitudRepository.findById(solicitudId)
+                .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
+
+        User resolutor = userRepository.findByEmail(emailResolutor)
+                .orElseThrow(() -> new RuntimeException("Resolutor no encontrado"));
+
+        final Long targetAssignmentId = requestedAssignmentId;
+        SolicitudResolutorAssignment assignment = solicitud.getResolutorAssignments().stream()
+                .filter(a -> !Boolean.TRUE.equals(a.getApproved())
+                        && !Boolean.TRUE.equals(a.getRejected())
+                        && a.getResolutor() != null
+                        && a.getResolutor().getId().equals(resolutor.getId())
+                        && (targetAssignmentId == null || targetAssignmentId.equals(a.getId())))
+                .findFirst()
+                .orElseGet(() -> solicitud.getResolutorAssignments().stream()
+                        .filter(a -> !Boolean.TRUE.equals(a.getApproved())
+                                && !Boolean.TRUE.equals(a.getRejected())
+                                && a.getResolutor() == null
+                                && tieneTipoResolucion(resolutor, a.getTipoResolucion())
+                                && (targetAssignmentId == null || targetAssignmentId.equals(a.getId())))
+                        .findFirst()
+                        .orElseThrow(() -> new RuntimeException("Asignación pendiente no encontrada para este resolutor")));
+
+        if (assignment.getResolutor() == null) {
+            assignment.setResolutor(resolutor);
+        }
+
+        assignment.setApproved(false);
+        assignment.setRejected(true);
+        assignment.setObservaciones(motivo);
+
+        // Registrar también el autor y motivo del rechazo en la observación general de la solicitud
+        String nombreResolutor = (resolutor.getName() != null && !resolutor.getName().trim().isEmpty())
+                ? resolutor.getName().trim()
+                : resolutor.getEmail();
+        String notaRechazo = "[Rechazado por " + nombreResolutor + " (" + assignment.getTipoResolucion() + "): " + motivo + "]";
+        String obsActual = solicitud.getObservation() != null ? solicitud.getObservation().trim() : "";
+        solicitud.setObservation(obsActual.isEmpty() ? notaRechazo : obsActual + "\n" + notaRechazo);
+
+        String detalleHistorial = "RESOLUCIÓN RECHAZADA (" + assignment.getTipoResolucion() + "): " + motivo;
+        logAssignmentChange(solicitud, resolutor, detalleHistorial);
+
+        updateSolicitudStatus(solicitud);
+        solicitudRepository.save(solicitud);
+    }
+
     private void updateSolicitudStatus(Solicitud solicitud) {
-        String currentStatus = solicitud.getStatus();
-        
-        // Si la solicitud no tiene responsable, vuelve a estado pendiente.
-        
+        List<SolicitudResolutorAssignment> assignments = solicitud.getResolutorAssignments();
+        if (assignments != null && !assignments.isEmpty()) {
+            long approvedCount = assignments.stream().filter(a -> Boolean.TRUE.equals(a.getApproved())).count();
+            long rejectedCount = assignments.stream().filter(a -> Boolean.TRUE.equals(a.getRejected())).count();
+            long closedCount = approvedCount + rejectedCount;
+            if (closedCount < assignments.size()) {
+                solicitud.setStatus("en resolucion");
+            } else if (rejectedCount == assignments.size()) {
+                solicitud.setStatus("rechazada");
+            } else {
+                solicitud.setStatus("completadas");
+            }
+            return;
+        }
+
+        // Si no tiene asignaciones de resolutor, depende de si tiene responsable asignado.
         if (solicitud.getResponsable() == null) {
             solicitud.setStatus("pendiente");
         } else {
-            List<SolicitudResolutorAssignment> assignments = solicitud.getResolutorAssignments();
-            if (assignments.isEmpty()) {
-                solicitud.setStatus("en proceso");
-            } else {
-                long approvedCount = assignments.stream().filter(SolicitudResolutorAssignment::getApproved).count();
-                if (approvedCount == assignments.size()) {
-                    solicitud.setStatus("completadas");
-                } else {
-                    solicitud.setStatus("en resolucion");
-                }
-            }
+            solicitud.setStatus("en proceso");
         }
     }
 }
